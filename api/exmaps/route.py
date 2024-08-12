@@ -1,17 +1,8 @@
 from aiohttp import web
+from src.db.queries.exmaps import list_maps
+import json
 
 
-async def get(request: web.Request):
-    return web.Response(status=200, text="Here's all exmaps")
-
-
-async def post(request: web.Request):
-    return web.Response(status=200, text="Posted a exmap")
-
-
-async def put(request: web.Request):
-    return web.Response(status=200, text="Put a exmap")
-
-
-async def delete(request: web.Request):
-    return web.Response(status=200, text="Deleted a exmap")
+async def get(_r: web.Request):
+    maps = await list_maps()
+    return web.json_response([m.to_dict() for m in maps])
