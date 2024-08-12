@@ -11,7 +11,7 @@ async def list_maps(conn=None, curver=True) -> list[PartialListMap]:
         WHERE $1 AND placement_curver > -1
             OR NOT $1 AND placement_allver > -1
     """, curver)
-    return [
+    return sorted([
         PartialListMap(row[0], row[1], row[2 + int(curver)])
         for row in payload
-    ]
+    ], key=lambda x: x.placement)
