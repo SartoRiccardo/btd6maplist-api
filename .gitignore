@@ -1,0 +1,10 @@
+
+config.py
+
+# Python
+venv
+__pycache__
+.idea
+
+# Misc
+.DS_Store
