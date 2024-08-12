@@ -1,5 +1,5 @@
 from aiohttp import web
-from src.db.queries.maps import list_maps
+from src.db.queries.maps import get_list_maps
 
 
 async def get(request: web.Request):
@@ -16,5 +16,5 @@ async def get(request: web.Request):
                 status=400,
             )
 
-    maps = await list_maps(curver=current_version)
+    maps = await get_list_maps(curver=current_version)
     return web.json_response([m.to_dict() for m in maps])

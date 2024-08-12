@@ -1,17 +1,9 @@
 from aiohttp import web
+from src.db.queries.maps import get_map
 
 
 async def get(request: web.Request):
-    return web.Response(status=200, text="Here's all maps/code")
-
-
-async def post(request: web.Request):
-    return web.Response(status=200, text="Posted a maps/code")
-
-
-async def put(request: web.Request):
-    return web.Response(status=200, text="Put a map/code")
-
-
-async def delete(request: web.Request):
-    return web.Response(status=200, text="Deleted a map/code")
+    map_data = await get_map(request.match_info["code"])
+    if map_data is None:
+        return web.json_response({"error": "No map with that ID found."}, status=404)
+    return web.json_response(map_data.to_dict())
