@@ -1,17 +1,20 @@
 from aiohttp import web
+from src.db.queries.maps import list_maps
 
 
 async def get(request: web.Request):
-    return web.Response(status=200, text="Here's all maps")
+    current_version = True
+    if "version" in request.query:
+        version = request.query["version"].lower()
+        if version.lower() == "all":
+            current_version = False
+        elif version != "current":
+            return web.json_response(
+                {
+                    "error": 'Allowed values for "ver": ["current", "all"]'
+                },
+                status=400,
+            )
 
-
-async def post(request: web.Request):
-    return web.Response(status=200, text="Posted a map")
-
-
-async def put(request: web.Request):
-    return web.Response(status=200, text="Put a map")
-
-
-async def delete(request: web.Request):
-    return web.Response(status=200, text="Deleted a map")
+    maps = await list_maps(curver=current_version)
+    return web.json_response([m.to_dict() for m in maps])

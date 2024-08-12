@@ -1,6 +1,5 @@
 from aiohttp import web
 from src.db.queries.exmaps import list_maps
-import json
 
 
 async def get(_r: web.Request):
