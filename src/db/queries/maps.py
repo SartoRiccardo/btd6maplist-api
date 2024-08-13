@@ -68,7 +68,7 @@ async def get_map(code, conn=None) -> Map | None:
     return Map(
         pl_map[0],
         pl_map[1],
-        pl_creat,
+        [(row[0], row[1]) for row in pl_creat],
         pl_codes,
         [(uid, ver/10 if ver else None) for uid, ver in pl_verif],
         pl_map[7],

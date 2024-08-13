@@ -29,15 +29,15 @@ class Map:
             "r6_start": self.r6_start,
             "map_data": self.map_data,
             "creators": [
-                {"id": creat, "role": role}
+                {"id": str(creat), "role": role}
                 for creat, role in self.creators
             ],
             "additional_codes": [
-                {"code": code, "description": descr}
+                {"code": str(code), "description": descr}
                 for code, descr in self.additional_codes
             ],
             "verifications": [
-                {"verifier": verif, "version": version}
+                {"verifier": str(verif), "version": version}
                 for verif, version in self.verifications
             ],
             "verified": self.verified,
