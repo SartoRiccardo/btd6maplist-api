@@ -9,6 +9,7 @@ class Map:
     creators: list[tuple[int, str | None]]
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None]]
+    verified: bool
     placement_cur: int | None
     placement_all: int | None
     difficulty: int | None
@@ -39,6 +40,7 @@ class Map:
                 {"verifier": verif, "version": version}
                 for verif, version in self.verifications
             ],
+            "verified": self.verified,
             "map_data_compatibility": [
                 {"status": status, "version": version}
                 for status, version in self.map_data_compatibility

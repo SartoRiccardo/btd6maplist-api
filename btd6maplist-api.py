@@ -9,7 +9,7 @@ from config import APP_HOST, APP_PORT
 from aiohttp import web
 import src.http
 import src.db.connection
-from src.utils.colors import purple
+from src.utils.colors import purple, cyan
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -54,6 +54,7 @@ def get_routes(cur_path: None | list = None) -> list:
             spec.loader.exec_module(route)
 
             api_route = "/" + "/".join(cur_path)
+            print(f"{cyan('Adding route:')} {api_route}")
             if hasattr(route, "get"):
                 routes.append(web.get(api_route, route.get))
                 routes.append(web.get(api_route+"/", route.get))

@@ -6,14 +6,21 @@ postgres = src.db.connection.postgres
 
 @postgres
 async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
-    payload = await conn.fetch("""
-        SELECT name, code, placement_allver, placement_curver
+    q_is_verified = """
+        SELECT (COUNT(*) > 0)
+        FROM verifications
+        WHERE map=code
+            AND version=(SELECT value FROM config WHERE name='current_btd6_ver')::int
+    """.strip()
+    payload = await conn.fetch(f"""
+        SELECT name, code, ({q_is_verified}) AS is_verified, placement_allver,
+            placement_curver
         FROM maps
         WHERE $1 AND placement_curver > -1
             OR NOT $1 AND placement_allver > -1
     """, curver)
     return sorted([
-        PartialListMap(row[0], row[1], row[2 + int(curver)])
+        PartialListMap(row[0], row[1], row[3 + int(curver)], row[2])
         for row in payload
     ], key=lambda x: x.placement)
 
@@ -33,10 +40,16 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 
 @postgres
 async def get_map(code, conn=None) -> Map | None:
-    payload = await conn.fetch("""
+    q_is_verified = """
+        SELECT COUNT(*) > 0
+        FROM verifications
+        WHERE map=$1
+            AND version=(SELECT value FROM config WHERE name='current_btd6_ver')::int
+    """.strip()
+    payload = await conn.fetch(f"""
         SELECT
             code, name, placement_curver, placement_allver, difficulty,
-            r6_start, map_data
+            r6_start, map_data, ({q_is_verified}) AS is_verified
         FROM maps
         WHERE code = $1
     """, code)
@@ -58,6 +71,7 @@ async def get_map(code, conn=None) -> Map | None:
         pl_creat,
         pl_codes,
         [(uid, ver/10 if ver else None) for uid, ver in pl_verif],
+        pl_map[7],
         pl_map[2],
         pl_map[3],
         pl_map[4],
