@@ -13,5 +13,5 @@ class LCC:
             "id": self.id,
             "leftover": self.leftover,
             "proof": self.proof,
-            "players": self.players,
+            "players": [str(p) for p in self.players],
         }
