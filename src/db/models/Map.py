@@ -19,6 +19,10 @@ class Map:
     map_data_compatibility: list[tuple[int, int]]
 
     def to_dict(self) -> dict:
+        compatibility = [*self.map_data_compatibility]
+        if len(compatibility) and compatibility[0][1] > 39:
+            compatibility.insert(0, (3, 39))
+
         return {
             "code": self.code,
             "name": self.name,
@@ -43,6 +47,6 @@ class Map:
             "verified": self.verified,
             "map_data_compatibility": [
                 {"status": status, "version": version}
-                for status, version in self.map_data_compatibility
+                for status, version in compatibility
             ],
         }
