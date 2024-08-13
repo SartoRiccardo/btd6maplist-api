@@ -9,7 +9,7 @@ from config import APP_HOST, APP_PORT
 from aiohttp import web
 import src.http
 import src.db.connection
-from src.utils.colors import purple, cyan
+from src.utils.colors import purple, green, yellow, blue, red
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -54,17 +54,20 @@ def get_routes(cur_path: None | list = None) -> list:
             spec.loader.exec_module(route)
 
             api_route = "/" + "/".join(cur_path)
-            print(f"{cyan('Adding route:')} {api_route}")
             if hasattr(route, "get"):
+                print(f"+{green('GET')} {api_route}")
                 routes.append(web.get(api_route, route.get))
                 routes.append(web.get(api_route+"/", route.get))
             if hasattr(route, "post"):
+                print(f"+{yellow('POST')} {api_route}")
                 routes.append(web.post(api_route, route.post))
                 routes.append(web.post(api_route+"/", route.post))
             if hasattr(route, "put"):
+                print(f"+{blue('PUT')} {api_route}")
                 routes.append(web.put(api_route, route.put))
                 routes.append(web.put(api_route+"/", route.put))
             if hasattr(route, "delete"):
+                print(f"+{red('DELETE')} {api_route}")
                 routes.append(web.delete(api_route, route.delete))
                 routes.append(web.delete(api_route+"/", route.delete))
 
