@@ -4,6 +4,9 @@ from src.db.models import PartialListMap, PartialExpertMap, Map, LCC
 postgres = src.db.connection.postgres
 
 
+q_btd6_current_ver = "(SELECT value FROM config WHERE name='current_btd6_ver')::int"
+
+
 @postgres
 async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
     q_is_verified = """
@@ -40,11 +43,11 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 
 @postgres
 async def get_map(code, conn=None) -> Map | None:
-    q_is_verified = """
+    q_is_verified = f"""
         SELECT COUNT(*) > 0
         FROM verifications
         WHERE map=$1
-            AND version=(SELECT value FROM config WHERE name='current_btd6_ver')::int
+            AND version={q_btd6_current_ver}
     """.strip()
     payload = await conn.fetch(f"""
         SELECT
@@ -59,10 +62,15 @@ async def get_map(code, conn=None) -> Map | None:
 
     lcc, pl_codes, pl_creat, pl_verif, pl_compat = await asyncio.gather(
         get_lcc_for(code),
-        conn.fetch("SELECT code, description from additional_codes WHERE belongs_to=$1", code),
-        conn.fetch("SELECT user_id, role from creators WHERE map=$1", code),
-        conn.fetch("SELECT user_id, version from verifications WHERE map=$1", code),
-        conn.fetch("SELECT status, version from mapver_compatibilities WHERE map=$1", code),
+        conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
+        conn.fetch("SELECT user_id, role FROM creators WHERE map=$1", code),
+        conn.fetch(f"""
+            SELECT user_id, version
+            FROM verifications WHERE map=$1
+                AND (version={q_btd6_current_ver}
+                OR version IS NULL)
+        """, code),
+        conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", code),
     )
 
     return Map(
