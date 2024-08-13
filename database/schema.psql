@@ -1,0 +1,95 @@
+CREATE TABLE config (
+  name VARCHAR(255) NOT NULL,
+  value TEXT,
+  type VARCHAR(255),
+  PRIMARY KEY(name)
+);
+INSERT INTO config VALUES
+('points_top_map', '100', 'int'), ('points_bottom_map', '5', 'int'), ('formula_slope', '0.88', 'float'),
+('points_extra_lcc', '20', 'int'), ('points_multi_gerry', '3', 'int'), ('points_multi_bb', '2', 'int'),
+('decimal_digits', '0', 'int'), ('map_count', '50', 'int'), ('current_btd6_ver', '441', 'int');
+
+CREATE TABLE users (
+  discord_id BIGINT NOT NULL,  -- IDs below 1000 are manual, non-Discord IDs.
+  name VARCHAR(255) NOT NULL,
+  nk_oak VARCHAR(255),
+  PRIMARY KEY(discord_id)
+);
+
+CREATE TABLE maps (
+  code VARCHAR(10) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  placement_curver INT DEFAULT -1,
+  placement_allver INT DEFAULT -1,
+  difficulty INT DEFAULT -1,
+  r6_start TEXT,
+  map_data TEXT,
+  PRIMARY KEY(code)
+);
+
+CREATE TABLE leastcostchimps (
+  id SERIAL PRIMARY KEY,
+  leftover INT NOT NULL,
+  proof TEXT NOT NULL,
+  map VARCHAR(10) NOT NULL
+);
+ALTER TABLE leastcostchimps ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+
+CREATE TABLE additional_codes (
+  code VARCHAR(10) NOT NULL,
+  description TEXT NOT NULL,
+  belongs_to VARCHAR(10) NOT NULL,
+  PRIMARY KEY(code)
+);
+ALTER TABLE additional_codes ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (belongs_to) REFERENCES maps(code) ON DELETE CASCADE;
+
+CREATE TABLE creators (
+  map VARCHAR(10) NOT NULL,
+  user_id BIGINT NOT NULL,
+  role TEXT
+);
+ALTER TABLE creators ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE creators ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+
+CREATE TABLE verifications (
+  map VARCHAR(10) NOT NULL,
+  user_id BIGINT NOT NULL,
+  version INT
+);
+ALTER TABLE verifications ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE verifications ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+
+CREATE TABLE list_completions (
+  map VARCHAR(10) NOT NULL,
+  user_id BIGINT NOT NULL,
+  black_border BOOLEAN,
+  no_geraldo BOOLEAN,
+  current_lcc BOOLEAN
+);
+ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE list_completions ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+
+CREATE TABLE lcc_players (
+  lcc_run INT NOT NULL,
+  user_id BIGINT NOT NULL
+);
+ALTER TABLE lcc_players ADD CONSTRAINT fk_lccs_1
+  FOREIGN KEY (lcc_run) REFERENCES leastcostchimps(id) ON DELETE CASCADE;
+ALTER TABLE lcc_players ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+
+CREATE TABLE mapver_compatibilities (
+  map VARCHAR(10) NOT NULL,
+  version INT NOT NULL,
+  status INT NOT NULL
+);
+ALTER TABLE mapver_compatibilities ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
