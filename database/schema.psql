@@ -116,6 +116,7 @@ SELECT
     ) AS points
 FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) AS indexes(n);
 
+-- Points LB
 CREATE VIEW list_curver_leaderboard AS
 SELECT p.user_id, SUM(p.points) AS score
 FROM (
@@ -160,4 +161,21 @@ FROM (
 ) p
     JOIN users u ON p.user_id = u.discord_id
 GROUP BY (p.user_id)
+ORDER BY score DESC;
+
+-- LCC lb
+CREATE VIEW list_curver_lcclb AS
+SELECT lccp.user_id, COUNT(lccp.user_id) AS score
+FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
+    JOIN maps m ON m.code = lccs.map
+WHERE m.placement_curver > -1 AND m.placement_curver <= 50
+GROUP BY lccp.user_id
+ORDER BY score DESC;
+
+CREATE VIEW list_allver_lcclb AS
+SELECT lccp.user_id, COUNT(lccp.user_id) AS score
+FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
+    JOIN maps m ON m.code = lccs.map
+WHERE m.placement_allver > -1 AND m.placement_allver <= 50
+GROUP BY lccp.user_id
 ORDER BY score DESC;
