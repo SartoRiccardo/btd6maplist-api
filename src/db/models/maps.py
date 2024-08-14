@@ -3,19 +3,65 @@ from .challenges import LCC
 
 
 @dataclass
-class Map:
+class PartialExpertMap:
+    name: str
+    code: str
+    difficulty: int
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "code": self.code,
+            "difficulty": self.difficulty,
+        }
+
+
+@dataclass
+class PartialListMap:
+    name: str
+    code: str
+    placement: int
+    verified: bool
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "code": self.code,
+            "placement": self.placement,
+            "verified": self.verified,
+        }
+
+
+
+@dataclass
+class PartialMap:
     code: str
     name: str
+    placement_cur: int | None
+    placement_all: int | None
+    difficulty: int | None
+    r6_start: str | None
+    map_data: str
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "name": self.name,
+            "placement_all": self.placement_all,
+            "placement_cur": self.placement_cur,
+            "difficulty": self.difficulty,
+            "r6_start": self.r6_start,
+            "map_data": self.map_data,
+        }
+
+
+@dataclass
+class Map(PartialMap):
     creators: list[tuple[int, str | None]]
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None]]
     verified: bool
-    placement_cur: int | None
-    placement_all: int | None
-    difficulty: int | None
     lcc: LCC
-    r6_start: str | None
-    map_data: str
     map_data_compatibility: list[tuple[int, int]]
 
     def to_dict(self) -> dict:
@@ -24,14 +70,8 @@ class Map:
             compatibility.insert(0, (3, 39))
 
         return {
-            "code": self.code,
-            "name": self.name,
-            "placement_all": self.placement_all,
-            "placement_cur": self.placement_cur,
-            "difficulty": self.difficulty,
+            **super().to_dict(),
             "lcc": self.lcc.to_dict() if self.lcc else None,
-            "r6_start": self.r6_start,
-            "map_data": self.map_data,
             "creators": [
                 {"id": str(creat), "role": role}
                 for creat, role in self.creators

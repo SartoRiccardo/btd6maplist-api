@@ -93,3 +93,71 @@ CREATE TABLE mapver_compatibilities (
 );
 ALTER TABLE mapver_compatibilities ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+
+-- Refresh when config changes
+CREATE MATERIALIZED VIEW listmap_points AS
+SELECT
+    indexes.n AS placement,
+    ROUND(
+        (
+            (SELECT value FROM config WHERE name='points_bottom_map')::float *
+            POWER(
+                (
+                    (SELECT value FROM config WHERE name='points_top_map')::float /
+                    (SELECT value FROM config WHERE name='points_bottom_map')::float
+                ),
+                POWER(
+                    (1 + (1 - indexes.n) / ((SELECT value FROM config WHERE name='map_count')::float - 1)),
+                    (SELECT value FROM config WHERE name='formula_slope')::float
+                )
+            )
+        )::numeric,
+        (SELECT value FROM config WHERE name='decimal_digits')::int
+    ) AS points
+FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) AS indexes(n);
+
+CREATE VIEW list_curver_leaderboard AS
+SELECT p.user_id, SUM(p.points) AS score
+FROM (
+    SELECT
+        c.user_id,
+        (
+           lp.points
+           * CASE c.black_border WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_bb')::int WHEN FALSE THEN 1 END
+           * CASE c.no_geraldo WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_gerry')::int WHEN FALSE THEN 1 END
+           + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
+        ) AS points
+    FROM listmap_points lp JOIN (
+        SELECT m.placement_curver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc
+        FROM list_completions lc JOIN maps m
+            ON lc.map = m.code
+        WHERE m.placement_curver > -1 AND m.placement_curver <= (SELECT value FROM config WHERE name='map_count')::int
+    ) c
+        ON lp.placement = c.placement
+) p
+    JOIN users u ON p.user_id = u.discord_id
+GROUP BY (p.user_id)
+ORDER BY score DESC;
+
+CREATE VIEW list_allver_leaderboard AS
+SELECT p.user_id, SUM(p.points) AS score
+FROM (
+    SELECT
+        c.user_id,
+        (
+           lp.points
+           * CASE c.black_border WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_bb')::int WHEN FALSE THEN 1 END
+           * CASE c.no_geraldo WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_gerry')::int WHEN FALSE THEN 1 END
+           + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
+        ) AS points
+    FROM listmap_points lp JOIN (
+        SELECT m.placement_allver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc
+        FROM list_completions lc JOIN maps m
+            ON lc.map = m.code
+        WHERE m.placement_allver > -1 AND m.placement_allver <= (SELECT value FROM config WHERE name='map_count')::int
+    ) c
+        ON lp.placement = c.placement
+) p
+    JOIN users u ON p.user_id = u.discord_id
+GROUP BY (p.user_id)
+ORDER BY score DESC;
