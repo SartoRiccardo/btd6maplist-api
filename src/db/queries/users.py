@@ -40,7 +40,7 @@ async def get_maplist_placement(id, curver=True, conn=None) -> tuple[int | None,
         """,
         int(id)
     )
-    if not len(payload[0]):
+    if not len(payload) or not len(payload[0]):
         return None, 0.0
     return payload[0][1], float(payload[0][0])
 
