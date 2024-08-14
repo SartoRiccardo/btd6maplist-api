@@ -1,6 +1,7 @@
 import asyncio
 import src.db.connection
 from src.db.models import User, PartialUser, MaplistProfile, PartialMap
+from src.db.queries.leaderboard import q_lb_format
 postgres = src.db.connection.postgres
 
 
@@ -21,40 +22,21 @@ async def get_user_min(id, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_maplist_placement(id, curver=True, conn=None) -> tuple[int | None, float]:
-    lb_view = "list_curver_leaderboard" if curver else "list_allver_leaderboard"
+async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tuple[int | None, float]:
+    verstr = "cur" if curver else "all"
+    lbname = "leaderboard" if type == "points" else "lcclb"
+    lb_view = f"list_{verstr}ver_{lbname}"
+
     payload = await conn.fetch(
         f"""
-        SELECT
-            lb1.score,
-            (
-                SELECT COUNT(*)+1
-                FROM (
-                    SELECT DISTINCT lb2.score
-                    FROM {lb_view} lb2
-                    WHERE lb2.score > lb1.score
-                ) lb3
-            ) AS placement
-        FROM {lb_view} lb1
+        {q_lb_format.format(lb_view)}
         WHERE lb1.user_id=$1
         """,
         int(id)
     )
     if not len(payload) or not len(payload[0]):
         return None, 0.0
-    return payload[0][1], float(payload[0][0])
-
-
-@postgres
-async def get_lccs_count_for(id, conn=None) -> int:
-    return (await conn.fetch(
-        """
-        SELECT COUNT(*)
-        FROM lcc_players
-        WHERE user_id=$1
-        """,
-        int(id)
-    ))[0][0]
+    return int(payload[0][2]), float(payload[0][1])
 
 
 @postgres
@@ -74,11 +56,12 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
 
 
 async def get_user(id) -> User | None:
-    puser, cur_pos, all_pos, lcc_count, maps = await asyncio.gather(
+    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = await asyncio.gather(
         get_user_min(id),
         get_maplist_placement(id),
-        get_maplist_placement(id, False),
-        get_lccs_count_for(id),
+        get_maplist_placement(id, curver=False),
+        get_maplist_placement(id, type="lcc"),
+        get_maplist_placement(id, curver=False, type="lcc"),
         get_maps_created_by(id),
     )
 
@@ -87,11 +70,16 @@ async def get_user(id) -> User | None:
         puser.name,
         puser.oak,
         MaplistProfile(
-            lcc_count,
-            cur_pos[1],
-            cur_pos[0],
-            all_pos[1],
-            all_pos[0],
+            curpt_pos[1],
+            curpt_pos[0],
+            curlcc_pos[1],
+            curlcc_pos[0],
+        ),
+        MaplistProfile(
+            allpt_pos[1],
+            allpt_pos[0],
+            alllcc_pos[1],
+            alllcc_pos[0],
         ),
         maps
     )
