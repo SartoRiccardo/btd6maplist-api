@@ -1,6 +1,12 @@
 import asyncio
 import src.db.connection
-from src.db.models import PartialListMap, PartialExpertMap, Map, LCC
+from src.db.models import (
+    PartialListMap,
+    PartialExpertMap,
+    Map,
+    LCC,
+    ListCompletion
+)
 postgres = src.db.connection.postgres
 
 
@@ -109,3 +115,18 @@ async def get_lcc_for(code, conn=None) -> LCC | None:
         the_run[2],
         [row[0] for row in payload_users]
     )
+
+
+@postgres
+async def get_completions_for(code, conn=None) -> list[ListCompletion]:
+    payload = await conn.fetch("""
+        SELECT user_id, black_border, no_geraldo, current_lcc
+        FROM list_completions
+        WHERE map=$1
+        ORDER BY current_lcc DESC,
+            no_geraldo DESC,
+            black_border DESC,
+            user_id ASC
+    """, code)
+
+    return [ListCompletion(code, *row) for row in payload]
