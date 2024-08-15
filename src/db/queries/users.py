@@ -1,6 +1,6 @@
 import asyncio
 import src.db.connection
-from src.db.models import User, PartialUser, MaplistProfile, PartialMap
+from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion
 from src.db.queries.leaderboard import q_lb_format
 postgres = src.db.connection.postgres
 
@@ -19,6 +19,31 @@ async def get_user_min(id, conn=None) -> PartialUser | None:
     return PartialUser(
         int(id), pl_user[0], pl_user[1]
     )
+
+
+@postgres
+async def get_completions_by(id, conn=None) -> list[ListCompletion]:
+    payload = await conn.fetch(
+        """
+        SELECT
+            lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
+            m.name, m.placement_curver, m.placement_allver, m.difficulty,
+            m.r6_start, m.map_data
+        FROM list_completions lc JOIN maps m ON lc.map=m.code
+        WHERE lc.user_id=$1
+        """,
+        int(id),
+    )
+    return [
+        ListCompletion(
+            PartialMap(
+                row[0], *row[4:10]
+            ),
+            int(id),
+            *row[1:4],
+        )
+        for row in payload
+    ]
 
 
 @postgres
@@ -56,14 +81,17 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
 
 
 async def get_user(id) -> User | None:
-    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = await asyncio.gather(
+    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps, completions = await asyncio.gather(
         get_user_min(id),
         get_maplist_placement(id),
         get_maplist_placement(id, curver=False),
         get_maplist_placement(id, type="lcc"),
         get_maplist_placement(id, curver=False, type="lcc"),
         get_maps_created_by(id),
+        get_completions_by(id)
     )
+    if not puser:
+        return None
 
     return User(
         puser.id,
@@ -81,5 +109,19 @@ async def get_user(id) -> User | None:
             alllcc_pos[1],
             alllcc_pos[0],
         ),
-        maps
+        completions,
+        maps,
     )
+
+
+@postgres
+async def create_user(id, name, if_not_exists=True, conn=None) -> bool:
+    rows = await conn.execute(
+        f"""
+        INSERT INTO users(discord_id, name)
+        VALUES ($1, $2)
+        {"ON CONFLICT DO NOTHING" if if_not_exists else ""}
+        """,
+        int(id), name,
+    )
+    return int(rows.split(" ")[2]) == 1

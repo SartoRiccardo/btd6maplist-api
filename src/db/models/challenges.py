@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from .maps import PartialMap
 
 
 @dataclass
@@ -19,7 +20,7 @@ class LCC:
 
 @dataclass
 class ListCompletion:
-    map: str
+    map: str | PartialMap
     user_id: int
     black_border: bool
     no_geraldo: bool
@@ -27,7 +28,7 @@ class ListCompletion:
 
     def to_dict(self) -> dict:
         return {
-            "map": self.map,
+            "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
             "user_id": str(self.user_id),
             "black_border": self.black_border,
             "no_geraldo": self.no_geraldo,

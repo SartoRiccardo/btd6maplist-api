@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from .challenges import LCC
 
 
 @dataclass
@@ -61,7 +60,7 @@ class Map(PartialMap):
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None]]
     verified: bool
-    lcc: LCC
+    lcc: "src.db.models.challenges.LCC"
     map_data_compatibility: list[tuple[int, int]]
 
     def to_dict(self) -> dict:

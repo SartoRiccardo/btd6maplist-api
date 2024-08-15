@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from .maps import PartialMap
+from .challenges import ListCompletion
 
 
 @dataclass
@@ -35,7 +35,8 @@ class MaplistProfile:
 class User(PartialUser):
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
-    created_maps: list[PartialMap]
+    completions: list[ListCompletion]
+    created_maps: list["src.db.models.maps.PartialMap"]
 
     def to_dict(self) -> dict:
         return {
@@ -44,5 +45,6 @@ class User(PartialUser):
                 "current": self.maplist_cur.to_dict(),
                 "all": self.maplist_all.to_dict(),
             },
+            "completions": [c.to_dict() for c in self.completions],
             "created_maps": [m.to_dict() for m in self.created_maps],
         }
