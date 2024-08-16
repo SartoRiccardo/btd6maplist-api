@@ -41,4 +41,4 @@ COPY . .
 #EXPOSE 4000
 
 # Run the application.
-CMD nohup python3 -u btd6maplist-api.py
+CMD python btd6maplist-api.py
