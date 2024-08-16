@@ -1,4 +1,5 @@
 import os
+import ssl
 import sys
 import asyncio
 import aiohttp
@@ -82,5 +83,10 @@ if __name__ == '__main__':
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
 
+    ssl_context = None
+    if os.path.exists("api.btd6maplist.crt") and os.path.exists("api.btd6maplist.key"):
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain("api.btd6maplist.crt", "api.btd6maplist.key")
+
     print(f"{purple('[START]')} Listening on port {APP_PORT}...")
-    web.run_app(app, host=APP_HOST, port=APP_PORT)
+    web.run_app(app, host=APP_HOST, port=APP_PORT, ssl_context=ssl_context)
