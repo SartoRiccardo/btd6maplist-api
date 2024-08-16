@@ -1,5 +1,7 @@
-
+api.btd6maplist.key*
+api.btd6maplist.crt*
 config.py
+compose.yaml
 
 # Python
 venv
