@@ -120,7 +120,7 @@ async def get_lcc_for(code, conn=None) -> LCC | None:
 @postgres
 async def get_completions_for(code, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch("""
-        SELECT user_id, black_border, no_geraldo, current_lcc
+        SELECT user_id, black_border, no_geraldo, current_lcc, beat_on_curver
         FROM list_completions
         WHERE map=$1
         ORDER BY current_lcc DESC,

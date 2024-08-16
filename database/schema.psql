@@ -70,7 +70,8 @@ CREATE TABLE list_completions (
   user_id BIGINT NOT NULL,
   black_border BOOLEAN,
   no_geraldo BOOLEAN,
-  current_lcc BOOLEAN
+  current_lcc BOOLEAN,
+  beat_on_curver BOOLEAN
 );
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
