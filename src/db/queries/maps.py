@@ -8,6 +8,7 @@ from src.db.models import (
     ListCompletion
 )
 from src.db.queries.subqueries import get_int_config
+from src.utils.misc import list_eq
 postgres = src.db.connection.postgres
 
 
@@ -118,15 +119,45 @@ async def get_lcc_for(code, conn=None) -> LCC | None:
 
 
 @postgres
-async def get_completions_for(code, conn=None) -> list[ListCompletion]:
-    payload = await conn.fetch("""
-        SELECT user_id, black_border, no_geraldo, current_lcc, format
+async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
+    q_unique_runs = """
+        SELECT DISTINCT user_id, black_border, no_geraldo, current_lcc
         FROM list_completions
         WHERE map=$1
         ORDER BY current_lcc DESC,
             no_geraldo DESC,
             black_border DESC,
             user_id ASC
-    """, code)
+        LIMIT $3
+        OFFSET $2
+    """
 
-    return [ListCompletion(code, *row) for row in payload]
+    payload = await conn.fetch(
+        f"""
+        SELECT runs.*, lc.format
+        FROM ({q_unique_runs}) runs JOIN list_completions lc ON runs.user_id = lc.user_id AND
+            runs.black_border = lc.black_border AND
+            runs.no_geraldo = lc.no_geraldo AND
+            runs.current_lcc = lc.current_lcc
+        WHERE map=$1
+        ORDER BY runs.current_lcc DESC,
+            runs.no_geraldo DESC,
+            runs.black_border DESC,
+            runs.user_id ASC
+        """,
+        code, idx_start, amount,
+    )
+    if not len(payload):
+        return []
+
+    completions = []
+    run = payload[0][:4]
+    formats = []
+    for i, row in enumerate(payload):
+        if list_eq(row[:4], run):
+            formats.append(row[4])
+        if not list_eq(row[:4], run) or i == len(payload)-1:
+            completions.append(ListCompletion(code, *run, formats))
+            run = row[:4]
+            formats = [row[4]]
+    return completions

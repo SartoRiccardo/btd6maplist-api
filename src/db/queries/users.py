@@ -2,6 +2,7 @@ import asyncio
 import src.db.connection
 from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion
 from src.db.queries.leaderboard import q_lb_format
+from src.utils.misc import list_eq
 postgres = src.db.connection.postgres
 
 
@@ -22,18 +23,63 @@ async def get_user_min(id, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_completions_by(id, conn=None) -> list[ListCompletion]:
+async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
+    q_unique_runs = """
+        SELECT DISTINCT map, black_border, no_geraldo, current_lcc
+        FROM list_completions
+        WHERE user_id=$1
+        ORDER BY current_lcc DESC,
+            no_geraldo DESC,
+            black_border DESC
+        LIMIT $3
+        OFFSET $2
+    """
+
     payload = await conn.fetch(
-        """
+        f"""
         SELECT
             lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
             m.name, m.placement_curver, m.placement_allver, m.difficulty,
             m.r6_start, m.map_data, lc.format
-        FROM list_completions lc JOIN maps m ON lc.map=m.code
+        FROM ({q_unique_runs}) runs JOIN list_completions lc ON runs.map = lc.map AND
+                runs.black_border = lc.black_border AND
+                runs.no_geraldo = lc.no_geraldo AND
+                runs.current_lcc = lc.current_lcc
+            JOIN maps m ON lc.map=m.code
         WHERE lc.user_id=$1
+        ORDER BY runs.current_lcc DESC,
+            runs.no_geraldo DESC,
+            runs.black_border DESC,
+            runs.map ASC
         """,
-        int(id),
+        int(id), idx_start, amount,
     )
+    if not len(payload):
+        return []
+
+    completions = []
+    run = payload[0][:4]
+    curmap = payload[0][4:10]
+    formats = []
+    for i, row in enumerate(payload):
+        if list_eq(row[:4], run):
+            formats.append(row[10])
+        if not list_eq(row[:4], run) or i == len(payload)-1:
+            completions.append(
+                ListCompletion(
+                    PartialMap(
+                        run[0], *curmap
+                    ),
+                    int(id),
+                    *run[1:4],
+                    formats,
+                )
+            )
+            run = row[:4]
+            curmap = row[4:10]
+            formats = [row[10]]
+    return completions
+
     return [
         ListCompletion(
             PartialMap(
@@ -41,7 +87,6 @@ async def get_completions_by(id, conn=None) -> list[ListCompletion]:
             ),
             int(id),
             *row[1:4],
-            row[10],
         )
         for row in payload
     ]
