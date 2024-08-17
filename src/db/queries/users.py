@@ -28,7 +28,7 @@ async def get_completions_by(id, conn=None) -> list[ListCompletion]:
         SELECT
             lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
             m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, lc.beat_on_curver
+            m.r6_start, m.map_data, lc.format
         FROM list_completions lc JOIN maps m ON lc.map=m.code
         WHERE lc.user_id=$1
         """,

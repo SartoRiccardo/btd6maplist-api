@@ -25,7 +25,7 @@ class ListCompletion:
     black_border: bool
     no_geraldo: bool
     current_lcc: bool
-    beat_on_curver: bool
+    format: int
 
     def to_dict(self) -> dict:
         return {
@@ -34,5 +34,5 @@ class ListCompletion:
             "black_border": self.black_border,
             "no_geraldo": self.no_geraldo,
             "current_lcc": self.current_lcc,
-            "beat_on_curver": self.beat_on_curver,
+            "format": self.format,
         }

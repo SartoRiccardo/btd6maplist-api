@@ -31,7 +31,13 @@ CREATE TABLE leastcostchimps (
   id SERIAL PRIMARY KEY,
   leftover INT NOT NULL,
   proof TEXT NOT NULL,
-  map VARCHAR(10) NOT NULL
+  map VARCHAR(10) NOT NULL,
+  /* FORMATS:
+   * - 0: All formats
+   * - 1: Maplist - current version 
+   * - 2: Maplist - all versions 
+   */
+  format INT DEFAULT 0
 );
 ALTER TABLE leastcostchimps ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
@@ -71,7 +77,7 @@ CREATE TABLE list_completions (
   black_border BOOLEAN,
   no_geraldo BOOLEAN,
   current_lcc BOOLEAN,
-  beat_on_curver BOOLEAN
+  format INT DEFAULT 0
 );
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
@@ -121,6 +127,7 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 CREATE VIEW list_curver_leaderboard AS
 SELECT p.user_id, SUM(p.points) AS score
 FROM (
+    -- Select every user's run and how many points it nets them
     SELECT
         c.user_id,
         (
@@ -130,12 +137,14 @@ FROM (
            + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
         ) AS points
     FROM listmap_points lp JOIN (
-        SELECT m.placement_curver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc
+        -- Select completions for every map
+        SELECT m.placement_curver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc, lc.format
         FROM list_completions lc JOIN maps m
             ON lc.map = m.code
         WHERE m.placement_curver > -1 AND m.placement_curver <= (SELECT value FROM config WHERE name='map_count')::int
     ) c
         ON lp.placement = c.placement
+    WHERE c.format=1 OR c.format=0
 ) p
     JOIN users u ON p.user_id = u.discord_id
 GROUP BY (p.user_id)
@@ -153,12 +162,13 @@ FROM (
            + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
         ) AS points
     FROM listmap_points lp JOIN (
-        SELECT m.placement_allver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc
+        SELECT m.placement_allver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc, lc.format
         FROM list_completions lc JOIN maps m
             ON lc.map = m.code
         WHERE m.placement_allver > -1 AND m.placement_allver <= (SELECT value FROM config WHERE name='map_count')::int
     ) c
         ON lp.placement = c.placement
+    WHERE c.format=2 OR c.format=0
 ) p
     JOIN users u ON p.user_id = u.discord_id
 GROUP BY (p.user_id)
@@ -169,7 +179,8 @@ CREATE VIEW list_curver_lcclb AS
 SELECT lccp.user_id, COUNT(lccp.user_id) AS score
 FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
     JOIN maps m ON m.code = lccs.map
-WHERE m.placement_curver > -1 AND m.placement_curver <= 50
+WHERE m.placement_curver > -1 AND m.placement_curver <= (SELECT value FROM config WHERE name='map_count')::int
+    AND lccs.format=1 OR lccs.format=0
 GROUP BY lccp.user_id
 ORDER BY score DESC;
 
@@ -177,6 +188,7 @@ CREATE VIEW list_allver_lcclb AS
 SELECT lccp.user_id, COUNT(lccp.user_id) AS score
 FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
     JOIN maps m ON m.code = lccs.map
-WHERE m.placement_allver > -1 AND m.placement_allver <= 50
+WHERE m.placement_allver > -1 AND m.placement_allver <= (SELECT value FROM config WHERE name='map_count')::int
+    AND lccs.format=2 OR lccs.format=0
 GROUP BY lccp.user_id
 ORDER BY score DESC;
