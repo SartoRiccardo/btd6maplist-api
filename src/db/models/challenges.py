@@ -7,6 +7,7 @@ class LCC:
     id: int
     leftover: int
     proof: str
+    format: int
     players: list[int]
 
     def to_dict(self) -> dict:
@@ -14,6 +15,7 @@ class LCC:
             "id": self.id,
             "leftover": self.leftover,
             "proof": self.proof,
+            "format": self.format,
             "players": [str(p) for p in self.players],
         }
 

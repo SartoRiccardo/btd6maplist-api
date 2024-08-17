@@ -67,8 +67,8 @@ async def get_map(code, conn=None) -> Map | None:
         return None
     pl_map = payload[0]
 
-    lcc, pl_codes, pl_creat, pl_verif, pl_compat = await asyncio.gather(
-        get_lcc_for(code),
+    lccs, pl_codes, pl_creat, pl_verif, pl_compat = await asyncio.gather(
+        get_lccs_for(code),
         conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
         conn.fetch("SELECT user_id, role FROM creators WHERE map=$1", code),
         conn.fetch(f"""
@@ -92,30 +92,47 @@ async def get_map(code, conn=None) -> Map | None:
         pl_codes,
         [(uid, ver/10 if ver else None) for uid, ver in pl_verif],
         pl_map[7],
-        lcc,
+        lccs,
         pl_compat
     )
 
 
 @postgres
-async def get_lcc_for(code, conn=None) -> LCC | None:
-    payload_runs = await conn.fetch("""
-        SELECT id, leftover, proof
-        FROM leastcostchimps
-        WHERE map=$1
-        ORDER BY leftover ASC
-        LIMIT 1
-    """, code)
-    if len(payload_runs) == 0:
-        return None
-    the_run = payload_runs[0]
-    payload_users = await conn.fetch("SELECT user_id FROM lcc_players WHERE lcc_run=$1", the_run[0])
-    return LCC(
-        the_run[0],
-        the_run[1],
-        the_run[2],
-        [row[0] for row in payload_users]
+async def get_lccs_for(code, conn=None) -> list[LCC]:
+    q_get_lccs = """
+        SELECT lcc.id, lcc.leftover, lcc.proof, lcc.format
+        FROM leastcostchimps lcc JOIN (
+                SELECT lcc1.format, MIN(lcc1.leftover) AS leftover
+                FROM leastcostchimps lcc1
+                WHERE lcc1.map=$1
+                GROUP BY(lcc1.format)
+            ) mins ON mins.leftover=lcc.leftover
+                AND mins.format=lcc.format
+        WHERE lcc.map=$1
+    """
+
+    payload = await conn.fetch(
+        f"""
+        SELECT runs.*, rp.user_id
+        FROM lcc_players rp JOIN ({q_get_lccs}) runs ON rp.lcc_run=runs.id
+        """,
+        code,
     )
+    if not len(payload):
+        return []
+
+    lccs = []
+    run = payload[0][:4]
+    players = []
+    for i, row in enumerate(payload):
+        if run[0] == row[0]:
+            players.append(row[4])
+        else:
+            lccs.append(LCC(*run, players))
+            run = row[:4]
+            players = [row[4]]
+    lccs.append(LCC(*run, players))
+    return lccs
 
 
 @postgres
@@ -156,8 +173,9 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> list[L
     for i, row in enumerate(payload):
         if list_eq(row[:4], run):
             formats.append(row[4])
-        if not list_eq(row[:4], run) or i == len(payload)-1:
+        else:
             completions.append(ListCompletion(code, *run, formats))
             run = row[:4]
             formats = [row[4]]
+    completions.append(ListCompletion(code, *run, formats))
     return completions

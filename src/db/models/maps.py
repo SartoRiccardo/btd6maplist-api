@@ -60,7 +60,7 @@ class Map(PartialMap):
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None]]
     verified: bool
-    lcc: "src.db.models.challenges.LCC"
+    lccs: list["src.db.models.challenges.LCC"]
     map_data_compatibility: list[tuple[int, int]]
 
     def to_dict(self) -> dict:
@@ -70,7 +70,7 @@ class Map(PartialMap):
 
         return {
             **super().to_dict(),
-            "lcc": self.lcc.to_dict() if self.lcc else None,
+            "lccs": [lcc.to_dict() for lcc in self.lccs],
             "creators": [
                 {"id": str(creat), "role": role}
                 for creat, role in self.creators

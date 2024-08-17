@@ -64,7 +64,7 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
     for i, row in enumerate(payload):
         if list_eq(row[:4], run):
             formats.append(row[10])
-        if not list_eq(row[:4], run) or i == len(payload)-1:
+        else:
             completions.append(
                 ListCompletion(
                     PartialMap(
@@ -78,18 +78,18 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
             run = row[:4]
             curmap = row[4:10]
             formats = [row[10]]
-    return completions
 
-    return [
+    completions.append(
         ListCompletion(
             PartialMap(
-                row[0], *row[4:10]
+                run[0], *curmap
             ),
             int(id),
-            *row[1:4],
+            *run[1:4],
+            formats,
         )
-        for row in payload
-    ]
+    )
+    return completions
 
 
 @postgres
