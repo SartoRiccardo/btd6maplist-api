@@ -34,11 +34,16 @@ async def start_db_connection(_app):
     await src.db.connection.start()
 
 
-def cors_handler(cors_options, methods):
+def get_cors_regex(cors_options):
     cors_regex = {}
     for origin in cors_options:
         origin_re = "^" + origin.replace(".", "\\.").replace("*", ".*") + "$"
         cors_regex[origin] = re.compile(origin_re)
+    return cors_regex
+
+
+def cors_handler(cors_options, methods):
+    cors_regex = get_cors_regex(cors_options)
 
     async def handler(request: web.Request):
         if "Origin" not in request.headers:
@@ -65,6 +70,21 @@ def cors_handler(cors_options, methods):
     return handler
 
 
+def cors_route(handler, cors_options):
+    cors_regex = get_cors_regex(cors_options)
+
+    async def inner(request: web.Request) -> web.Response:
+        response = await handler(request)
+        if "Origin" in request.headers:
+            for allowed_origin in cors_regex:
+                if re.match(cors_regex[allowed_origin], request.headers["Origin"]):
+                    response.headers["Access-Control-Allow-Origin"] = allowed_origin
+                    break
+        return response
+
+    return inner
+
+
 def get_routes(cur_path: None | list = None) -> list:
     """Dinamically builds routes wrt the /api folder"""
     if cur_path is None:
@@ -86,26 +106,26 @@ def get_routes(cur_path: None | list = None) -> list:
             sys.modules[bmodule] = route
             spec.loader.exec_module(route)
 
+            cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
             api_route = "/" + "/".join(cur_path)
             methods = []
             if hasattr(route, "get"):
                 print(f"+{green('GET')} {api_route}")
-                routes.append(web.get(api_route, route.get))
+                routes.append(web.get(api_route, cors_route(route.get, cors_origins)))
                 methods.append("GET")
             if hasattr(route, "post"):
                 print(f"+{yellow('POST')} {api_route}")
-                routes.append(web.post(api_route, route.post))
+                routes.append(web.post(api_route, cors_route(route.post, cors_origins)))
                 methods.append("POST")
             if hasattr(route, "put"):
                 print(f"+{blue('PUT')} {api_route}")
-                routes.append(web.put(api_route, route.put))
+                routes.append(web.put(api_route, cors_route(route.put, cors_origins)))
                 methods.append("PUT")
             if hasattr(route, "delete"):
                 print(f"+{red('DELETE')} {api_route}")
-                routes.append(web.delete(api_route, route.delete))
+                routes.append(web.delete(api_route, cors_route(route.delete, cors_origins)))
                 methods.append("DELETE")
             if len(methods):
-                cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
                 routes.append(web.options(api_route, cors_handler(cors_origins, methods)))
 
             pass  # Open and append
