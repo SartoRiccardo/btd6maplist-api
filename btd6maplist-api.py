@@ -1,4 +1,5 @@
 import os
+import re
 import ssl
 import sys
 import asyncio
@@ -6,11 +7,11 @@ import aiohttp
 import importlib
 from importlib import util
 import contextlib
-from config import APP_HOST, APP_PORT
+from config import APP_HOST, APP_PORT, CORS_ORIGINS
 from aiohttp import web
 import src.http
 import src.db.connection
-from src.utils.colors import purple, green, yellow, blue, red
+from src.utils.colors import purple, green, yellow, blue, red, cyan
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -31,6 +32,37 @@ async def init_client_session(_app):
 
 async def start_db_connection(_app):
     await src.db.connection.start()
+
+
+def cors_handler(cors_options, methods):
+    cors_regex = {}
+    for origin in cors_options:
+        origin_re = "^" + origin.replace(".", "\\.").replace("*", ".*") + "$"
+        cors_regex[origin] = re.compile(origin_re)
+
+    async def handler(request: web.Request):
+        if "Origin" not in request.headers:
+            return web.Response(status=400)
+
+        allow = False
+        for allowed_origin in cors_regex:
+            if re.match(cors_regex[allowed_origin], request.headers["Origin"]):
+                allow = True
+                break
+
+        if not allow:
+            return web.Response(status=400)
+
+        return web.Response(
+            status=204,
+            headers={
+                "Access-Control-Allow-Origin": allowed_origin,
+                "Access-Control-Allow-Methods": ",".join(methods),
+                "Access-Control-Allow-Headers": "X-Requested-With",
+                # "Access-Control-Max-Age": "86400",
+            }
+        )
+    return handler
 
 
 def get_routes(cur_path: None | list = None) -> list:
@@ -55,22 +87,26 @@ def get_routes(cur_path: None | list = None) -> list:
             spec.loader.exec_module(route)
 
             api_route = "/" + "/".join(cur_path)
+            methods = []
             if hasattr(route, "get"):
                 print(f"+{green('GET')} {api_route}")
                 routes.append(web.get(api_route, route.get))
-                routes.append(web.get(api_route+"/", route.get))
+                methods.append("GET")
             if hasattr(route, "post"):
                 print(f"+{yellow('POST')} {api_route}")
                 routes.append(web.post(api_route, route.post))
-                routes.append(web.post(api_route+"/", route.post))
+                methods.append("POST")
             if hasattr(route, "put"):
                 print(f"+{blue('PUT')} {api_route}")
                 routes.append(web.put(api_route, route.put))
-                routes.append(web.put(api_route+"/", route.put))
+                methods.append("PUT")
             if hasattr(route, "delete"):
                 print(f"+{red('DELETE')} {api_route}")
                 routes.append(web.delete(api_route, route.delete))
-                routes.append(web.delete(api_route+"/", route.delete))
+                methods.append("DELETE")
+            if len(methods):
+                cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
+                routes.append(web.options(api_route, cors_handler(cors_origins, methods)))
 
             pass  # Open and append
     return routes
