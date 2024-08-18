@@ -171,3 +171,16 @@ async def create_user(id, name, if_not_exists=True, conn=None) -> bool:
         int(id), name,
     )
     return int(rows.split(" ")[2]) == 1
+
+
+@postgres
+async def edit_user(id: str, name: str, oak: str | None, conn=None) -> bool:
+    rows = await conn.execute(
+        f"""
+        UPDATE users
+        SET name=$2, nk_oak=$3
+        WHERE discord_id=$1
+        """,
+        int(id), name, oak,
+    )
+    return int(rows.split(" ")[1]) == 1
