@@ -8,10 +8,12 @@ class PartialUser:
     name: str
     oak: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self, with_oak: bool = False) -> dict:
+        oak = {} if with_oak else {"oak": self.oak}
         return {
             "id": str(self.id),
             "name": self.name,
+            **oak,
         }
 
 
@@ -38,7 +40,7 @@ class User(PartialUser):
     completions: list[ListCompletion]
     created_maps: list["src.db.models.maps.PartialMap"]
 
-    def to_dict(self) -> dict:
+    def to_dict(self, with_oak: bool = False) -> dict:
         return {
             **super().to_dict(),
             "maplist": {
