@@ -14,7 +14,7 @@ async def post(request: web.Request):
 
     token = request.query["discord_token"]
     disc_response = await src.http.http.get(
-        "https://discord.com/api/v10//users/@me",
+        "https://discord.com/api/v10/users/@me",
         headers={"Authorization": f"Bearer {token}"}
     )
     if disc_response.status != 200:
