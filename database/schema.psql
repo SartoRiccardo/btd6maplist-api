@@ -6,7 +6,7 @@ CREATE TABLE config (
 );
 INSERT INTO config VALUES
 ('points_top_map', '100', 'int'), ('points_bottom_map', '5', 'int'), ('formula_slope', '0.88', 'float'),
-('points_extra_lcc', '20', 'int'), ('points_multi_gerry', '3', 'int'), ('points_multi_bb', '2', 'int'),
+('points_extra_lcc', '20', 'int'), ('points_multi_gerry', '2', 'int'), ('points_multi_bb', '3', 'int'),
 ('decimal_digits', '0', 'int'), ('map_count', '50', 'int'), ('current_btd6_ver', '441', 'int');
 
 CREATE TABLE users (
