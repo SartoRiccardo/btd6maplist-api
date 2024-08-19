@@ -1,3 +1,5 @@
+import asyncio
+
 import src.db.connection
 from src.db.models import ConfigVar
 postgres = src.db.connection.postgres
@@ -22,3 +24,13 @@ async def get_config(conn=None) -> list[ConfigVar]:
         except ValueError:
             config.append(ConfigVar(name, value))
     return config
+
+
+@postgres
+async def update_config(config: dict[str, str], conn=None) -> None:
+    q_format = "UPDATE config SET value=$2 WHERE name=$1"
+    await asyncio.gather(*[
+        conn.execute(q_format, vname, config[vname])
+        for vname in config
+    ])
+    await conn.execute("REFRESH MATERIALIZED VIEW listmap_points")

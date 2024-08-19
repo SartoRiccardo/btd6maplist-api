@@ -13,3 +13,10 @@ def list_eq(l1, l2) -> bool:
         if l1[i] != l2[i]:
             return False
     return True
+
+
+def index_where(l: list, cond) -> int:
+    for i in range(len(l)):
+        if cond(l[i]):
+            return i
+    return -1
