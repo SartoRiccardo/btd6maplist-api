@@ -1,9 +1,11 @@
+import functools
 import os
 import re
 import ssl
 import sys
 import asyncio
 import aiohttp
+from aiohttp_swagger import setup_swagger
 import importlib
 from importlib import util
 import contextlib
@@ -73,6 +75,7 @@ def cors_handler(cors_options, methods):
 def cors_route(handler, cors_options):
     cors_regex = get_cors_regex(cors_options)
 
+    @functools.wraps(handler)
     async def inner(request: web.Request) -> web.Response:
         response = await handler(request)
         if "Origin" in request.headers:
@@ -83,6 +86,14 @@ def cors_route(handler, cors_options):
         return response
 
     return inner
+
+
+allowed_methods = {
+    "get": (web.get, green),
+    "post": (web.post, yellow),
+    "put": (web.put, blue),
+    "delete": (web.delete, red),
+}
 
 
 def get_routes(cur_path: None | list = None) -> list:
@@ -109,26 +120,16 @@ def get_routes(cur_path: None | list = None) -> list:
             cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
             api_route = "/" + "/".join(cur_path)
             methods = []
-            if hasattr(route, "get"):
-                print(f"+{green('GET')} {api_route}")
-                routes.append(web.get(api_route, cors_route(route.get, cors_origins)))
-                methods.append("GET")
-            if hasattr(route, "post"):
-                print(f"+{yellow('POST')} {api_route}")
-                routes.append(web.post(api_route, cors_route(route.post, cors_origins)))
-                methods.append("POST")
-            if hasattr(route, "put"):
-                print(f"+{blue('PUT')} {api_route}")
-                routes.append(web.put(api_route, cors_route(route.put, cors_origins)))
-                methods.append("PUT")
-            if hasattr(route, "delete"):
-                print(f"+{red('DELETE')} {api_route}")
-                routes.append(web.delete(api_route, cors_route(route.delete, cors_origins)))
-                methods.append("DELETE")
+            for method in allowed_methods:
+                if not hasattr(route, method):
+                    continue
+                routefunc, routecolor = allowed_methods[method]
+                print(f"+{routecolor(method.upper())} {api_route}")
+                routes.append(routefunc(api_route, cors_route(getattr(route, method), cors_origins)))
+                methods.append(method.upper())
             if len(methods):
                 routes.append(web.options(api_route, cors_handler(cors_origins, methods)))
 
-            pass  # Open and append
     return routes
 
 
@@ -136,6 +137,15 @@ if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     app = web.Application()
     app.add_routes(get_routes())
+    setup_swagger(
+        app,
+        swagger_url="/doc",
+        ui_version=3,
+        api_version="1.0.0",
+        title="BTD6 Maplist API",
+        description="API for the BTD6 Maplist community.",
+        contact="<a href=\"https://github.com/SartoRiccardo\">@SartoRiccardo on GitHub</a>",
+    )
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
 
