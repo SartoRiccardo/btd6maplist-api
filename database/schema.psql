@@ -27,6 +27,13 @@ CREATE TABLE maps (
   PRIMARY KEY(code)
 );
 
+CREATE TABLE map_aliases(
+  map VARCHAR(10) NOT NULL,
+  alias VARCHAR(20) NOT NULL,
+);
+ALTER TABLE leastcostchimps ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+
 CREATE TABLE leastcostchimps (
   id SERIAL PRIMARY KEY,
   leftover INT NOT NULL,
