@@ -32,7 +32,7 @@ async def put(request: web.Request):
         idx = index_where(config, lambda x: x.name == key)
         vtype = type(config[idx].value)
         try:
-            vtype(data["config"][key])
+            data["config"][key] = vtype(data["config"][key])
         except ValueError:
             errors[key] = f"Must be of type {vtype.__name__}"
 
