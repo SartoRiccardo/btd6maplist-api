@@ -6,7 +6,7 @@ import ssl
 import sys
 import asyncio
 import aiohttp
-from aiohttp_swagger import setup_swagger
+import aiohttp_swagger
 import importlib
 from importlib import util
 import contextlib
@@ -134,23 +134,36 @@ def get_routes(cur_path: None | list = None) -> list:
     return routes
 
 
-if __name__ == '__main__':
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    app = web.Application()
-    app.add_routes(get_routes())
+def swagger(app):
+    def swagger_gen_docs_without_head(app, *args, **kwargs):
+        clone_app = web.Application()
+        for route in app.router.routes():
+            if route.method == "HEAD":
+                continue
+            clone_app.router.add_route(route.method, route.resource.canonical, route.handler)
+        return aiohttp_swagger.helpers.builders.generate_doc_from_each_end_point(clone_app, *args, **kwargs)
+    aiohttp_swagger.generate_doc_from_each_end_point = swagger_gen_docs_without_head
 
     with open("src/db/models/definitions.yaml") as fin:
         definitions = yaml.safe_load(fin.read())
-    setup_swagger(
+    aiohttp_swagger.setup_swagger(
         app,
         swagger_url="/doc",
         ui_version=3,
         api_version="1.0.0",
         title="BTD6 Maplist API",
-        description="API for the BTD6 Maplist community.",
+        description="API for the BTD6 Maplist community. "
+                    "All `GET` methods also support `HEAD` with the same documentation.",
         contact="<a href=\"https://github.com/SartoRiccardo\">@SartoRiccardo on GitHub</a>",
         definitions=definitions,
     )
+
+
+if __name__ == '__main__':
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    app = web.Application()
+    app.add_routes(get_routes())
+    swagger(app)
 
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
