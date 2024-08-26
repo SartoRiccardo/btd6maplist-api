@@ -6,6 +6,25 @@ import src.http
 
 
 async def get(request: web.Request):
+    """
+    ---
+    description: Returns an user's data.
+    tags:
+    - Users
+    parameters:
+    - in: path
+      name: uid
+      required: true
+      schema:
+        type: integer
+      description: The user's Discord ID.
+    responses:
+      "200":
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+    """
     user_data = await get_user(request.match_info["uid"])
     if user_data is None:
         return web.json_response({"error": "No user with that ID found."}, status=404)
@@ -19,6 +38,61 @@ async def get(request: web.Request):
 
 
 async def put(request: web.Request):
+    """
+    ---
+    description: Modify an user's data.
+    tags:
+    - Users
+    parameters:
+    - in: path
+      name: uid
+      required: true
+      schema:
+        type: integer
+      description: The user's Discord ID.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - type: object
+              properties:
+                token:
+                  type: string
+                  description: A Discord OAuth2 access token.
+            - $ref: "#/components/schemas/Profile"
+    responses:
+      "200":
+        description: |
+          Returns the modified user.
+          `error` will be an empty object in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                data:
+                  $ref: "#/components/schemas/Profile"
+      "400":
+        description: |
+          One of the fields is badly formatted.
+          `data` will be an empty object in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                  description: Each key-value pair is the key of the wrong field and a description as to why.
+                data:
+                  type: object
+      "401":
+        description: Your token is missing, or invalid.
+    """
     data = json.loads(await request.text())
 
     if "token" not in data:

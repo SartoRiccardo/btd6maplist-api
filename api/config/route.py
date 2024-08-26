@@ -7,10 +7,80 @@ from config import MAPLIST_GUILD_ID, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
 
 async def get(_r: web.Request):
+    """
+    ---
+    description: Returns a list of config variables for the project.
+    tags:
+    - Misc
+    responses:
+      "200":
+        description: Returns an array of `ConfigVar`.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/ConfigVar"
+    """
     return web.json_response([cfg.to_dict() for cfg in await get_config()])
 
 
 async def put(request: web.Request):
+    """
+    ---
+    description: Change any number of the config variables. Must be a Maplist Moderator.
+    tags:
+    - Misc
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - type: object
+              properties:
+                token:
+                  type: string
+                  description: A Discord OAuth2 access token.
+            - type: array
+              items:
+                $ref: "#/components/schemas/ConfigVar"
+    responses:
+      "200":
+        description: |
+          Returns the modified config variables.
+          `error` will be an empty object in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                data:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ConfigVar"
+      "400":
+        description: |
+          One of the fields is badly formatted.
+          `data` will be an empty array in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                  description: Each key-value pair is the key of the wrong field and a description as to why.
+                data:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ConfigVar"
+                  example: []
+      "401":
+        description: Your token is missing, invalid or you don't have the privileges for this.
+    """
     data = json.loads(await request.text())
 
     if "token" not in data:

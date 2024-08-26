@@ -4,6 +4,36 @@ import src.http
 
 
 async def post(request: web.Request):
+    """
+    ---
+    description: |
+      Creates an user based on a Discord profile if it's not in the database, and
+      returns its discord profile alongside its Maplist profile.
+    tags:
+    - Users
+    parameters:
+    - in: query
+      name: discord_token
+      required: true
+      schema:
+        type: string
+      description: The user's Discord OAuth2 Access Token.
+    responses:
+      "200":
+        description: Returns the user's Discord profile and its maplist profile.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discord_profile:
+                  type: object
+                  description: Check out Discord's documentation for this field's schema.
+                maplist_profile:
+                  $ref: "#/components/schemas/Profile"
+      "400":
+        description: "`discord_token` is missing or invalid."
+    """
     if "discord_token" not in request.query:
         return web.json_response(
             {

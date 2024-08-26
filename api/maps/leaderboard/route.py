@@ -6,6 +6,42 @@ from src.db.queries.leaderboard import (
 
 
 async def get(request: web.Request):
+    """
+    ---
+    description: Returns the Maplist leaderboard. People with 0 points are omitted.
+    tags:
+    - The List
+    parameters:
+    - in: query
+      name: page
+      required: false
+      schema:
+        type: integer
+      description: Pagination. Defaults to `1`.
+    - in: query
+      name: version
+      required: false
+      schema:
+        type: string
+        enum: [current, all]
+      description: The format of the leaderboard to get.
+    - in: query
+      name: value
+      required: false
+      schema:
+        type: string
+        enum: [points, lccs]
+      description: The type of leaderboard to get.
+    responses:
+      "200":
+        description: Returns an array of `LeaderboardEntry`.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/LeaderboardEntry"
+    """
     current_version = True
     if "version" in request.query:
         version = request.query["version"].lower()

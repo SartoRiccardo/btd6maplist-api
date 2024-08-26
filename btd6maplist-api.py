@@ -1,4 +1,5 @@
 import functools
+import yaml
 import os
 import re
 import ssl
@@ -137,6 +138,9 @@ if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     app = web.Application()
     app.add_routes(get_routes())
+
+    with open("src/db/models/definitions.yaml") as fin:
+        definitions = yaml.safe_load(fin.read())
     setup_swagger(
         app,
         swagger_url="/doc",
@@ -145,7 +149,9 @@ if __name__ == '__main__':
         title="BTD6 Maplist API",
         description="API for the BTD6 Maplist community.",
         contact="<a href=\"https://github.com/SartoRiccardo\">@SartoRiccardo on GitHub</a>",
+        definitions=definitions,
     )
+
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
 

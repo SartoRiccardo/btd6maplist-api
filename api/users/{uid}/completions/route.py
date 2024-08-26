@@ -6,6 +6,35 @@ PAGE_ENTRIES = 50
 
 
 async def get(request: web.Request):
+    """
+    ---
+    description: Returns a list of up to 50 maplist completions by the user.
+    tags:
+    - Users
+    - The List
+    parameters:
+    - in: path
+      name: uid
+      required: true
+      schema:
+        type: integer
+      description: The user's Discord ID.
+    - in: query
+      name: page
+      required: false
+      schema:
+        type: integer
+      description: Pagination. Defaults to `1`.
+    responses:
+      "200":
+        description: Returns an array of `ListCompletion`.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/ListCompletionWithMap"
+    """
     page = 1
     if "page" in request.query and request.query["page"].isnumeric():
         page = int(request.query["page"])

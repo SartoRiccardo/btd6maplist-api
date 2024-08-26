@@ -31,7 +31,6 @@ class PartialListMap:
         }
 
 
-
 @dataclass
 class PartialMap:
     code: str
