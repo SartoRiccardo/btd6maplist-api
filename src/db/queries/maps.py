@@ -99,22 +99,24 @@ async def get_map(code, conn=None) -> Map | None:
 
 @postgres
 async def get_lccs_for(code, conn=None) -> list[LCC]:
-    q_get_lccs = """
-        SELECT lcc.id, lcc.leftover, lcc.proof, lcc.format
-        FROM leastcostchimps lcc JOIN (
-                SELECT lcc1.format, MIN(lcc1.leftover) AS leftover
-                FROM leastcostchimps lcc1
-                WHERE lcc1.map=$1
-                GROUP BY(lcc1.format)
-            ) mins ON mins.leftover=lcc.leftover
-                AND mins.format=lcc.format
-        WHERE lcc.map=$1
-    """
-
     payload = await conn.fetch(
         f"""
+        WITH lcc_mins AS (
+            SELECT format, MIN(leftover) AS leftover
+            FROM leastcostchimps
+            WHERE map=$1
+            GROUP BY(format)
+        ),
+        lcc_runs AS (
+            SELECT lcc.id, lcc.leftover, lcc.proof, lcc.format
+            FROM leastcostchimps lcc
+            JOIN lcc_mins mins
+                ON mins.leftover=lcc.leftover
+                AND mins.format=lcc.format
+            WHERE lcc.map=$1
+        )
         SELECT runs.*, rp.user_id
-        FROM lcc_players rp JOIN ({q_get_lccs}) runs ON rp.lcc_run=runs.id
+        FROM lcc_players rp JOIN lcc_runs runs ON rp.lcc_run=runs.id
         """,
         code,
     )
@@ -137,22 +139,21 @@ async def get_lccs_for(code, conn=None) -> list[LCC]:
 
 @postgres
 async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
-    q_unique_runs = """
-        SELECT DISTINCT user_id, black_border, no_geraldo, current_lcc
-        FROM list_completions
-        WHERE map=$1
-        ORDER BY current_lcc DESC,
-            no_geraldo DESC,
-            black_border DESC,
-            user_id ASC
-        LIMIT $3
-        OFFSET $2
-    """
-
     payload = await conn.fetch(
         f"""
+        WITH unique_runs AS (
+            SELECT DISTINCT user_id, black_border, no_geraldo, current_lcc
+            FROM list_completions
+            WHERE map=$1
+            ORDER BY current_lcc DESC,
+                no_geraldo DESC,
+                black_border DESC,
+                user_id ASC
+            LIMIT $3
+            OFFSET $2
+        )
         SELECT runs.*, lc.format
-        FROM ({q_unique_runs}) runs JOIN list_completions lc ON runs.user_id = lc.user_id AND
+        FROM unique_runs runs JOIN list_completions lc ON runs.user_id = lc.user_id AND
             runs.black_border = lc.black_border AND
             runs.no_geraldo = lc.no_geraldo AND
             runs.current_lcc = lc.current_lcc

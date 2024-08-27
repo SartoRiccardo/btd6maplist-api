@@ -35,30 +35,33 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 @postgres
 async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
-    q_unique_runs = """
-        SELECT DISTINCT map, black_border, no_geraldo, current_lcc
-        FROM list_completions
-        WHERE user_id=$1
-        ORDER BY current_lcc DESC,
-            no_geraldo DESC,
-            black_border DESC
-        LIMIT $3
-        OFFSET $2
-    """
-
     payload = await conn.fetch(
         f"""
+        WITH unique_runs (
+            SELECT DISTINCT map, black_border, no_geraldo, current_lcc
+            FROM list_completions
+            WHERE user_id=$1
+            ORDER BY current_lcc DESC,
+                no_geraldo DESC,
+                black_border DESC
+            LIMIT $3
+            OFFSET $2
+        )
         SELECT
             lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
             m.name, m.placement_curver, m.placement_allver, m.difficulty,
             m.r6_start, m.map_data, lc.format
-        FROM ({q_unique_runs}) runs JOIN list_completions lc ON runs.map = lc.map AND
-                runs.black_border = lc.black_border AND
-                runs.no_geraldo = lc.no_geraldo AND
-                runs.current_lcc = lc.current_lcc
-            JOIN maps m ON lc.map=m.code
+        FROM unique_runs runs
+        JOIN list_completions lc
+            ON runs.map = lc.map
+            AND runs.black_border = lc.black_border
+            AND runs.no_geraldo = lc.no_geraldo
+            AND runs.current_lcc = lc.current_lcc
+        JOIN maps m
+            ON lc.map=m.code
         WHERE lc.user_id=$1
-        ORDER BY runs.current_lcc DESC,
+        ORDER BY
+            runs.current_lcc DESC,
             runs.no_geraldo DESC,
             runs.black_border DESC,
             runs.map ASC
