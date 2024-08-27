@@ -1,5 +1,4 @@
 import functools
-import yaml
 import os
 import re
 import ssl
@@ -14,6 +13,7 @@ from config import APP_HOST, APP_PORT, CORS_ORIGINS
 from aiohttp import web
 import src.http
 import src.db.connection
+import src.db.models
 from src.utils.colors import purple, green, yellow, blue, red, cyan
 
 
@@ -144,8 +144,6 @@ def swagger(app):
         return aiohttp_swagger.helpers.builders.generate_doc_from_each_end_point(clone_app, *args, **kwargs)
     aiohttp_swagger.generate_doc_from_each_end_point = swagger_gen_docs_without_head
 
-    with open("src/db/models/definitions.yaml") as fin:
-        definitions = yaml.safe_load(fin.read())
     aiohttp_swagger.setup_swagger(
         app,
         swagger_url="/doc",
@@ -155,7 +153,7 @@ def swagger(app):
         description="API for the BTD6 Maplist community. "
                     "All `GET` methods also support `HEAD` with the same documentation.",
         contact="<a href=\"https://github.com/SartoRiccardo\">@SartoRiccardo on GitHub</a>",
-        definitions=definitions,
+        definitions=src.db.models.swagger_definitions,
     )
 
 

@@ -3,6 +3,18 @@ from dataclasses import dataclass
 
 @dataclass
 class PartialExpertMap:
+    """
+    type: object
+    properties:
+      name:
+        type: string
+        description: The name of the map.
+      code:
+        type: string
+        description: The code of the map.
+      difficulty:
+        $ref: "#/components/schemas/ExpertDifficulty"
+    """
     name: str
     code: str
     difficulty: int
@@ -17,6 +29,22 @@ class PartialExpertMap:
 
 @dataclass
 class PartialListMap:
+    """
+    type: object
+    properties:
+      name:
+        type: string
+        description: The map's name.
+      code:
+        type: string
+        description: The map's code.
+      placement:
+        type: integer
+        description: The map's placement in the list (starts from 1).
+      verified:
+        type: boolean
+        description: "`true` if the map was verified in the current update."
+    """
     name: str
     code: str
     placement: int
@@ -33,6 +61,32 @@ class PartialListMap:
 
 @dataclass
 class PartialMap:
+    """
+    type: object
+    properties:
+      name:
+        type: string
+        description: The map's name.
+      code:
+        type: string
+        description: The map's code.
+      placement_cur:
+        type: integer
+        description: The map's placement in the list ~ current version (starts from 1). If none, it's set to `-1`.
+      placement_all:
+        type: integer
+        description: The map's placement in the list ~ all versions (starts from 1). If none, it's set to `-1`.
+      difficulty:
+        $ref: "#/components/schemas/ExpertDifficulty"
+      r6_start:
+        type: string
+        nullable: true
+        description: URL to how to start Round 6.
+      map_data:
+        type: string
+        nullable: true
+        description: URL to the map data.
+    """
     code: str
     name: str
     placement_cur: int | None
@@ -55,6 +109,69 @@ class PartialMap:
 
 @dataclass
 class Map(PartialMap):
+    """
+    allOf:
+    - $ref: "#/components/schemas/PartialMap"
+    - type: object
+      properties:
+        creators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: "#/components/schemas/DiscordID"
+              role:
+                type: string
+                nullable: true
+                description: The contributions the user had in the map's creation
+          description: The map's creators
+        additional_codes:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                description: The map's code.
+              description:
+                type: string
+                nullable: true
+                description: What this map has different from the original
+          description: Additional codes for the map, if any.
+        verifications:
+          type: array
+          items:
+            type: object
+            properties:
+              verifier:
+                $ref: "#/components/schemas/DiscordID"
+              version:
+                type: number
+                nullable: true
+                description: >
+                  The version the map was verified in.
+                  If it's the first verification, it's set to `null`.
+          description: The users who verified the map
+        verified:
+          type: boolean
+          description: "`true` if the map was verified in the current update."
+        lccs:
+          $ref: "#/components/schemas/LCC"
+        map_data_compatibility:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                $ref: "#/components/schemas/MapVersionCompatibility"
+              version:
+                type: number
+                description: The version since this compatibility status came into effect.
+          description: >
+            Changelog of compatibilities with previous versions.
+            It always implicitely starts at v39.0 with it being unavailable.
+    """
     creators: list[tuple[int, str | None]]
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None]]

@@ -4,6 +4,26 @@ from .challenges import ListCompletion
 
 @dataclass
 class PartialUser:
+    """
+    type: object
+    properties:
+      id:
+        type: string
+        description: The user's Discord ID.
+      name:
+        type: string
+        description: The user's name.
+    ---
+    Profile:
+      allOf:
+      - $ref: "#/components/schemas/PartialUser"
+      - type: object
+        properties:
+          oak:
+            type: string
+            nullable: true
+            description: The user's NinjaKiwi OpenData Access Key
+    """
     id: id
     name: str
     oak: str
@@ -19,6 +39,24 @@ class PartialUser:
 
 @dataclass
 class MaplistProfile:
+    """
+    type: object
+    properties:
+      points:
+        type: integer
+        description: Points on the leaderboard.
+      pts_placement:
+        type: integer
+        nullable: true
+        description: Placement on the points leaderboard.
+      lccs:
+        type: integer
+        description: Number of current LCCs.
+      lccs_placement:
+        type: integer
+        nullable: true
+        description: Placement on the LCC leaderboard.
+    """
     points: int
     pts_placement: int
     lccs: int
@@ -35,6 +73,20 @@ class MaplistProfile:
 
 @dataclass
 class User(PartialUser):
+    """
+    allOf:
+    - $ref: "#/components/schemas/PartialUser"
+    - type: object
+      properties:
+        maplist_cur:
+          $ref: "#/components/schemas/MaplistProfile"
+        maplist_all:
+          $ref: "#/components/schemas/MaplistProfile"
+        created_maps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartialMap"
+    """
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
     completions: list[ListCompletion]
