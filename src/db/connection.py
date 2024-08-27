@@ -2,13 +2,13 @@ import asyncpg
 import config
 from src.utils.colors import red
 
-connection = None
+pool: asyncpg.Pool | None
 
 
 async def start():
-    global connection
+    global pool
     try:
-        connection = await asyncpg.create_pool(
+        pool = await asyncpg.create_pool(
             user=config.DB_USER, password=config.DB_PSWD,
             database=config.DB_NAME, host=config.DB_HOST
         )
@@ -17,9 +17,10 @@ async def start():
         exit(-1)
 
 
-def postgres(func):
-    async def inner(*args, **kwargs):
-        if connection is None:
+def postgres(wrapped):
+    async def wrapper(*args, **kwargs):
+        if pool is None:
             return
-        return await func(*args, **kwargs, conn=connection)
-    return inner
+        async with pool.acquire() as conn:
+            return await wrapped(*args, **kwargs, conn=conn)
+    return wrapper
