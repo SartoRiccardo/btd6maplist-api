@@ -77,7 +77,7 @@ def get_repeated_indexes(l: list) -> list[int]:
     return repeated
 
 
-def check_fields(body: dict | list | Any, schema: dict | Type, path: str = "") -> dict:
+def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str = "") -> dict:
     if isinstance(body, dict):
         for key in schema:
             if key not in body:
@@ -85,8 +85,10 @@ def check_fields(body: dict | list | Any, schema: dict | Type, path: str = "") -
             if error := check_fields(body[key], schema[key], path=f"{path}.{key}"):
                 return error
     elif isinstance(body, list):
+        if not isinstance(schema, list):
+            return {path[1:]: f"Wrong typing (must be `{schema}`)"}
         for i, item in enumerate(body):
-            if error := check_fields(item, schema, path=f"{path}[{i}]"):
+            if error := check_fields(item, schema[0], path=f"{path}[{i}]"):
                 return error
     elif not isinstance(body, schema):
         return {path[1:]: f"Wrong typing (must be `{schema}`)"}
@@ -96,7 +98,6 @@ def check_fields(body: dict | list | Any, schema: dict | Type, path: str = "") -
 async def post_validate(body: dict) -> dict:
     errors = {}
 
-    # Yes there's a vulnerability that makes the server 500. Should get proper schema checking
     check_fields_exists = {
         "code": str,
         "name": str,
@@ -105,12 +106,12 @@ async def post_validate(body: dict) -> dict:
         "difficulty": int,
         "r6_start": str | None,
         "map_data": str | None,
-        "additional_codes": {"code": str, "description": str | None},
-        "creators": {"id": str, "role": str | None},
-        "verifiers": {"id": str, "version": int | None},
-        "aliases": str,
-        "version_compatibilities": {"version": int, "status": int},
-        # "optimal_heros": str,
+        "additional_codes": [{"code": str, "description": str | None}],
+        "creators": [{"id": str, "role": str | None}],
+        "verifiers": [{"id": str, "version": int | None}],
+        "aliases": [str],
+        "version_compatibilities": [{"version": int, "status": int}],
+        # "optimal_heros": [str],
     }
     check = check_fields(body, check_fields_exists)
     if len(check):
