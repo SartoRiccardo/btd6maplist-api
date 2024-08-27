@@ -64,9 +64,9 @@ def cors_handler(cors_options, methods):
         return web.Response(
             status=204,
             headers={
-                "Access-Control-Allow-Origin": allowed_origin,
+                "Access-Control-Allow-Origin": request.headers["Origin"],
                 "Access-Control-Allow-Methods": ",".join(methods),
-                "Access-Control-Allow-Headers": "X-Requested-With",
+                "Access-Control-Allow-Headers": "X-Requested-With, Authorization",
                 # "Access-Control-Max-Age": "86400",
             }
         )
@@ -82,7 +82,7 @@ def cors_route(handler, cors_options):
         if "Origin" in request.headers:
             for allowed_origin in cors_regex:
                 if re.match(cors_regex[allowed_origin], request.headers["Origin"]):
-                    response.headers["Access-Control-Allow-Origin"] = allowed_origin
+                    response.headers["Access-Control-Allow-Origin"] = request.headers["Origin"]
                     break
         return response
 
