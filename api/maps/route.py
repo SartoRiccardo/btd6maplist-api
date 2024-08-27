@@ -1,5 +1,8 @@
+import src.utils.routedecos
+import src.http
 from aiohttp import web
 from src.db.queries.maps import get_list_maps
+from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
 
 async def get(request: web.Request):
@@ -43,3 +46,15 @@ async def get(request: web.Request):
 
     maps = await get_list_maps(curver=current_version)
     return web.json_response([m.to_dict() for m in maps])
+
+
+async def post_validate(body: dict) -> dict:
+    errors = {}
+    return errors
+
+
+@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.validate_json_body(post_validate)
+@src.utils.routedecos.with_maplist_profile
+async def post(request: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
+    return web.Response(status=204)
