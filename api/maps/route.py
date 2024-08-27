@@ -52,9 +52,6 @@ async def get(request: web.Request):
     return web.json_response([m.to_dict() for m in maps])
 
 
-from pprint import pprint
-
-
 MAX_TEXT_LEN = 100
 MAX_ADD_CODES = 5
 
@@ -142,7 +139,9 @@ async def post_validate(body: dict) -> dict:
     #         if isdup:
     #             errors[f"aliases[{i}].alias"] = "Already assigned to another map"
 
-    if rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
+    if len(body["creators"]) == 0:
+        errors["creators"] = "Must have at least one creator"
+    elif rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
         for idx in rep_idx:
             errors[f"creators[{idx}].id"] = "Duplicate creator"
     else:
@@ -152,6 +151,8 @@ async def post_validate(body: dict) -> dict:
         for i, usr in enumerate(users):
             if usr is None:
                 errors[f"creators[{i}].id"] = "This user doesn't exist"
+            else:
+                body["creators"][i]["id"] = str(usr.id)
         for i, crt in enumerate(body["creators"]):
             if crt["role"] is not None and len(crt["role"]) > MAX_TEXT_LEN:
                 errors[f"creators[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
@@ -161,6 +162,8 @@ async def post_validate(body: dict) -> dict:
     for i, usr in enumerate(users):
         if usr is None:
             errors[f"verifiers[{i}].id"] = "This user doesn't exist"
+        else:
+            body["verifiers"][i]["id"] = str(usr.id)
 
     if not (-1 <= body["difficulty"] <= 3):
         errors["difficulty"] = "Must be between -1 and 3, included"
