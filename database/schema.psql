@@ -31,7 +31,8 @@ CREATE TABLE maps (
 
 CREATE TABLE map_aliases(
   map VARCHAR(10) NOT NULL,
-  alias VARCHAR(20) NOT NULL
+  alias VARCHAR(20) NOT NULL,
+  PRIMARY KEY(alias)
 );
 ALTER TABLE map_aliases ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;

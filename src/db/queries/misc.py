@@ -28,9 +28,9 @@ async def get_config(conn=None) -> list[ConfigVar]:
 
 @postgres
 async def update_config(config: dict[str, Any], conn=None) -> None:
-    q_format = "UPDATE config SET value=$2 WHERE name=$1"
-    await asyncio.gather(*[
-        conn.execute(q_format, vname, str(config[vname]))
-        for vname in config
-    ])
+    for vname in config:
+        await conn.execute(
+            "UPDATE config SET value=$2 WHERE name=$1",
+            vname, str(config[vname])
+        )
     await conn.execute("REFRESH MATERIALIZED VIEW listmap_points")

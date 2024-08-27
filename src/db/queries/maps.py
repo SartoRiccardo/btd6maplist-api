@@ -67,18 +67,20 @@ async def get_map(code, conn=None) -> Map | None:
         return None
     pl_map = payload[0]
 
-    lccs, pl_codes, pl_creat, pl_verif, pl_compat = await asyncio.gather(
+    coros = [
         get_lccs_for(code),
         conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
         conn.fetch("SELECT user_id, role FROM creators WHERE map=$1", code),
         conn.fetch(f"""
-            SELECT user_id, version
-            FROM verifications WHERE map=$1
-                AND (version={get_int_config("current_btd6_ver")}
-                OR version IS NULL)
-        """, code),
+                SELECT user_id, version
+                FROM verifications WHERE map=$1
+                    AND (version={get_int_config("current_btd6_ver")}
+                    OR version IS NULL)
+            """, code),
         conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", code),
-    )
+    ]
+
+    lccs, pl_codes, pl_creat, pl_verif, pl_compat = [await coro for coro in coros]
 
     return Map(
         pl_map[0],
@@ -192,3 +194,64 @@ async def map_exists(code, conn=None) -> bool:
 async def alias_exists(alias, conn=None) -> bool:
     result = await conn.execute("SELECT alias FROM map_aliases WHERE alias=$1", alias)
     return int(result[len("SELECT "):]) > 0
+
+
+@postgres
+async def add_map(map_data: dict, conn=None) -> None:
+    async with conn.transaction():
+        for field in ["placement_allver", "placement_curver"]:
+            if map_data[field] > -1:
+                await conn.execute(
+                    f"""
+                    UPDATE maps
+                    SET {field} = {field}+1
+                    WHERE {field} > $1
+                    """,
+                    map_data[field]
+                )
+
+        await conn.execute(
+            """
+            INSERT INTO maps(
+                code, name, placement_allver, placement_curver, difficulty,
+                map_data, r6_start
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            """,
+            map_data["code"], map_data["name"], map_data["placement_allver"],
+            map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
+            map_data["r6_start"],
+        )
+
+        await conn.executemany(
+            "INSERT INTO additional_codes(code, description, belongs_to) VALUES ($1, $2, $3)",
+            [
+                (obj["code"], obj["description"], map_data["code"])
+                for obj in map_data["additional_codes"]
+            ]
+        )
+        await conn.executemany(
+            "INSERT INTO creators(map, user_id, role) VALUES ($1, $2, $3)",
+            [
+                (map_data["code"], int(obj["id"]), obj["role"])
+                for obj in map_data["creators"]
+            ]
+        )
+        await conn.executemany(
+            "INSERT INTO verifications(map, user_id, version) VALUES ($1, $2, $3)",
+            [
+                (map_data["code"], int(obj["id"]), obj["version"])
+                for obj in map_data["verifiers"]
+            ]
+        )
+        await conn.executemany(
+            "INSERT INTO mapver_compatibilities(map, version, status) VALUES ($1, $2, $3)",
+            [
+                (map_data["code"], obj["version"], obj["status"])
+                for obj in map_data["version_compatibilities"]
+            ]
+        )
+        await conn.executemany(
+            "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",
+            [(map_data["code"], alias) for alias in map_data["aliases"]]
+        )

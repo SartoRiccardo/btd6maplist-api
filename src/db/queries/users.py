@@ -37,7 +37,7 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         f"""
-        WITH unique_runs (
+        WITH unique_runs AS (
             SELECT DISTINCT map, black_border, no_geraldo, current_lcc
             FROM list_completions
             WHERE user_id=$1
@@ -116,7 +116,7 @@ async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tu
         f"""
         SELECT user_id, score, placement
         FROM {lb_view}
-        WHERE lb1.user_id=$1
+        WHERE user_id=$1
         """,
         int(id)
     )
