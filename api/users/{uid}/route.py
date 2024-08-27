@@ -1,8 +1,15 @@
+import re
+
 from aiohttp import web
 from src.db.queries.users import get_user, edit_user
 from src.ninjakiwi import get_btd6_user_deco
 import json
 import src.http
+import string
+
+
+NAME_MAX_LEN = 100
+NAME_CHARS = string.ascii_letters + string.digits + "-_."
 
 
 async def get(request: web.Request):
@@ -101,6 +108,10 @@ async def put(request: web.Request):
     errors = {}
     if "name" not in data:
         errors["name"] = "Missing name"
+    elif len(data["name"]) > NAME_MAX_LEN:
+        errors["name"] = f"Name must be under {NAME_MAX_LEN} characters"
+    elif not re.match("^["+NAME_CHARS.replace(".", "\\.")+"]+$", data["name"]):
+        errors["name"] = f"Allowed characters for name: {NAME_CHARS}"
 
     if "oak" not in data:
         errors["oak"] = "Missing oak"
