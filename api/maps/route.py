@@ -182,7 +182,7 @@ async def post_validate(body: dict) -> dict:
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_json_body(post_validate)
 @src.utils.routedecos.with_maplist_profile
-async def post(request: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
+async def post(_r: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
     errors = {}
     if json_body["difficulty"] != -1 and MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
         errors["difficulty"] = "You are not an Expert List moderator"

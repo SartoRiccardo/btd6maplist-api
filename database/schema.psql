@@ -25,14 +25,15 @@ CREATE TABLE maps (
   difficulty INT DEFAULT -1,
   r6_start TEXT,
   map_data TEXT,
+  optimal_hero TEXT,
   PRIMARY KEY(code)
 );
 
 CREATE TABLE map_aliases(
   map VARCHAR(10) NOT NULL,
-  alias VARCHAR(20) NOT NULL,
+  alias VARCHAR(20) NOT NULL
 );
-ALTER TABLE leastcostchimps ADD CONSTRAINT fk_maps_1
+ALTER TABLE map_aliases ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 
 CREATE TABLE leastcostchimps (
@@ -133,70 +134,129 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 
 -- Points LB
 CREATE VIEW list_curver_leaderboard AS
-SELECT p.user_id, SUM(p.points) AS score
-FROM (
-    -- Select every user's run and how many points it nets them
+WITH config_values AS (
     SELECT
-        c.user_id,
+        (SELECT value::int FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::int FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::int FROM config WHERE name='points_extra_lcc') AS points_extra_lcc,
+        (SELECT value::int FROM config WHERE name='map_count') AS map_count
+),
+valid_completions AS (
+    SELECT
+        m.placement_curver AS placement,
+        lc.user_id,
+        lc.black_border,
+        lc.no_geraldo,
+        lc.current_lcc,
+        lc.format
+    FROM list_completions lc
+    JOIN maps m ON lc.map = m.code
+    CROSS JOIN config_values cv
+    WHERE m.placement_curver BETWEEN 0 AND cv.map_count
+      AND lc.format IN (0, 1)
+),
+user_points AS (
+    SELECT
+        vc.user_id,
         (
-           lp.points
-           * CASE c.black_border WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_bb')::int WHEN FALSE THEN 1 END
-           * CASE c.no_geraldo WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_gerry')::int WHEN FALSE THEN 1 END
-           + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
+            lmp.points
+            * CASE WHEN vc.black_border THEN cv.points_multi_bb ELSE 1 END
+            * CASE WHEN vc.no_geraldo THEN cv.points_multi_gerry ELSE 1 END
+            + CASE WHEN vc.current_lcc THEN cv.points_extra_lcc ELSE 0 END
         ) AS points
-    FROM listmap_points lp JOIN (
-        -- Select completions for every map
-        SELECT m.placement_curver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc, lc.format
-        FROM list_completions lc JOIN maps m
-            ON lc.map = m.code
-        WHERE m.placement_curver > -1 AND m.placement_curver <= (SELECT value FROM config WHERE name='map_count')::int
-    ) c
-        ON lp.placement = c.placement
-    WHERE c.format=1 OR c.format=0
-) p
-    JOIN users u ON p.user_id = u.discord_id
-GROUP BY (p.user_id)
-ORDER BY score DESC;
+    FROM valid_completions vc
+    JOIN listmap_points lmp ON vc.placement = lmp.placement
+    CROSS JOIN config_values cv
+),
+leaderboard AS (
+    SELECT
+        up.user_id,
+        SUM(up.points) AS score
+    FROM user_points up
+    GROUP BY up.user_id
+)
+SELECT user_id, score, RANK() OVER (ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
 
 CREATE VIEW list_allver_leaderboard AS
-SELECT p.user_id, SUM(p.points) AS score
-FROM (
+WITH config_values AS (
     SELECT
-        c.user_id,
+        (SELECT value::int FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::int FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::int FROM config WHERE name='points_extra_lcc') AS points_extra_lcc,
+        (SELECT value::int FROM config WHERE name='map_count') AS map_count
+),
+valid_completions AS (
+    SELECT
+        m.placement_allver AS placement,
+        lc.user_id,
+        lc.black_border,
+        lc.no_geraldo,
+        lc.current_lcc,
+        lc.format
+    FROM list_completions lc
+    JOIN maps m ON lc.map = m.code
+    CROSS JOIN config_values cv
+    WHERE m.placement_allver BETWEEN 0 AND cv.map_count
+      AND lc.format IN (0, 2)
+),
+user_points AS (
+    SELECT
+        vc.user_id,
         (
-           lp.points
-           * CASE c.black_border WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_bb')::int WHEN FALSE THEN 1 END
-           * CASE c.no_geraldo WHEN TRUE THEN (SELECT value FROM config WHERE name='points_multi_gerry')::int WHEN FALSE THEN 1 END
-           + CASE c.current_lcc WHEN TRUE THEN  (SELECT value FROM config WHERE name='points_extra_lcc')::int WHEN FALSE THEN 0 END
+            lmp.points
+            * CASE WHEN vc.black_border THEN cv.points_multi_bb ELSE 1 END
+            * CASE WHEN vc.no_geraldo THEN cv.points_multi_gerry ELSE 1 END
+            + CASE WHEN vc.current_lcc THEN cv.points_extra_lcc ELSE 0 END
         ) AS points
-    FROM listmap_points lp JOIN (
-        SELECT m.placement_allver AS placement, lc.user_id, lc.black_border, lc.no_geraldo, lc.current_lcc, lc.format
-        FROM list_completions lc JOIN maps m
-            ON lc.map = m.code
-        WHERE m.placement_allver > -1 AND m.placement_allver <= (SELECT value FROM config WHERE name='map_count')::int
-    ) c
-        ON lp.placement = c.placement
-    WHERE c.format=2 OR c.format=0
-) p
-    JOIN users u ON p.user_id = u.discord_id
-GROUP BY (p.user_id)
-ORDER BY score DESC;
+    FROM valid_completions vc
+    JOIN listmap_points lmp ON vc.placement = lmp.placement
+    CROSS JOIN config_values cv
+),
+leaderboard AS (
+    SELECT
+        up.user_id,
+        SUM(up.points) AS score
+    FROM user_points up
+    GROUP BY up.user_id
+)
+SELECT user_id, score, RANK() OVER (ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
 
 -- LCC lb
 CREATE VIEW list_curver_lcclb AS
-SELECT lccp.user_id, COUNT(lccp.user_id) AS score
-FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
+WITH config_values AS (
+    SELECT value::int AS map_count FROM config WHERE name = 'map_count'
+),
+leaderboard AS (
+    SELECT lccp.user_id, COUNT(lccp.user_id) AS score
+    FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
     JOIN maps m ON m.code = lccs.map
-WHERE m.placement_curver > -1 AND m.placement_curver <= (SELECT value FROM config WHERE name='map_count')::int
-    AND lccs.format=1 OR lccs.format=0
-GROUP BY lccp.user_id
-ORDER BY score DESC;
+    CROSS JOIN config_values cv
+    WHERE m.placement_curver BETWEEN 0 AND cv.map_count
+        AND lccs.format IN (0, 1)
+    GROUP BY lccp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
 
 CREATE VIEW list_allver_lcclb AS
-SELECT lccp.user_id, COUNT(lccp.user_id) AS score
-FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
+WITH config_values AS (
+    SELECT value::int AS map_count FROM config WHERE name = 'map_count'
+),
+leaderboard AS (
+    SELECT lccp.user_id, COUNT(lccp.user_id) AS score
+    FROM lcc_players lccp JOIN leastcostchimps lccs ON lccp.lcc_run = lccs.id
     JOIN maps m ON m.code = lccs.map
-WHERE m.placement_allver > -1 AND m.placement_allver <= (SELECT value FROM config WHERE name='map_count')::int
-    AND lccs.format=2 OR lccs.format=0
-GROUP BY lccp.user_id
-ORDER BY score DESC;
+    CROSS JOIN config_values cv
+    WHERE m.placement_allver BETWEEN 0 AND cv.map_count
+        AND lccs.format IN (0, 2)
+    GROUP BY lccp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;

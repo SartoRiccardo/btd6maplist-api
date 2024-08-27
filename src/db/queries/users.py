@@ -1,7 +1,6 @@
 import asyncio
 import src.db.connection
 from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion
-from src.db.queries.leaderboard import q_lb_format
 from src.utils.misc import list_eq
 postgres = src.db.connection.postgres
 
@@ -112,7 +111,8 @@ async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tu
 
     payload = await conn.fetch(
         f"""
-        {q_lb_format.format(lb_view)}
+        SELECT user_id, score, placement
+        FROM {lb_view}
         WHERE lb1.user_id=$1
         """,
         int(id)
