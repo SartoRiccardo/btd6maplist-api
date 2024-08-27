@@ -4,7 +4,7 @@ import re
 import src.utils.routedecos
 import src.http
 from aiohttp import web
-from src.db.queries.maps import get_list_maps, map_exists, alias_exists
+from src.db.queries.maps import get_list_maps, map_exists, alias_exists, add_map
 from src.db.queries.users import get_user_min
 from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
@@ -157,8 +157,9 @@ async def post_validate(body: dict) -> dict:
             if crt["role"] is not None and len(crt["role"]) > MAX_TEXT_LEN:
                 errors[f"creators[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
 
-    user_ids = set([verif["id"] for verif in body["verifiers"]])
-    users = await asyncio.gather(*[get_user_min(id) for id in user_ids])
+    users = await asyncio.gather(*[
+        get_user_min(verif["id"]) for verif in body["verifiers"]
+    ])
     for i, usr in enumerate(users):
         if usr is None:
             errors[f"verifiers[{i}].id"] = "This user doesn't exist"
@@ -193,4 +194,5 @@ async def post(_r: web.Request, json_body: dict = None, maplist_profile: dict = 
     if len(errors):
         return web.json_response({"errors": errors, "data": {}}, status=400)
 
+    await add_map(json_body)
     return web.Response(status=204)
