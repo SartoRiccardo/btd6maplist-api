@@ -179,3 +179,15 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> list[L
             formats = [row[4]]
     completions.append(ListCompletion(code, *run, formats))
     return completions
+
+
+@postgres
+async def map_exists(code, conn=None) -> bool:
+    result = await conn.execute("SELECT code FROM maps WHERE code=$1", code)
+    return int(result[len("SELECT "):]) > 0
+
+
+@postgres
+async def alias_exists(alias, conn=None) -> bool:
+    result = await conn.execute("SELECT alias FROM map_aliases WHERE alias=$1", alias)
+    return int(result[len("SELECT "):]) > 0

@@ -13,7 +13,8 @@ CREATE TABLE users (
   discord_id BIGINT NOT NULL,  -- IDs below 1000 are manual, non-Discord IDs.
   name VARCHAR(255) NOT NULL,
   nk_oak VARCHAR(255),
-  PRIMARY KEY(discord_id)
+  PRIMARY KEY(discord_id),
+  CONSTRAINT uq_name UNIQUE(name)
 );
 
 CREATE TABLE maps (

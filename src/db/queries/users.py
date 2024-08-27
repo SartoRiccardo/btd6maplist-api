@@ -7,18 +7,30 @@ postgres = src.db.connection.postgres
 
 
 @postgres
-async def get_user_min(id, conn=None) -> PartialUser | None:
-    payload = await conn.fetch("""
-        SELECT name, nk_oak
-        FROM users
-        WHERE discord_id=$1
-    """, int(id))
+async def get_user_min(id: str, conn=None) -> PartialUser | None:
+    """id can be either the Discord ID or the name"""
+    if id.isnumeric():
+        payload = await conn.fetch("""
+            SELECT discord_id, name, nk_oak
+            FROM users
+            WHERE discord_id=$1
+            UNION
+            SELECT discord_id, name, nk_oak
+            FROM users
+            WHERE name=LOWER($2)
+        """, int(id), id)
+    else:
+        payload = await conn.fetch("""
+            SELECT discord_id, name, nk_oak
+            FROM users
+            WHERE name=LOWER($1)
+        """, id)
     if not len(payload):
         return None
 
     pl_user = payload[0]
     return PartialUser(
-        int(id), pl_user[0], pl_user[1]
+        int(pl_user[0]), pl_user[1], pl_user[2]
     )
 
 
