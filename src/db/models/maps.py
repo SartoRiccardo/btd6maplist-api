@@ -171,6 +171,11 @@ class Map(PartialMap):
           description: >
             Changelog of compatibilities with previous versions.
             It always implicitely starts at v39.0 with it being unavailable.
+        aliases:
+          type: array
+          items:
+            type: string
+          description: A list of aliases for the map
     """
     creators: list[tuple[int, str | None]]
     additional_codes: list[tuple[str, str | None]]
@@ -178,6 +183,7 @@ class Map(PartialMap):
     verified: bool
     lccs: list["src.db.models.challenges.LCC"]
     map_data_compatibility: list[tuple[int, int]]
+    aliases: list[str]
 
     def to_dict(self) -> dict:
         compatibility = [*self.map_data_compatibility]
@@ -204,4 +210,5 @@ class Map(PartialMap):
                 {"status": status, "version": version}
                 for status, version in compatibility
             ],
+            "aliases": self.aliases,
         }

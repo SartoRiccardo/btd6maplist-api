@@ -78,9 +78,10 @@ async def get_map(code, conn=None) -> Map | None:
                     OR version IS NULL)
             """, code),
         conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", code),
+        conn.fetch("SELECT alias FROM map_aliases WHERE map=$1", code)
     ]
 
-    lccs, pl_codes, pl_creat, pl_verif, pl_compat = [await coro for coro in coros]
+    lccs, pl_codes, pl_creat, pl_verif, pl_compat, pl_aliases = [await coro for coro in coros]
 
     return Map(
         pl_map[0],
@@ -95,7 +96,8 @@ async def get_map(code, conn=None) -> Map | None:
         [(uid, ver/10 if ver else None) for uid, ver in pl_verif],
         pl_map[7],
         lccs,
-        pl_compat
+        pl_compat,
+        [row[0] for row in pl_aliases],
     )
 
 
