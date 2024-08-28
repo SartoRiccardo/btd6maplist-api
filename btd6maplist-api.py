@@ -157,11 +157,16 @@ def swagger(app):
     )
 
 
+async def redirect_to_swagger(r):
+    return web.Response(status=301, headers={"Location": "/doc"})
+
+
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     app = web.Application()
     app.add_routes(get_routes())
     swagger(app)
+    app.router.add_get("/", redirect_to_swagger)
 
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
