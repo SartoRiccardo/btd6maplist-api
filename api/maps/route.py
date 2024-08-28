@@ -184,6 +184,39 @@ async def post_validate(body: dict) -> dict:
 @src.utils.routedecos.validate_json_body(post_validate)
 @src.utils.routedecos.with_maplist_profile
 async def post(_r: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
+    """
+    ---
+    description: Add a map. Must be a Maplist or Expert List Moderator.
+    tags:
+    - The List
+    - Experts
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ConfigVar"
+    responses:
+      "204":
+        description: The resource was created correctly
+      "400":
+        description: |
+          One of the fields is badly formatted.
+          `data` will be an empty array in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                  description: Each key-value pair is the key of the wrong field and a description as to why.
+                data:
+                  $ref: "#/components/schemas/Map"
+                  example: []
+      "401":
+        description: Your token is missing, invalid or you don't have the privileges for this.
+    """
     errors = {}
     if json_body["difficulty"] != -1 and MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
         errors["difficulty"] = "You are not an Expert List moderator"
