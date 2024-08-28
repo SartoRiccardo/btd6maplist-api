@@ -226,7 +226,7 @@ async def add_map(map_data: dict, conn=None) -> None:
                     f"""
                     UPDATE maps
                     SET {field} = {field}+1
-                    WHERE {field} > $1
+                    WHERE {field} >= $1
                     """,
                     map_data[field]
                 )
