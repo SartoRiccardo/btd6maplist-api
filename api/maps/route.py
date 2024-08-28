@@ -189,13 +189,13 @@ async def post(_r: web.Request, json_body: dict = None, maplist_profile: dict = 
     description: Add a map. Must be a Maplist or Expert List Moderator.
     tags:
     - The List
-    - Experts
+    - Expert List
     requestBody:
       required: true
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ConfigVar"
+            $ref: "#/components/schemas/Map"
     responses:
       "204":
         description: The resource was created correctly
@@ -212,8 +212,8 @@ async def post(_r: web.Request, json_body: dict = None, maplist_profile: dict = 
                   type: object
                   description: Each key-value pair is the key of the wrong field and a description as to why.
                 data:
-                  $ref: "#/components/schemas/Map"
-                  example: []
+                  type: object
+                  example: {}
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """

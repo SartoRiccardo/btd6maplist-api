@@ -11,7 +11,9 @@ class ConfigVar:
         type: string
         description: The name of the variable
       value:
+        type: string
         description: The value of the variable. Can be of any type.
+        example: any type
     """
     name: str
     value: Any
