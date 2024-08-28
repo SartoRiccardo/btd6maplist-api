@@ -70,12 +70,27 @@ async def get_map(code, conn=None) -> Map | None:
     coros = [
         get_lccs_for(code),
         conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
-        conn.fetch("SELECT user_id, role FROM creators WHERE map=$1", code),
+        conn.fetch(
+            """
+            SELECT user_id, role, name
+            FROM creators c
+            JOIN users u
+                ON u.discord_id=c.user_id
+            WHERE map=$1
+            """, code
+        ),
         conn.fetch(f"""
-                SELECT user_id, version
-                FROM verifications WHERE map=$1
-                    AND (version={get_int_config("current_btd6_ver")}
-                    OR version IS NULL)
+                WITH config_vars AS (
+                    SELECT
+                        ({get_int_config("current_btd6_ver")}) AS current_btd6_ver
+                )
+                SELECT user_id, version, name
+                FROM verifications v
+                CROSS JOIN config_vars cv
+                JOIN users u
+                    ON u.discord_id=v.user_id
+                WHERE map=$1
+                    AND (version=cv.current_btd6_ver OR version IS NULL)
             """, code),
         conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", code),
         conn.fetch("SELECT alias FROM map_aliases WHERE map=$1", code)
@@ -91,9 +106,9 @@ async def get_map(code, conn=None) -> Map | None:
         pl_map[4],
         pl_map[5],
         pl_map[6],
-        [(row[0], row[1]) for row in pl_creat],
+        [(row[0], row[1], row[2]) for row in pl_creat],
         pl_codes,
-        [(uid, ver/10 if ver else None) for uid, ver in pl_verif],
+        [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],
         pl_map[7],
         lccs,
         pl_compat,
@@ -104,7 +119,7 @@ async def get_map(code, conn=None) -> Map | None:
 @postgres
 async def get_lccs_for(code, conn=None) -> list[LCC]:
     payload = await conn.fetch(
-        f"""
+        """
         WITH lcc_mins AS (
             SELECT format, MIN(leftover) AS leftover
             FROM leastcostchimps
@@ -119,8 +134,12 @@ async def get_lccs_for(code, conn=None) -> list[LCC]:
                 AND mins.format=lcc.format
             WHERE lcc.map=$1
         )
-        SELECT runs.*, rp.user_id
-        FROM lcc_players rp JOIN lcc_runs runs ON rp.lcc_run=runs.id
+        SELECT runs.*, rp.user_id, name
+        FROM lcc_players rp
+        JOIN lcc_runs runs
+            ON rp.lcc_run=runs.id
+        JOIN users u
+            ON rp.user_id=u.discord_id
         """,
         code,
     )
@@ -132,11 +151,11 @@ async def get_lccs_for(code, conn=None) -> list[LCC]:
     players = []
     for i, row in enumerate(payload):
         if run[0] == row[0]:
-            players.append(row[4])
+            players.append((row[4], row[5]))
         else:
             lccs.append(LCC(*run, players))
             run = row[:4]
-            players = [row[4]]
+            players = [(row[4], row[5])]
     lccs.append(LCC(*run, players))
     return lccs
 

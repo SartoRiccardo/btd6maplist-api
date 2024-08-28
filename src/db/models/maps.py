@@ -121,6 +121,9 @@ class Map(PartialMap):
             properties:
               id:
                 $ref: "#/components/schemas/DiscordID"
+              name:
+                type: str
+                description: The username of the creator
               role:
                 type: string
                 nullable: true
@@ -146,6 +149,9 @@ class Map(PartialMap):
             properties:
               verifier:
                 $ref: "#/components/schemas/DiscordID"
+              name:
+                type: str
+                description: The username of the verifier
               version:
                 type: number
                 nullable: true
@@ -177,9 +183,9 @@ class Map(PartialMap):
             type: string
           description: A list of aliases for the map
     """
-    creators: list[tuple[int, str | None]]
+    creators: list[tuple[int, str | None, str]]
     additional_codes: list[tuple[str, str | None]]
-    verifications: list[tuple[str, float | None]]
+    verifications: list[tuple[str, float | None, str]]
     verified: bool
     lccs: list["src.db.models.challenges.LCC"]
     map_data_compatibility: list[tuple[int, int]]
@@ -194,16 +200,16 @@ class Map(PartialMap):
             **super().to_dict(),
             "lccs": [lcc.to_dict() for lcc in self.lccs],
             "creators": [
-                {"id": str(creat), "role": role}
-                for creat, role in self.creators
+                {"id": str(creat), "role": role, "name": creat_name}
+                for creat, role, creat_name in self.creators
             ],
             "additional_codes": [
                 {"code": str(code), "description": descr}
                 for code, descr in self.additional_codes
             ],
             "verifications": [
-                {"verifier": str(verif), "version": version}
-                for verif, version in self.verifications
+                {"verifier": str(verif), "version": version, "name": verif_name}
+                for verif, version, verif_name in self.verifications
             ],
             "verified": self.verified,
             "map_data_compatibility": [

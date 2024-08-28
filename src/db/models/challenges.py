@@ -25,14 +25,20 @@ class LCC:
       players:
         type: array
         items:
-          $ref: "#/components/schemas/DiscordID"
+          type: object
+          properties:
+            id:
+              $ref: "#/components/schemas/DiscordID"
+            name:
+              type: string
+              description: The username of the player.
         description: The players who took part in the run. Oftentimes it's a single item.
     """
     id: int
     leftover: int
     proof: str
     format: int
-    players: list[int]
+    players: list[tuple[int, str]]
 
     def to_dict(self) -> dict:
         return {
@@ -40,7 +46,7 @@ class LCC:
             "leftover": self.leftover,
             "proof": self.proof,
             "format": self.format,
-            "players": [str(p) for p in self.players],
+            "players": [{"id": str(id), "name": name} for id, name in self.players],
         }
 
 
