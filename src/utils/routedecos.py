@@ -51,7 +51,6 @@ def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
             headers={"Authorization": f"Bearer {token}"}
         )
         r = disc_response
-        print(r.from_cache, r.created_at, r.expires, r.is_expired)
         if not disc_response.ok:
             return web.Response(status=401)
 
