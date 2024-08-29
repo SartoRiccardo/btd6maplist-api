@@ -125,7 +125,7 @@ def get_routes(cur_path: None | list = None) -> list:
                 if not hasattr(route, method):
                     continue
                 routefunc, routecolor = allowed_methods[method]
-                print(f"+{routecolor(method.upper())} {api_route}")
+                print(f"+{routecolor(method.upper())}\t{api_route}")
                 routes.append(routefunc(api_route, cors_route(getattr(route, method), cors_origins)))
                 methods.append(method.upper())
             if len(methods):
