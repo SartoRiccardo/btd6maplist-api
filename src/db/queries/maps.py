@@ -228,6 +228,57 @@ async def alias_exists(alias, conn=None) -> bool:
     return int(result[len("SELECT "):]) > 0
 
 
+async def insert_map_relations(map_data: dict, conn) -> None:
+    await conn.executemany(
+        "INSERT INTO additional_codes(code, description, belongs_to) VALUES ($1, $2, $3)",
+        [
+            (obj["code"], obj["description"], map_data["code"])
+            for obj in map_data["additional_codes"]
+        ]
+    )
+    await conn.executemany(
+        "INSERT INTO creators(map, user_id, role) VALUES ($1, $2, $3)",
+        [
+            (map_data["code"], int(obj["id"]), obj["role"])
+            for obj in map_data["creators"]
+        ]
+    )
+    await conn.executemany(
+        "INSERT INTO verifications(map, user_id, version) VALUES ($1, $2, $3)",
+        [
+            (map_data["code"], int(obj["id"]), obj["version"])
+            for obj in map_data["verifiers"]
+        ]
+    )
+    await conn.executemany(
+        "INSERT INTO mapver_compatibilities(map, version, status) VALUES ($1, $2, $3)",
+        [
+            (map_data["code"], obj["version"], obj["status"])
+            for obj in map_data["version_compatibilities"]
+        ]
+    )
+    await conn.executemany(
+        "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",
+        [(map_data["code"], alias) for alias in map_data["aliases"]]
+    )
+
+
+async def delete_map_relations(code: str, conn) -> None:
+    relations = [
+        ("additional_codes", "belongs_to"),
+        ("creators", "map"),
+        ("verifications", "map"),
+        ("mapver_compatibilities", "map"),
+        ("map_aliases", "map"),
+    ]
+    coros = [
+        conn.execute(f"DELETE FROM {table} WHERE {fkey}=$1", code)
+        for table, fkey in relations
+    ]
+    for coro in coros:
+        await coro
+
+
 @postgres
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
@@ -255,35 +306,67 @@ async def add_map(map_data: dict, conn=None) -> None:
             map_data["r6_start"],
         )
 
-        await conn.executemany(
-            "INSERT INTO additional_codes(code, description, belongs_to) VALUES ($1, $2, $3)",
-            [
-                (obj["code"], obj["description"], map_data["code"])
-                for obj in map_data["additional_codes"]
-            ]
+        await insert_map_relations(map_data, conn)
+
+
+@postgres
+async def edit_map(
+        map_data: dict,
+        map_current: PartialMap | None = None,
+        conn=None
+) -> None:
+    if not map_current:
+        map_current = await get_map(map_data["code"], partial=True, conn=conn)
+
+    async with conn.transaction():
+        for field, model_field in [("placement_allver", "placement_all"), ("placement_curver", "placement_cur")]:
+            if field not in map_data:
+                continue
+            old_pos = getattr(map_current, model_field)
+            new_pos = map_data[field]
+            if old_pos == new_pos:
+                continue
+
+            if old_pos == -1:
+                old_pos = 1000
+            elif new_pos == -1:
+                new_pos = 1000
+
+            await conn.execute(
+                f"""
+                UPDATE maps
+                SET {field} = {field} + SIGN($1-$2)
+                WHERE {field} BETWEEN LEAST($1, $2) AND GREATEST($1, $2)
+                """,
+                old_pos, new_pos
+            )
+
+        fields = [
+            field for field in [
+                "name",
+                "placement_allver",
+                "placement_curver",
+                "difficulty",
+                "map_data",
+                "r6_start"
+            ] if field in map_data
+        ]
+
+        field_format = "{}=${}"
+        await conn.execute(
+            f"""
+            UPDATE maps
+            SET
+                {", ".join([
+                    field_format.format(field, i+2)
+                    for i, field in enumerate(fields)
+                ])}
+            WHERE code=$1
+            """,
+            map_data["code"],
+            *[map_data.get(field) for field in fields],
         )
-        await conn.executemany(
-            "INSERT INTO creators(map, user_id, role) VALUES ($1, $2, $3)",
-            [
-                (map_data["code"], int(obj["id"]), obj["role"])
-                for obj in map_data["creators"]
-            ]
-        )
-        await conn.executemany(
-            "INSERT INTO verifications(map, user_id, version) VALUES ($1, $2, $3)",
-            [
-                (map_data["code"], int(obj["id"]), obj["version"])
-                for obj in map_data["verifiers"]
-            ]
-        )
-        await conn.executemany(
-            "INSERT INTO mapver_compatibilities(map, version, status) VALUES ($1, $2, $3)",
-            [
-                (map_data["code"], obj["version"], obj["status"])
-                for obj in map_data["version_compatibilities"]
-            ]
-        )
-        await conn.executemany(
-            "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",
-            [(map_data["code"], alias) for alias in map_data["aliases"]]
-        )
+
+        await delete_map_relations(map_data["code"], conn)
+
+        await insert_map_relations(map_data, conn)

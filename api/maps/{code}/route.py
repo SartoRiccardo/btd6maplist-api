@@ -1,12 +1,12 @@
 from aiohttp import web
-from src.db.queries.maps import get_map
+from src.db.queries.maps import get_map, edit_map
 import src.utils.routedecos
 from src.utils.validators import validate_full_map
 from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 
 
 @src.utils.routedecos.validate_resource_exists(get_map, "code")
-async def get(request: web.Request, resource: "src.db.models.Map" = None):
+async def get(_r: web.Request, resource: "src.db.models.Map" = None):
     """
     ---
     description: Returns an map's data.
@@ -86,10 +86,10 @@ async def put(
     if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
         del json_body["placement_allver"]
         del json_body["placement_curver"]
-    from pprint import pprint
-    pprint(json_body)
 
-    return web.Response(status=501)
+    await edit_map(json_body, resource)
+
+    return web.Response(status=204)
 
 
 @src.utils.routedecos.bearer_auth
