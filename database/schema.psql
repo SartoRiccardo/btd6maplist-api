@@ -26,11 +26,11 @@ CREATE TABLE maps (
   r6_start TEXT,
   map_data TEXT,
   optimal_hero TEXT NOT NULL DEFAULT '',
-  deleted_on DATETIME,
+  deleted_on TIMESTAMP,
   PRIMARY KEY(code)
 );
 
-CREATE TABLE map_aliases(
+CREATE TABLE map_aliases (
   map VARCHAR(10) NOT NULL,
   alias VARCHAR(20) NOT NULL,
   PRIMARY KEY(alias)
