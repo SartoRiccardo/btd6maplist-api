@@ -15,19 +15,32 @@ postgres = src.db.connection.postgres
 
 @postgres
 async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
-    q_is_verified = f"""
-        SELECT (COUNT(*) > 0)
-        FROM verifications
-        WHERE map=code
-            AND version={get_int_config("current_btd6_ver")}
-    """.strip()
     placement_vname = "placement_curver" if curver else "placement_allver"
     payload = await conn.fetch(f"""
-        SELECT name, code, ({q_is_verified}) AS is_verified, placement_allver,
+        WITH config_vars AS (
+            SELECT
+                ({get_int_config("current_btd6_ver")}) AS current_btd6_ver,
+                ({get_int_config("map_count")}) AS map_count
+        ),
+        verified_current AS (
+            SELECT map, (COUNT(map) > 0) AS is_verified
+            FROM verifications
+            CROSS JOIN config_vars
+            WHERE version=current_btd6_ver
+            GROUP BY map
+        )
+        SELECT
+            name,
+            m.code,
+            is_verified IS NOT NULL,
+            placement_allver,
             placement_curver
-        FROM maps
-        WHERE {placement_vname} > -1
-            AND {placement_vname} <= {get_int_config("map_count")}
+        FROM maps m
+        LEFT JOIN verified_current vc
+            ON m.code=vc.map
+        CROSS JOIN config_vars cvar
+        WHERE {placement_vname} BETWEEN 1 AND cvar.map_count
+            AND deleted_on IS NULL
         ORDER BY {placement_vname} ASC
     """, )
     return [
@@ -42,6 +55,7 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
         SELECT name, code, difficulty
         FROM maps
         WHERE difficulty > -1
+            AND deleted_on IS NULL
     """)
     return [
         PartialExpertMap(row[0], row[1], row[2])
@@ -60,9 +74,9 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
     payload = await conn.fetch(f"""
         SELECT
             code, name, placement_curver, placement_allver, difficulty,
-            r6_start, map_data, ({q_is_verified}) AS is_verified
+            r6_start, map_data, ({q_is_verified}) AS is_verified, deleted_on
         FROM maps
-        WHERE code = $1
+        WHERE code=$1
     """, code)
     if len(payload) == 0:
         return None
@@ -76,6 +90,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
             pl_map[4],
             pl_map[5],
             pl_map[6],
+            pl_map[8],
         )
 
     coros = [
@@ -117,6 +132,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         pl_map[4],
         pl_map[5],
         pl_map[6],
+        pl_map[8],
         [(row[0], row[1], row[2]) for row in pl_creat],
         pl_codes,
         [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],
@@ -391,9 +407,9 @@ async def delete_map(
     updates = []
     indexes = [map_current.placement_cur, map_current.placement_all, map_current.difficulty]
     if modify_pos:
-        updates += ["position_curver=-1", "position_allver=-1"]
-        await update_list_placements("position_curver", map_current.placement_cur, -1)
-        await update_list_placements("position_allver", map_current.placement_all, -1)
+        updates += ["placement_curver=-1", "placement_allver=-1"]
+        await update_list_placements("placement_curver", map_current.placement_cur, -1)
+        await update_list_placements("placement_allver", map_current.placement_all, -1)
         indexes[0] = -1
         indexes[1] = -1
     if modify_diff:
@@ -401,7 +417,7 @@ async def delete_map(
         indexes[2] = -1
 
     if all([x == -1 for x in indexes]):
-        updates.append("deleted_on=current_timestamp")
+        updates.append("deleted_on=CURRENT_TIMESTAMP")
 
     async with conn.transaction():
         await conn.execute(

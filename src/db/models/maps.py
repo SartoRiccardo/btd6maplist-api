@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -86,6 +87,10 @@ class PartialMap:
         type: string
         nullable: true
         description: URL to the map data.
+      deleted_on:
+        type: integer
+        nullable: true
+        description: Timestamp of the map's deletion (in seconds).
     """
     code: str
     name: str
@@ -94,6 +99,7 @@ class PartialMap:
     difficulty: int | None
     r6_start: str | None
     map_data: str
+    deleted_on: datetime | None
 
     def to_dict(self) -> dict:
         return {
@@ -104,6 +110,7 @@ class PartialMap:
             "difficulty": self.difficulty,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
+            "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
         }
 
 

@@ -156,6 +156,7 @@ valid_completions AS (
     CROSS JOIN config_values cv
     WHERE m.placement_curver BETWEEN 0 AND cv.map_count
       AND lc.format IN (0, 1)
+      AND m.deleted_on IS NULL
 ),
 user_points AS (
     SELECT
@@ -203,6 +204,7 @@ valid_completions AS (
     CROSS JOIN config_values cv
     WHERE m.placement_allver BETWEEN 0 AND cv.map_count
       AND lc.format IN (0, 2)
+      AND m.deleted_on IS NULL
 ),
 user_points AS (
     SELECT
@@ -240,6 +242,7 @@ leaderboard AS (
     CROSS JOIN config_values cv
     WHERE m.placement_curver BETWEEN 0 AND cv.map_count
         AND lccs.format IN (0, 1)
+        AND m.deleted_on IS NULL
     GROUP BY lccp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -257,6 +260,7 @@ leaderboard AS (
     CROSS JOIN config_values cv
     WHERE m.placement_allver BETWEEN 0 AND cv.map_count
         AND lccs.format IN (0, 2)
+        AND m.deleted_on IS NULL
     GROUP BY lccp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement

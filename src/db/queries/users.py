@@ -60,6 +60,7 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
         JOIN maps m
             ON lc.map=m.code
         WHERE lc.user_id=$1
+            AND m.deleted_on IS NULL
         ORDER BY
             runs.current_lcc DESC,
             runs.no_geraldo DESC,
@@ -82,7 +83,7 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
             completions.append(
                 ListCompletion(
                     PartialMap(
-                        run[0], *curmap
+                        run[0], *curmap, None
                     ),
                     int(id),
                     *run[1:4],
@@ -96,7 +97,7 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
     completions.append(
         ListCompletion(
             PartialMap(
-                run[0], *curmap
+                run[0], *curmap, None
             ),
             int(id),
             *run[1:4],
@@ -135,10 +136,11 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         FROM maps m JOIN creators c
             ON m.code = c.map
         WHERE c.user_id=$1
+            AND m.deleted_on IS NULL
         """,
         int(id)
     )
-    return [PartialMap(*m) for m in payload]
+    return [PartialMap(*m, None) for m in payload]
 
 
 async def get_user(id) -> User | None:
