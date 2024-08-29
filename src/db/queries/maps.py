@@ -283,15 +283,7 @@ async def delete_map_relations(code: str, conn) -> None:
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
         for field in ["placement_allver", "placement_curver"]:
-            if map_data[field] > -1:
-                await conn.execute(
-                    f"""
-                    UPDATE maps
-                    SET {field} = {field}+1
-                    WHERE {field} >= $1
-                    """,
-                    map_data[field]
-                )
+            await update_list_placements("position_curver", -1, map_data[field])
 
         await conn.execute(
             """
@@ -324,22 +316,7 @@ async def edit_map(
                 continue
             old_pos = getattr(map_current, model_field)
             new_pos = map_data[field]
-            if old_pos == new_pos:
-                continue
-
-            if old_pos == -1:
-                old_pos = 1000
-            elif new_pos == -1:
-                new_pos = 1000
-
-            await conn.execute(
-                f"""
-                UPDATE maps
-                SET {field} = {field} + SIGN($1::int - $2::int)
-                WHERE {field} BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)
-                """,
-                old_pos, new_pos
-            )
+            await update_list_placements(field, old_pos, new_pos, conn=conn)
 
         fields = [
             field for field in [
@@ -370,3 +347,69 @@ async def edit_map(
         await delete_map_relations(map_data["code"], conn)
 
         await insert_map_relations(map_data, conn)
+
+
+@postgres
+async def update_list_placements(
+        field: str,
+        old_pos: int,
+        new_pos: int,
+        conn=None
+) -> None:
+    if old_pos == new_pos:
+        return
+    if old_pos == -1:
+        old_pos = 1000
+    elif new_pos == -1:
+        new_pos = 1000
+
+    await conn.execute(
+        f"""
+        UPDATE maps
+        SET {field} = {field} + SIGN($1::int - $2::int)
+        WHERE {field} BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)
+        """,
+        old_pos, new_pos
+    )
+
+
+@postgres
+async def delete_map(
+        code: str,
+        *,
+        map_current: PartialMap | None = None,
+        modify_diff: bool = False,
+        modify_pos: bool = False,
+        conn=None
+) -> None:
+    if not (modify_diff or modify_pos):
+        return
+
+    if not map_current:
+        map_current = await get_map(code, partial=True, conn=conn)
+
+    updates = []
+    indexes = [map_current.placement_cur, map_current.placement_all, map_current.difficulty]
+    if modify_pos:
+        updates += ["position_curver=-1", "position_allver=-1"]
+        await update_list_placements("position_curver", map_current.placement_cur, -1)
+        await update_list_placements("position_allver", map_current.placement_all, -1)
+        indexes[0] = -1
+        indexes[1] = -1
+    if modify_diff:
+        updates.append("difficulty=-1")
+        indexes[2] = -1
+
+    if all([x == -1 for x in indexes]):
+        updates.append("deleted_on=current_timestamp")
+
+    async with conn.transaction():
+        await conn.execute(
+            f"""
+            UPDATE maps
+            SET
+                {", ".join(updates)}
+            WHERE code=$1
+            """,
+            code
+        )
