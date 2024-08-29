@@ -1,6 +1,7 @@
 import asyncpg
 import config
 from src.utils.colors import red
+from functools import wraps
 
 pool: asyncpg.Pool | None
 
@@ -18,7 +19,11 @@ async def start():
 
 
 def postgres(wrapped):
+    @wraps(wrapped)
     async def wrapper(*args, **kwargs):
+        if "conn" in kwargs:
+            return await wrapped(*args, **kwargs)
+
         if pool is None:
             return
         async with pool.acquire() as conn:
