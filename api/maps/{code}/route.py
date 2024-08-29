@@ -103,9 +103,9 @@ async def delete(
 ):
     """
     ---
-    description: >
-    Soft deletes a map. Must be a Maplist or Expert List Moderator.
-    Deleted maps and all their data are kept in the database, but ignored.
+    description: |
+      Soft deletes a map. Must be a Maplist or Expert List Moderator.
+      Deleted maps and all their data are kept in the database, but ignored.
     tags:
     - The List
     - Expert List
