@@ -335,8 +335,8 @@ async def edit_map(
             await conn.execute(
                 f"""
                 UPDATE maps
-                SET {field} = {field} + SIGN($1-$2)
-                WHERE {field} BETWEEN LEAST($1, $2) AND GREATEST($1, $2)
+                SET {field} = {field} + SIGN($1::int - $2::int)
+                WHERE {field} BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)
                 """,
                 old_pos, new_pos
             )
