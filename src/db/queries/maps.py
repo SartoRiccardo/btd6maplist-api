@@ -3,6 +3,7 @@ import src.db.connection
 from src.db.models import (
     PartialListMap,
     PartialExpertMap,
+    PartialMap,
     Map,
     LCC,
     ListCompletion
@@ -49,7 +50,7 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 
 
 @postgres
-async def get_map(code, conn=None) -> Map | None:
+async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | None:
     q_is_verified = f"""
         SELECT COUNT(*) > 0
         FROM verifications
@@ -66,6 +67,16 @@ async def get_map(code, conn=None) -> Map | None:
     if len(payload) == 0:
         return None
     pl_map = payload[0]
+    if partial:
+        return PartialMap(
+            pl_map[0],
+            pl_map[1],
+            pl_map[2],
+            pl_map[3],
+            pl_map[4],
+            pl_map[5],
+            pl_map[6],
+        )
 
     coros = [
         get_lccs_for(code),

@@ -25,7 +25,8 @@ CREATE TABLE maps (
   difficulty INT DEFAULT -1,
   r6_start TEXT,
   map_data TEXT,
-  optimal_hero TEXT,
+  optimal_hero TEXT NOT NULL DEFAULT '',
+  deleted_on DATETIME,
   PRIMARY KEY(code)
 );
 
@@ -85,7 +86,7 @@ CREATE TABLE list_completions (
   map VARCHAR(10) NOT NULL,
   user_id BIGINT NOT NULL,
   black_border BOOLEAN,
-  no_geraldo BOOLEAN,
+  no_geraldo BOOLEAN,  -- no optimal hero
   current_lcc BOOLEAN,
   format INT DEFAULT 0
 );
