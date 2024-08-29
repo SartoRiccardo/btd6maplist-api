@@ -50,6 +50,8 @@ def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
             f"https://discord.com/api/v10/users/@me/guilds/{MAPLIST_GUILD_ID}/member",
             headers={"Authorization": f"Bearer {token}"}
         )
+        r = disc_response
+        print(r.from_cache, r.created_at, r.expires, r.is_expired)
         if not disc_response.ok:
             return web.Response(status=401)
 

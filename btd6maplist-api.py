@@ -4,12 +4,12 @@ import re
 import ssl
 import sys
 import asyncio
-import aiohttp
 import aiohttp_swagger
 import importlib
 from importlib import util
 import contextlib
 from config import APP_HOST, APP_PORT, CORS_ORIGINS
+import aiohttp_client_cache
 from aiohttp import web
 import src.http
 import src.db.connection
@@ -19,10 +19,22 @@ from src.utils.colors import purple, green, yellow, blue, red, cyan
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
 async def init_client_session(_app):
+    cache = aiohttp_client_cache.SQLiteBackend(
+        cache_name="~/.cache/aiohttp-requests.db",
+        expire_after=0,
+        urls_expire_after={
+            "data.ninjakiwi.com": 60*5,
+            "discord.com": 60,
+        },
+        include_headers=True,
+    )
+
     async def init_session():
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp_client_cache.CachedSession(cache=cache) as session:
             src.http.set_session(session)
-            await asyncio.Future()  # Run forever
+            while True:
+                await session.delete_expired_responses()
+                await asyncio.sleep(3600 * 24 * 5)
 
     task = asyncio.create_task(init_session())
 
