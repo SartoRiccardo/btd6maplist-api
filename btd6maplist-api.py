@@ -23,7 +23,7 @@ async def init_client_session(_app):
         cache_name="~/.cache/aiohttp-requests.db",
         expire_after=0,
         urls_expire_after={
-            "data.ninjakiwi.com": 60*5,
+            "data.ninjakiwi.com": 3600*24,
             "discord.com": 60,
         },
         include_headers=True,
@@ -175,7 +175,9 @@ async def redirect_to_swagger(r):
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    app = web.Application()
+    app = web.Application(
+        client_max_size=1024**2 * 2,
+    )
     app.add_routes(get_routes())
     swagger(app)
     app.router.add_get("/", redirect_to_swagger)
