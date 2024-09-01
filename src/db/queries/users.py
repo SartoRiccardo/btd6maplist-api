@@ -50,7 +50,7 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
         SELECT
             lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
             m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, lc.format
+            m.r6_start, m.map_data, m.optimal_heros, lc.format
         FROM unique_runs runs
         JOIN list_completions lc
             ON runs.map = lc.map
@@ -72,32 +72,35 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[List
     if not len(payload):
         return []
 
+    map_start_idx = 4
+    map_end_idx = 11
+
     completions = []
-    run = payload[0][:4]
-    curmap = payload[0][4:10]
+    run = payload[0][:map_start_idx]
+    curmap = payload[0][map_start_idx:map_end_idx]
     formats = []
     for i, row in enumerate(payload):
-        if list_eq(row[:4], run):
-            formats.append(row[10])
+        if list_eq(row[:map_start_idx], run):
+            formats.append(row[map_end_idx])
         else:
             completions.append(
                 ListCompletion(
                     PartialMap(
-                        run[0], *curmap, None
+                        run[0], *curmap[:-1], None, curmap[-1].split(";")
                     ),
                     int(id),
-                    *run[1:4],
+                    *run[1:map_start_idx],
                     formats,
                 )
             )
-            run = row[:4]
-            curmap = row[4:10]
-            formats = [row[10]]
+            run = row[:map_start_idx]
+            curmap = row[map_start_idx:map_end_idx]
+            formats = [row[map_end_idx]]
 
     completions.append(
         ListCompletion(
             PartialMap(
-                run[0], *curmap, None
+                run[0], *curmap[:-1], None, curmap[-1].split(";")
             ),
             int(id),
             *run[1:4],
@@ -132,7 +135,7 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         """
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data
+            m.r6_start, m.map_data, m.optimal_heros
         FROM maps m JOIN creators c
             ON m.code = c.map
         WHERE c.user_id=$1
@@ -140,7 +143,7 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         """,
         int(id)
     )
-    return [PartialMap(*m, None) for m in payload]
+    return [PartialMap(*m[-1], m[-1].split(";"), None) for m in payload]
 
 
 async def get_user(id) -> User | None:

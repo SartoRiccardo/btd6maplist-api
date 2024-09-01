@@ -25,7 +25,7 @@ CREATE TABLE maps (
   difficulty INT DEFAULT -1,
   r6_start TEXT,
   map_data TEXT,
-  optimal_hero TEXT NOT NULL DEFAULT '',
+  optimal_heros TEXT NOT NULL DEFAULT '',
   deleted_on TIMESTAMP,
   PRIMARY KEY(code)
 );

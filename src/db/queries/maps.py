@@ -74,7 +74,8 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
     payload = await conn.fetch(f"""
         SELECT
             code, name, placement_curver, placement_allver, difficulty,
-            r6_start, map_data, ({q_is_verified}) AS is_verified, deleted_on
+            r6_start, map_data, ({q_is_verified}) AS is_verified, deleted_on,
+            optimal_heros
         FROM maps
         WHERE code=$1
     """, code)
@@ -91,6 +92,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
             pl_map[5],
             pl_map[6],
             pl_map[8],
+            pl_map[9].split(";"),
         )
 
     coros = [
@@ -133,6 +135,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         pl_map[5],
         pl_map[6],
         pl_map[8],
+        pl_map[9].split(";"),
         [(row[0], row[1], row[2]) for row in pl_creat],
         pl_codes,
         [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],

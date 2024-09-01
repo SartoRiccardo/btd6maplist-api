@@ -87,6 +87,27 @@ class PartialMap:
         type: string
         nullable: true
         description: URL to the map data.
+      optimal_heros:
+        type: array
+        items:
+        - type: string
+          enum:
+          - quincy
+          - gwen
+          - obyn
+          - striker
+          - churchill
+          - ben
+          - ezili
+          - pat
+          - adora
+          - brickell
+          - etienne
+          - sauda
+          - psi
+          - geraldo
+          - corvus
+          - rosalia
       deleted_on:
         type: integer
         nullable: true
@@ -100,6 +121,7 @@ class PartialMap:
     r6_start: str | None
     map_data: str
     deleted_on: datetime | None
+    optimal_heros: list[str]
 
     def to_dict(self) -> dict:
         return {
@@ -110,6 +132,7 @@ class PartialMap:
             "difficulty": self.difficulty,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
+            "optimal_heros": self.optimal_heros,
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
         }
 
