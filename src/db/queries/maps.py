@@ -302,19 +302,19 @@ async def delete_map_relations(code: str, conn) -> None:
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
         for field in ["placement_allver", "placement_curver"]:
-            await update_list_placements("position_curver", -1, map_data[field])
+            await update_list_placements(field, -1, map_data[field])
 
         await conn.execute(
             """
             INSERT INTO maps(
                 code, name, placement_allver, placement_curver, difficulty,
-                map_data, r6_start
+                map_data, r6_start, optimal_heros
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             """,
             map_data["code"], map_data["name"], map_data["placement_allver"],
             map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
-            map_data["r6_start"],
+            map_data["r6_start"], ";".join(map_data["optimal_heros"])
         )
 
         await insert_map_relations(map_data, conn)
@@ -326,6 +326,7 @@ async def edit_map(
         map_current: PartialMap | None = None,
         conn=None
 ) -> None:
+    map_data["optimal_heros"] = ";".join(map_data["optimal_heros"])
     if not map_current:
         map_current = await get_map(map_data["code"], partial=True, conn=conn)
 
@@ -344,7 +345,8 @@ async def edit_map(
                 "placement_curver",
                 "difficulty",
                 "map_data",
-                "r6_start"
+                "r6_start",
+                "optimal_heros",
             ] if field in map_data
         ]
 

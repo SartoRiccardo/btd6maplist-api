@@ -62,7 +62,7 @@ def typecheck_full_map(body: dict) -> dict:
         "verifiers": [{"id": str, "version": int | None}],
         "aliases": [str],
         "version_compatibilities": [{"version": int, "status": int}],
-        # "optimal_heros": [str],
+        "optimal_heros": [str],
     }
     check = check_fields(body, check_fields_exists)
     if len(check):
@@ -136,6 +136,14 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
             errors[f"version_compatibilities[{i}].status"] = "Must be between 0 and 3, included"
+
+    allowed_heros = [
+        "quincy", "gwen", "obyn", "striker", "churchill", "ben", "ezili", "pat", "adora", "brickell", "etienne",
+        "sauda", "psi", "geraldo", "corvus", "rosalia",
+    ]
+    for i, hero in enumerate(body["optimal_heros"]):
+        if hero not in allowed_heros:
+            errors["optimal_heros[i].hero"] = "That hero doesn't exist"
 
     return errors
 

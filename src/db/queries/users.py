@@ -143,7 +143,7 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         """,
         int(id)
     )
-    return [PartialMap(*m[-1], m[-1].split(";"), None) for m in payload]
+    return [PartialMap(*m[:-1], None, m[-1].split(";")) for m in payload]
 
 
 async def get_user(id) -> User | None:

@@ -90,7 +90,7 @@ class PartialMap:
       optimal_heros:
         type: array
         items:
-        - type: string
+          type: string
           enum:
           - quincy
           - gwen
