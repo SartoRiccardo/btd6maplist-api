@@ -108,7 +108,7 @@ async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Re
                                 (propositions[data['type']][data["proposed"]] + " Expert"),
                         },
                     ],
-                    "color": 0x38761d if data["type"] == "list" else 0x990099
+                    "color": 0x2e7d32 if data["type"] == "list" else 0x7b1fa2
                 },
                 {
                     "url": f"https://join.btd6.com/Map/{data['code']}",
