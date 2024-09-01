@@ -8,6 +8,7 @@ from src.db.queries.users import get_user_min
 
 
 MAX_TEXT_LEN = 100
+MAX_LONG_TEXT_LEN = 500
 MAX_ADD_CODES = 5
 
 
@@ -47,7 +48,7 @@ def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str 
     return {}
 
 
-def typecheck_full_map(body: dict):
+def typecheck_full_map(body: dict) -> dict:
     check_fields_exists = {
         "code": str,
         "name": str,
@@ -136,4 +137,30 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
         if not (0 <= vcompat["status"] <= 3):
             errors[f"version_compatibilities[{i}].status"] = "Must be between 0 and 3, included"
 
+    return errors
+
+
+def typecheck_submission(body: dict) -> dict:
+    check_fields_exists = {
+        "code": str,
+        "notes": str | None,
+        "proposed": int,
+        "type": str,
+    }
+    check = check_fields(body, check_fields_exists)
+    if len(check):
+        return check
+
+
+async def validate_submission(body: dict) -> dict:
+    if check_fail := typecheck_submission(body):
+        return check_fail
+
+    errors = {}
+    if await map_exists(body["code"]):
+        return {"code": "Map already exists"}
+    if body["notes"] and len(body["notes"]) > MAX_LONG_TEXT_LEN:
+        errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
+    if body["type"] not in ["list", "experts"]:
+        errors["type"] = f"Must be either `list` or `experts`"
     return errors
