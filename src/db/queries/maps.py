@@ -9,7 +9,6 @@ from src.db.models import (
     ListCompletion
 )
 from src.db.queries.subqueries import get_int_config
-from src.utils.misc import list_eq
 postgres = src.db.connection.postgres
 
 
@@ -96,7 +95,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         )
 
     coros = [
-        get_lccs_for(code),
+        get_lccs_for(code, conn=conn),
         conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
         conn.fetch(
             """
@@ -146,93 +145,93 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
     )
 
 
+def parse_runs_payload(payload, has_count: bool = True) -> list[ListCompletion]:
+    run_idx = 0 + int(has_count)
+    lcc_idx = 6 + int(has_count)
+    agg_idx = 9 + int(has_count)
+
+    return [
+        ListCompletion(
+            run[run_idx],
+            run[run_idx + 1],
+            list(set(run[agg_idx])),
+            run[run_idx + 2],
+            run[run_idx + 3],
+            run[run_idx + 4],
+            run[run_idx + 5],
+            LCC(*run[lcc_idx:agg_idx]) if run[lcc_idx] else None,
+        )
+        for run in payload
+    ]
+
+
 @postgres
-async def get_lccs_for(code, conn=None) -> list[LCC]:
+async def get_lccs_for(code, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         """
-        WITH lcc_mins AS (
-            SELECT format, MIN(leftover) AS leftover
-            FROM leastcostchimps
-            WHERE map=$1
-            GROUP BY(format)
-        ),
-        lcc_runs AS (
-            SELECT lcc.id, lcc.leftover, lcc.proof, lcc.format
-            FROM leastcostchimps lcc
-            JOIN lcc_mins mins
-                ON mins.leftover=lcc.leftover
-                AND mins.format=lcc.format
-            WHERE lcc.map=$1
-        )
-        SELECT runs.*, rp.user_id, name
-        FROM lcc_players rp
-        JOIN lcc_runs runs
-            ON rp.lcc_run=runs.id
-        JOIN users u
-            ON rp.user_id=u.discord_id
+        SELECT
+            runs.id, runs.map, runs.black_border, runs.no_geraldo, TRUE,
+            runs.format,
+
+            lccs.id, lccs.proof, lccs.leftover,
+
+            ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids
+        FROM list_completions runs
+        JOIN lccs_by_map lbm
+            ON lbm.id = runs.lcc
+        JOIN leastcostchimps lccs
+            ON runs.lcc = lccs.id
+        JOIN listcomp_players ply
+            ON ply.run = runs.id
+        WHERE runs.map = $1
         """,
         code,
     )
     if not len(payload):
         return []
 
-    lccs = []
-    run = payload[0][:4]
-    players = []
-    for i, row in enumerate(payload):
-        if run[0] == row[0]:
-            players.append((row[4], row[5]))
-        else:
-            lccs.append(LCC(*run, players))
-            run = row[:4]
-            players = [(row[4], row[5])]
-    lccs.append(LCC(*run, players))
-    return lccs
+    return parse_runs_payload(payload, has_count=False)
 
 
 @postgres
-async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
+async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
     payload = await conn.fetch(
         f"""
-        WITH unique_runs AS (
-            SELECT DISTINCT user_id, black_border, no_geraldo, current_lcc
-            FROM list_completions
-            WHERE map=$1
-            ORDER BY current_lcc DESC,
-                no_geraldo DESC,
-                black_border DESC,
-                user_id ASC
-            LIMIT $3
-            OFFSET $2
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            LEFT JOIN lccs_by_map lccs
+                ON lccs.id = r.lcc
+            WHERE r.map = $1
+        ),
+        unique_runs AS (
+            SELECT
+                rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+                rwf.format,
+                
+                lccs.id, lccs.proof, lccs.leftover,
+                
+                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
+            FROM runs_with_flags rwf
+            JOIN listcomp_players ply
+                ON ply.run = rwf.id
+            LEFT JOIN leastcostchimps lccs
+                ON rwf.lcc = lccs.id
         )
-        SELECT runs.*, lc.format
-        FROM unique_runs runs JOIN list_completions lc ON runs.user_id = lc.user_id AND
-            runs.black_border = lc.black_border AND
-            runs.no_geraldo = lc.no_geraldo AND
-            runs.current_lcc = lc.current_lcc
-        WHERE map=$1
-        ORDER BY runs.current_lcc DESC,
-            runs.no_geraldo DESC,
-            runs.black_border DESC,
-            runs.user_id ASC
+        SELECT COUNT(*) OVER() AS total_count, uq.*
+        FROM unique_runs uq
+        ORDER BY
+            uq.current_lcc DESC,
+            uq.no_geraldo DESC,
+            uq.black_border DESC,
+            uq.user_ids ASC
+        LIMIT $3
+        OFFSET $2
         """,
         code, idx_start, amount,
     )
-    if not len(payload):
-        return []
 
-    completions = []
-    run = payload[0][:4]
-    formats = []
-    for i, row in enumerate(payload):
-        if list_eq(row[:4], run):
-            formats.append(row[4])
-        else:
-            completions.append(ListCompletion(code, *run, formats))
-            run = row[:4]
-            formats = [row[4]]
-    completions.append(ListCompletion(code, *run, formats))
-    return completions
+    return parse_runs_payload(payload), payload[0][0] if len(payload) else 0
 
 
 @postgres

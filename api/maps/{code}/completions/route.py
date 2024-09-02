@@ -35,5 +35,8 @@ async def get(request: web.Request):
               items:
                 $ref: "#/components/schemas/ListCompletion"
     """
-    completions = await get_completions_for(request.match_info["code"])
-    return web.json_response([cmp.to_dict() for cmp in completions])
+    completions, total = await get_completions_for(request.match_info["code"])
+    return web.json_response({
+        "total": total,
+        "completions": [cmp.to_dict() for cmp in completions],
+    })

@@ -193,7 +193,9 @@ class Map(PartialMap):
           type: boolean
           description: "`true` if the map was verified in the current update."
         lccs:
-          $ref: "#/components/schemas/LCC"
+          type: array
+          items:
+            $ref: "#/components/schemas/ListCompletion"
         map_data_compatibility:
           type: array
           items:
@@ -217,7 +219,7 @@ class Map(PartialMap):
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, float | None, str]]
     verified: bool
-    lccs: list["src.db.models.challenges.LCC"]
+    lccs: list["src.db.models.challenges.ListCompletion"]
     map_data_compatibility: list[tuple[int, int]]
     aliases: list[str]
 
