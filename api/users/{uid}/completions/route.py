@@ -42,11 +42,11 @@ async def get(request: web.Request):
                   items:
                     $ref: "#/components/schemas/ListCompletionWithMap"
     """
-    page = 1
-    if "page" in request.query and request.query["page"].isnumeric():
-        page = int(request.query["page"])
-        if page <= 0:
-            page = 1
+    page = request.query.get("page")
+    if not (page and page.isnumeric()):
+        page = 1
+    else:
+        page = max(1, int(page))
 
     completions, count = await get_completions_by(
         request.match_info["uid"],

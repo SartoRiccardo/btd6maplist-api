@@ -2,7 +2,7 @@ from aiohttp import web
 from src.db.queries.maps import get_completions_for
 
 
-ITEMS_PER_PAGE = 50
+PAGE_ENTRIES = 50
 
 
 async def get(request: web.Request):
@@ -31,11 +31,27 @@ async def get(request: web.Request):
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/ListCompletion"
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: The total count of player entries, for pagination.
+                completions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ListCompletion"
     """
-    completions, total = await get_completions_for(request.match_info["code"])
+    page = request.query.get("page")
+    if not (page and page.isnumeric()):
+        page = 1
+    else:
+        page = max(1, int(page))
+
+    completions, total = await get_completions_for(
+        request.match_info["code"],
+        idx_start=PAGE_ENTRIES * (page-1),
+        amount=PAGE_ENTRIES,
+    )
     return web.json_response({
         "total": total,
         "completions": [cmp.to_dict() for cmp in completions],
