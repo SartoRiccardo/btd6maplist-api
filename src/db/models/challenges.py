@@ -22,8 +22,8 @@ class LCC:
           the correct saveup.
     """
     id: int
-    leftover: int
     proof: str
+    leftover: int
 
     def to_dict(self) -> dict:
         return {
