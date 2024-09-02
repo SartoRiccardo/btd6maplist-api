@@ -201,3 +201,45 @@ async def edit_user(id: str, name: str, oak: str | None, conn=None) -> bool:
         int(id), name, oak,
     )
     return int(rows.split(" ")[1]) == 1
+
+
+@postgres
+async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCompletion]:
+    payload = await conn.fetch(
+        """
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            LEFT JOIN lccs_by_map lccs
+                ON lccs.id = r.lcc
+            JOIN listcomp_players ply
+                ON ply.run = r.id
+            WHERE r.map = $2
+                AND ply.user_id = $1
+        )
+        SELECT
+            r.id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
+            lcc.id, lcc.proof, lcc.leftover,
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids
+        FROM runs_with_flags r
+        JOIN listcomp_players ply
+            ON ply.run = r.id
+        LEFT JOIN leastcostchimps lcc
+            ON lcc.id = r.lcc
+        """,
+        int(user_id), code,
+    )
+
+    return [
+        ListCompletion(
+            row[0],
+            row[1],
+            row[9],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+            LCC(row[6], row[7], row[8]) if row[6] else None
+        )
+        for row in payload
+    ]
