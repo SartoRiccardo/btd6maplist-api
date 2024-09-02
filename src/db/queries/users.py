@@ -1,7 +1,7 @@
 import asyncio
 import src.db.connection
-from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion
-from src.utils.misc import list_eq
+from src.utils.misc import aggregate_payload
+from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC
 postgres = src.db.connection.postgres
 
 
@@ -34,80 +34,76 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> list[ListCompletion]:
+async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
+    partition = "rwf.map,rwf.no_geraldo,rwf.black_border,rwf.current_lcc"
     payload = await conn.fetch(
         f"""
-        WITH unique_runs AS (
-            SELECT DISTINCT map, black_border, no_geraldo, current_lcc
-            FROM list_completions
-            WHERE user_id=$1
-            ORDER BY current_lcc DESC,
-                no_geraldo DESC,
-                black_border DESC
-            LIMIT $3
-            OFFSET $2
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            JOIN listcomp_players ply
+                ON ply.run = r.id
+            LEFT JOIN lccs_by_map lccs
+                ON lccs.id = r.lcc
+            WHERE ply.user_id = $1
+        ),
+        unique_runs AS (
+            SELECT DISTINCT ON
+                (rwf.map, rwf.no_geraldo, rwf.black_border, rwf.current_lcc)
+                rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+                
+                m.name, m.placement_curver, m.placement_allver, m.difficulty,
+                m.r6_start, m.map_data, m.optimal_heros,
+                
+                lccs.id, lccs.proof, lccs.leftover,
+    
+                ARRAY_AGG(rwf.format) OVER (PARTITION by {partition}) AS formats,
+                ARRAY_AGG(ply.user_id) OVER (PARTITION by {partition}) AS user_ids
+            FROM runs_with_flags rwf
+            JOIN listcomp_players ply
+                ON ply.run = rwf.id
+            LEFT JOIN leastcostchimps lccs
+                ON rwf.lcc = lccs.id
+            JOIN maps m
+                ON m.code = rwf.map
+            WHERE m.deleted_on IS NULL
         )
-        SELECT
-            lc.map, lc.black_border, lc.no_geraldo, lc.current_lcc,
-            m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, m.optimal_heros, lc.format
-        FROM unique_runs runs
-        JOIN list_completions lc
-            ON runs.map = lc.map
-            AND runs.black_border = lc.black_border
-            AND runs.no_geraldo = lc.no_geraldo
-            AND runs.current_lcc = lc.current_lcc
-        JOIN maps m
-            ON lc.map=m.code
-        WHERE lc.user_id=$1
-            AND m.deleted_on IS NULL
+        SELECT COUNT(*) OVER() AS total_count, uq.*
+        FROM unique_runs uq
         ORDER BY
-            runs.current_lcc DESC,
-            runs.no_geraldo DESC,
-            runs.black_border DESC,
-            runs.map ASC
+            uq.current_lcc DESC,
+            uq.no_geraldo DESC,
+            uq.black_border DESC,
+            uq.map ASC
+        LIMIT $3
+        OFFSET $2
         """,
         int(id), idx_start, amount,
     )
-    if not len(payload):
-        return []
 
-    map_start_idx = 4
-    map_end_idx = 11
+    import pprint
+    pprint.pp([list(pl) for pl in payload])
 
-    completions = []
-    run = payload[0][:map_start_idx]
-    curmap = payload[0][map_start_idx:map_end_idx]
-    formats = []
-    for i, row in enumerate(payload):
-        if list_eq(row[:map_start_idx], run):
-            formats.append(row[map_end_idx])
-        else:
-            completions.append(
-                ListCompletion(
-                    PartialMap(
-                        run[0], *curmap[:-1], None, curmap[-1].split(";")
-                    ),
-                    int(id),
-                    *run[1:map_start_idx],
-                    formats,
-                )
-            )
-            run = row[:map_start_idx]
-            curmap = row[map_start_idx:map_end_idx]
-            formats = [row[map_end_idx]]
+    map_sidx = 5
+    map_eidx = 12
+    lcc_eidx = 15
+    group_sidx = lcc_eidx
 
-    completions.append(
+    return [
         ListCompletion(
             PartialMap(
-                run[0], *curmap[:-1], None, curmap[-1].split(";")
+                run[1],
+                *run[map_sidx:map_eidx][:-1],
+                None,
+                run[map_sidx:map_eidx][-1].split(";")
             ),
-            int(id),
-            *run[1:4],
-            formats,
+            list(set(run[group_sidx+1])),
+            *run[2:map_sidx],
+            list(set(run[group_sidx])),
+            LCC(*run[map_eidx:lcc_eidx]) if run[map_eidx] else None,
         )
-    )
-    return completions
+        for run in payload
+    ], payload[0][0] if len(payload) else 0
 
 
 @postgres
@@ -146,16 +142,20 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
     return [PartialMap(*m[:-1], None, m[-1].split(";")) for m in payload]
 
 
-async def get_user(id) -> User | None:
-    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps, completions = await asyncio.gather(
-        get_user_min(id),
-        get_maplist_placement(id),
-        get_maplist_placement(id, curver=False),
-        get_maplist_placement(id, type="lcc"),
-        get_maplist_placement(id, curver=False, type="lcc"),
-        get_maps_created_by(id),
-        get_completions_by(id)
-    )
+@postgres
+async def get_user(id, conn=None) -> User | None:
+    coros = [
+        get_user_min(id, conn=conn),
+        get_maplist_placement(id, conn=conn),
+        get_maplist_placement(id, curver=False, conn=conn),
+        get_maplist_placement(id, type="lcc", conn=conn),
+        get_maplist_placement(id, curver=False, type="lcc", conn=conn),
+        get_maps_created_by(id, conn=conn),
+    ]
+
+    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = [
+        await coro for coro in coros
+    ]
     if not puser:
         return None
 
@@ -175,7 +175,6 @@ async def get_user(id) -> User | None:
             alllcc_pos[1],
             alllcc_pos[0],
         ),
-        completions,
         maps,
     )
 

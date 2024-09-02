@@ -31,9 +31,16 @@ async def get(request: web.Request):
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/ListCompletionWithMap"
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: The total count of player entries, for pagination.
+                completions:
+                  type: array
+                  description: The player's completions
+                  items:
+                    $ref: "#/components/schemas/ListCompletionWithMap"
     """
     page = 1
     if "page" in request.query and request.query["page"].isnumeric():
@@ -41,9 +48,12 @@ async def get(request: web.Request):
         if page <= 0:
             page = 1
 
-    completions = await get_completions_by(
+    completions, count = await get_completions_by(
         request.match_info["uid"],
         idx_start=(page-1)*PAGE_ENTRIES,
         amount=PAGE_ENTRIES,
     )
-    return web.json_response([cmp.to_dict() for cmp in completions])
+    return web.json_response({
+        "total": count,
+        "completions": [cmp.to_dict() for cmp in completions],
+    })

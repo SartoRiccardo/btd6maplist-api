@@ -20,3 +20,29 @@ def index_where(l: list, cond) -> int:
         if cond(l[i]):
             return i
     return -1
+
+
+def aggregate_payload(
+        payload: list,
+        distinct_range: range = None,
+        to_group_range: range = None,
+):
+    di_s = distinct_range.start
+    di_e = distinct_range.stop
+    tgi_s = to_group_range.start
+
+    new_pl = []
+    current = None
+    unchanged = None
+    grouped = None
+    for row in payload:
+        if current is None or not list_eq(current, row[di_s:di_e]):
+            if current is not None:
+                new_pl.append([*current, *unchanged, *[list(set(f)) for f in grouped]])
+            current = row[di_s:di_e]
+            unchanged = row[di_e:tgi_s]
+            grouped = [[] for _ in to_group_range]
+        for i in to_group_range:
+            grouped[i-tgi_s].append(row[i])
+    new_pl.append([*current, *unchanged, *[list(set(f)) for f in grouped]])
+    return new_pl
