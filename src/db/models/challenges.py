@@ -38,6 +38,9 @@ class ListCompletion:
     """
     type: object
     properties:
+      id:
+        type: integer
+        description: The completion's unique ID
       map:
         type: string
         description: The code of the map that was completed
@@ -56,11 +59,8 @@ class ListCompletion:
       current_lcc:
         type: boolean
         description: "`true` if the run is the current LCC for the map."
-      formats:
-        type: array
-        items:
-          $ref: "#/components/schemas/MaplistFormat"
-        description: A list of Maplist formats this run was valid in.
+      format:
+        $ref: "#/components/schemas/MaplistFormat"
     ---
     ListCompletionWithMap:
       allOf:
@@ -70,21 +70,23 @@ class ListCompletion:
           map:
             $ref: "#/components/schemas/PartialMap"
     """
+    id: int
     map: str | PartialMap
     user_ids: list[int]
     black_border: bool
     no_geraldo: bool
     current_lcc: bool
-    formats: list[int]
+    format: int
     lcc: LCC | None
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
             "user_ids": [str(usr) for usr in self.user_ids],
             "black_border": self.black_border,
             "no_geraldo": self.no_geraldo,
             "current_lcc": self.current_lcc,
             "lcc": self.lcc.to_dict() if self.lcc else None,
-            "formats": self.formats,
+            "format": self.format,
         }

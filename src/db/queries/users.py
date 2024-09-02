@@ -35,7 +35,6 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 @postgres
 async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
-    partition = "rwf.map,rwf.no_geraldo,rwf.black_border,rwf.current_lcc"
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
@@ -48,17 +47,16 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[lis
             WHERE ply.user_id = $1
         ),
         unique_runs AS (
-            SELECT DISTINCT ON
-                (rwf.map, rwf.no_geraldo, rwf.black_border, rwf.current_lcc)
-                rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+            SELECT
+                rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+                rwf.format,
                 
                 m.name, m.placement_curver, m.placement_allver, m.difficulty,
                 m.r6_start, m.map_data, m.optimal_heros,
                 
                 lccs.id, lccs.proof, lccs.leftover,
-    
-                ARRAY_AGG(rwf.format) OVER (PARTITION by {partition}) AS formats,
-                ARRAY_AGG(ply.user_id) OVER (PARTITION by {partition}) AS user_ids
+                
+                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
@@ -81,26 +79,26 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[lis
         int(id), idx_start, amount,
     )
 
-    import pprint
-    pprint.pp([list(pl) for pl in payload])
-
-    map_sidx = 5
-    map_eidx = 12
-    lcc_eidx = 15
-    group_sidx = lcc_eidx
+    run_sidx = 1
+    map_sidx = 7
+    lcc_sidx = 14
+    group_sidx = 17
 
     return [
         ListCompletion(
+            run[run_sidx],
             PartialMap(
-                run[1],
-                *run[map_sidx:map_eidx][:-1],
+                run[run_sidx+1],
+                *run[map_sidx:lcc_sidx][:-1],
                 None,
-                run[map_sidx:map_eidx][-1].split(";")
+                run[lcc_sidx-1].split(";")
             ),
-            list(set(run[group_sidx+1])),
-            *run[2:map_sidx],
-            list(set(run[group_sidx])),
-            LCC(*run[map_eidx:lcc_eidx]) if run[map_eidx] else None,
+            run[group_sidx],
+            run[run_sidx+2],
+            run[run_sidx+3],
+            run[run_sidx+4],
+            run[run_sidx+5],
+            LCC(*run[lcc_sidx:group_sidx]) if run[lcc_sidx] else None,
         )
         for run in payload
     ], payload[0][0] if len(payload) else 0
