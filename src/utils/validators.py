@@ -172,3 +172,29 @@ async def validate_submission(body: dict) -> dict:
     if body["type"] not in ["list", "experts"]:
         errors["type"] = f"Must be either `list` or `experts`"
     return errors
+
+
+def is_link(text: str) -> bool:
+    return re.match("^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$", text) is not None
+
+
+async def validate_completion_submission(body: dict) -> dict:
+    check_fields_exists = {
+        "format": int,
+        "notes": str | None,
+        "black_border": bool,
+        "no_geraldo": bool,
+        "current_lcc": bool,
+    }
+    check = check_fields(body, check_fields_exists)
+    if len(check):
+        return check
+
+    errors = {}
+    if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
+            ("video_proof_url" not in body or not is_link(body["video_proof_url"])):
+        errors["video_proof_url"] = "Missing or invalid URL"
+    if not (0 < body["format"] <= 3):
+        errors["format"] = "Must be between 1 and 3, included"
+    return errors
+

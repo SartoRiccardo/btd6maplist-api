@@ -147,48 +147,6 @@ JOIN leastcostchimps lcc
     ON r.lcc = lcc.id
 WHERE mll.leftover = lcc.leftover;
 
---CREATE VIEW lccs_curver AS
---WITH maps_lcc_leftovers AS (
---    SELECT
---        r.map,
---        MIN(lcc.leftover) AS leftover
---    FROM list_completions r
---    JOIN leastcostchimps lcc
---        ON r.lcc = lcc.id
---    WHERE r.format IN (0, 1)
---    GROUP BY r.map
---)
---SELECT
---    mll.map, lcc.id
---FROM maps_lcc_leftovers mll
---JOIN list_completions r
---    ON r.map = mll.map
---JOIN leastcostchimps lcc
---    ON r.lcc = lcc.id
---WHERE mll.leftover = lcc.leftover
---    AND r.format IN (0, 1);
---
---CREATE VIEW lccs_allver AS
---WITH maps_lcc_leftovers AS (
---    SELECT
---        r.map,
---        MIN(lcc.leftover) AS leftover
---    FROM list_completions r
---    JOIN leastcostchimps lcc
---        ON r.lcc = lcc.id
---    WHERE r.format IN (0, 2)
---    GROUP BY r.map
---)
---SELECT
---    mll.map, lcc.id
---FROM maps_lcc_leftovers mll
---JOIN list_completions r
---    ON r.map = mll.map
---JOIN leastcostchimps lcc
---    ON r.lcc = lcc.id
---WHERE mll.leftover = lcc.leftover
---    AND r.format IN (0, 2);
-
 
 -- Points LB
 CREATE VIEW list_curver_leaderboard AS
