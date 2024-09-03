@@ -40,22 +40,25 @@ async def post(
           schema:
             type: object
             properties:
-              code:
-                type: string
-                description: The code of the map.
               notes:
                 type: string
-                description: Additional notes about the map.
+                description: Additional notes about the run.
                 nullable: true
-              type:
+              format:
+                $ref: "#/components/schemas/MaplistFormat"
+              black_border:
+                type: boolean
+                description: Whether the run is black bordered.
+              no_geraldo:
+                type: boolean
+                description: If the run didn't use the optimal hero (not necessarily geraldo).
+              current_lcc:
+                type: boolean
+                description: Whether the run is a LCC attempt.
+              video_proof_url:
                 type: string
-                enum:
-                - list
-                - experts
-                description: Which list the map will be submitted on
-              proposed:
-                type: integer
-                description: The proposed difficulty/index of the list. 0-6 for list and 0-6 for experts.
+                description: URL to video proof of you beating some hard rounds.
+                nullable: true
     responses:
       "204":
         description: The map was submitted
