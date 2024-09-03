@@ -60,5 +60,9 @@ async def post(request: web.Request):
 
     return web.json_response({
         "discord_profile": disc_profile,
-        "maplist_profile": (await get_user(disc_profile["id"])).to_dict(with_oak=True)
+        "maplist_profile": (
+            await get_user(
+                disc_profile["id"],
+                with_completions=True)
+        ).to_dict(with_oak=True, with_completions=True)
     })

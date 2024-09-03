@@ -34,7 +34,7 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
+async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
@@ -105,6 +105,43 @@ async def get_completions_by(id, idx_start=0, amount=50, conn=None) -> tuple[lis
 
 
 @postgres
+async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
+    id = int(id)
+    payload = await conn.fetch(
+        f"""
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            LEFT JOIN lccs_by_map lccs
+                ON lccs.id = r.lcc
+        )
+        SELECT
+            rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+            rwf.format
+        FROM runs_with_flags rwf
+        JOIN listcomp_players ply
+            ON ply.run = rwf.id
+        WHERE ply.user_id = $1
+        """,
+        id
+    )
+
+    return [
+        ListCompletion(
+            run[0],
+            run[1],
+            [id],
+            run[2],
+            run[3],
+            run[4],
+            run[5],
+            None,
+        )
+        for run in payload
+    ]
+
+
+@postgres
 async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tuple[int | None, float]:
     verstr = "cur" if curver else "all"
     lbname = "leaderboard" if type == "points" else "lcclb"
@@ -141,9 +178,12 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
 
 
 @postgres
-async def get_user(id, conn=None) -> User | None:
+async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:
+    puser = await get_user_min(id, conn=conn)
+    if not puser:
+        return None
+
     coros = [
-        get_user_min(id, conn=conn),
         get_maplist_placement(id, conn=conn),
         get_maplist_placement(id, curver=False, conn=conn),
         get_maplist_placement(id, type="lcc", conn=conn),
@@ -151,11 +191,15 @@ async def get_user(id, conn=None) -> User | None:
         get_maps_created_by(id, conn=conn),
     ]
 
-    puser, curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = [
+    curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = [
         await coro for coro in coros
     ]
     if not puser:
         return None
+
+    comps = []
+    if with_completions:
+        comps = await get_min_completions_by(id, conn=conn)
 
     return User(
         puser.id,
@@ -174,6 +218,7 @@ async def get_user(id, conn=None) -> User | None:
             alllcc_pos[0],
         ),
         maps,
+        comps,
     )
 
 

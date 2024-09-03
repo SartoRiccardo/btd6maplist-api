@@ -90,13 +90,17 @@ class User(PartialUser):
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
     created_maps: list["src.db.models.maps.PartialMap"]
+    completions: list[ListCompletion]
 
-    def to_dict(self, with_oak: bool = False) -> dict:
-        return {
-            **super().to_dict(),
+    def to_dict(self, with_oak: bool = False, with_completions: bool = False) -> dict:
+        data = {
+            **super().to_dict(with_oak),
             "maplist": {
                 "current": self.maplist_cur.to_dict(),
                 "all": self.maplist_all.to_dict(),
             },
             "created_maps": [m.to_dict() for m in self.created_maps],
         }
+        if with_completions:
+            data["completions"] = [c.to_dict() for c in self.completions]
+        return data
