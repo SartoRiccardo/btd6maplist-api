@@ -153,11 +153,6 @@ async def post(
         )
         embeds[0]["image"] = {"url": f"attachment://proof.{proof_ext}"}
 
-    json_data = {"embeds": embeds}
-    if description:
-        json_data["content"] = description
-    form_data.add_field("payload_json", json.dumps(json_data))
-
     lcc_data = None
     if data["current_lcc"]:
         lcc_data = {
@@ -172,6 +167,13 @@ async def post(
         lcc_data,  # leftover, proof
         int(discord_profile['id']),
     )
+    embeds[0]["footer"] = {"text": f"Run No.{run_id}"}
+
+    json_data = {"embeds": embeds}
+    if description:
+        json_data["content"] = description
+    form_data.add_field("payload_json", json.dumps(json_data))
+
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
