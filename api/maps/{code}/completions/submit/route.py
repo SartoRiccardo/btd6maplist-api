@@ -59,7 +59,15 @@ async def post(
                 description: Whether the run is a LCC attempt.
               video_proof_url:
                 type: string
-                description: URL to video proof of you beating some hard rounds.
+                description: |
+                  URL to video proof of you beating some hard rounds.
+                  Can be omitted if not needed.
+                nullable: true
+              leftover:
+                type: integer
+                description: |
+                  Leftover of your LCC attempt.
+                  Can be omitted if not needed.
                 nullable: true
     responses:
       "204":
