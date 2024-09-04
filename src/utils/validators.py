@@ -197,6 +197,11 @@ async def validate_completion_submission(body: dict) -> dict:
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
             ("video_proof_url" not in body or not is_link(body["video_proof_url"])):
         errors["video_proof_url"] = "Missing or invalid URL"
+    if body["current_lcc"]:
+        if "leftover" not in body or not isinstance(body["leftover"], int):
+            errors["leftover"] = "Missing or non-integer saveup"
+        elif 0 > body["leftover"]:
+            errors["leftover"] = "Must be greater than 0"
     if not (0 < body["format"] <= 3):
         errors["format"] = "Must be between 1 and 3, included"
     return errors

@@ -87,6 +87,8 @@ CREATE TABLE list_completions (
   black_border BOOLEAN,
   no_geraldo BOOLEAN,  -- no optimal hero
   lcc INT,
+  created_on TIMESTAMP DEFAULT NOW(),
+  accepted BOOLEAN DEFAULT FALSE,
   format INT DEFAULT 0
 );
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
@@ -136,6 +138,7 @@ WITH maps_lcc_leftovers AS (
     FROM list_completions r
     JOIN leastcostchimps lcc
         ON r.lcc = lcc.id
+    WHERE r.accepted
     GROUP BY r.map, r.format
 )
 SELECT
@@ -183,6 +186,7 @@ user_points AS (
         ON lccs.map = r.map AND lccs.format = r.format
     CROSS JOIN config_values cv
     WHERE r.format IN (0, 1)
+        AND r.accepted
 ),
 leaderboard AS (
     SELECT
@@ -228,7 +232,8 @@ user_points AS (
     LEFT JOIN lccs_by_map lccs
         ON lccs.map = r.map AND lccs.format = r.format
     CROSS JOIN config_values cv
-    WHERE r.format IN (0, 1)
+    WHERE r.format IN (0, 2)
+        AND r.accepted
 ),
 leaderboard AS (
     SELECT
@@ -260,6 +265,7 @@ leaderboard AS (
     WHERE m.placement_curver BETWEEN 1 AND cv.map_count
         AND lccs.format IN (0, 1)
         AND m.deleted_on IS NULL
+        AND r.accepted
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -284,6 +290,7 @@ leaderboard AS (
     WHERE m.placement_allver BETWEEN 1 AND cv.map_count
         AND lccs.format IN (0, 2)
         AND m.deleted_on IS NULL
+        AND r.accepted
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement

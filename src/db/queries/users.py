@@ -1,6 +1,5 @@
 import asyncio
 import src.db.connection
-from src.utils.misc import aggregate_payload
 from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC
 postgres = src.db.connection.postgres
 
@@ -45,6 +44,7 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE ply.user_id = $1
+                and r.accepted
         ),
         unique_runs AS (
             SELECT
@@ -114,6 +114,7 @@ async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
             FROM list_completions r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
+                and r.accepted
         )
         SELECT
             rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
@@ -261,6 +262,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
                 ON ply.run = r.id
             WHERE r.map = $2
                 AND ply.user_id = $1
+                and r.accepted
         )
         SELECT
             r.id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,

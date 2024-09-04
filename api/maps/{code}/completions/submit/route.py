@@ -9,7 +9,7 @@ from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
 from src.utils.emojis import Emj
 from src.db.queries.maps import get_map
-# from src.db.queries.completions import submit_run
+from src.db.queries.completions import submit_run
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
 
 
@@ -122,7 +122,7 @@ async def post(
                     "name": "Run Properties",
                     "value": (f"* {Emj.black_border} Black Border\n" if data["black_border"] else "") +
                             (f"* {Emj.no_geraldo} No Optimal Hero\n" if data["no_geraldo"] else "") +
-                            (f"* {Emj.lcc} Least Cash CHIMPS\n" if data["current_lcc"] else ""),
+                            (f"* {Emj.lcc} Least Cash CHIMPS *(leftover: __${data['leftover']:,}__)*\n" if data["current_lcc"] else ""),
                     "inline": True,
                 })
                 description = f"__Video Proof: {data['video_proof_url']}__"
@@ -150,20 +150,20 @@ async def post(
         json_data["content"] = description
     form_data.add_field("payload_json", json.dumps(json_data))
 
-    # lcc_data = None
-    # if data["current_lcc"]:
-    #     lcc_data = {
-    #         "proof": "",
-    #         "saveup": data["lcc_saveup"],
-    #     }
-    # print(await submit_run(
-    #     resource.code,
-    #     data["black_border"],
-    #     data["no_geraldo"],
-    #     data["format"],
-    #     lcc_data,  # saveup, proof
-    #     int(discord_profile['id']),
-    # ))
+    lcc_data = None
+    if data["current_lcc"]:
+        lcc_data = {
+            "proof": f"{MEDIA_BASE_URL}/{proof_fname}",
+            "leftover": data["leftover"],
+        }
+    run_id = await submit_run(
+        resource.code,
+        data["black_border"],
+        data["no_geraldo"],
+        data["format"],
+        lcc_data,  # leftover, proof
+        int(discord_profile['id']),
+    )
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
