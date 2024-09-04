@@ -1,7 +1,9 @@
+import os.path
+
 APP_HOST = "localhost"
 APP_PORT = 4000
 
-PERSISTENT_DATA_PATH = "~"
+PERSISTENT_DATA_PATH = os.path.expanduser("~")
 MEDIA_BASE_URL = "https://localhost:5000"
 
 DB_USER = "postgres"
