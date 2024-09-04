@@ -132,7 +132,7 @@ class PartialMap:
             "difficulty": self.difficulty,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
-            "optimal_heros": self.optimal_heros,
+            "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
         }
 
