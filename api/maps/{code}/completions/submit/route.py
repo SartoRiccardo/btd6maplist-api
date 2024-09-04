@@ -83,13 +83,14 @@ async def post(
     embeds = []
     hook_url = ""
     description = None
-    proof_fname = None
+    data = None
+    proof_ext = None
+    file_contents = None
     while part := await reader.next():
         if part.name == "proof_completion":
             # Max 2MB cause of the Application init
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
-            proof_fname, fpath = await save_media(file_contents, proof_ext)
 
         elif part.name == "data":
             data = await part.json()
@@ -127,13 +128,23 @@ async def post(
                 description = f"__Video Proof: {data['video_proof_url']}__"
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 2 else WEBHOOK_EXPLIST_RUN
 
-    print(len(embeds), proof_fname, len(embeds) and proof_fname)
-    if not (len(embeds) and proof_fname):
+    if not (len(embeds) and file_contents):
         return web.json_response(status=HTTPStatus.BAD_REQUEST)
 
-    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
-
     form_data = FormData()
+
+    if data["current_lcc"]:
+        proof_fname, fpath = await save_media(file_contents, proof_ext)
+        embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
+    else:
+        form_data.add_field(
+            "file[0]",
+            io.BytesIO(file_contents),
+            filename=f"proof.{proof_ext}",
+            content_type="application/octet-stream",
+        )
+        embeds[0]["image"] = {"url": f"attachment://proof.{proof_ext}"}
+
     json_data = {"embeds": embeds}
     if description:
         json_data["content"] = description
