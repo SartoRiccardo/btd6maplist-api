@@ -8,7 +8,7 @@ import aiohttp_swagger
 import importlib
 from importlib import util
 import contextlib
-from config import APP_HOST, APP_PORT, CORS_ORIGINS
+from config import APP_HOST, APP_PORT, CORS_ORIGINS, PERSISTENT_DATA_PATH
 import aiohttp_client_cache
 from aiohttp import web
 import src.http
@@ -20,7 +20,7 @@ from src.utils.colors import purple, green, yellow, blue, red, cyan
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
 async def init_client_session(_app):
     cache = aiohttp_client_cache.SQLiteBackend(
-        cache_name="~/.cache/aiohttp-requests.db",
+        cache_name=os.path.join(PERSISTENT_DATA_PATH, ".cache", "aiohttp-requests.db"),
         expire_after=0,
         urls_expire_after={
             "data.ninjakiwi.com": 3600*24,

@@ -5,10 +5,12 @@ import json
 import src.http
 from http import HTTPStatus
 import src.utils.routedecos
+from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
 from src.utils.emojis import Emj
 from src.db.queries.maps import get_map
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN
+# from src.db.queries.completions import submit_run
+from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
 
 
 formats = [
@@ -80,14 +82,15 @@ async def post(
 
     embeds = []
     hook_url = ""
-    images = []
     description = None
-    proof_ext = None
+    proof_fname = None
     while part := await reader.next():
         if part.name == "proof_completion":
             # Max 2MB cause of the Application init
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            images.append((f"proof.{proof_ext}", io.BytesIO(await part.read(decode=False))))
+            file_contents = await part.read(decode=False)
+            proof_fname, fpath = await save_media(file_contents, proof_ext)
+
         elif part.name == "data":
             data = await part.json()
             if len(errors := await validate_completion_submission(data)):
@@ -124,24 +127,32 @@ async def post(
                 description = f"__Video Proof: {data['video_proof_url']}__"
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 2 else WEBHOOK_EXPLIST_RUN
 
-    if not (len(embeds) and len(images)):
+    print(len(embeds), proof_fname, len(embeds) and proof_fname)
+    if not (len(embeds) and proof_fname):
         return web.json_response(status=HTTPStatus.BAD_REQUEST)
 
-    embeds[0]["image"] = {"url": f"attachment://proof.{proof_ext}"}
+    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
 
     form_data = FormData()
     json_data = {"embeds": embeds}
     if description:
         json_data["content"] = description
     form_data.add_field("payload_json", json.dumps(json_data))
-    for i, value in enumerate(images):
-        fname, fstream = value
-        form_data.add_field(
-            f"files[{i}]",
-            fstream,
-            filename=fname,
-            content_type="application/octet-stream",
-        )
+
+    # lcc_data = None
+    # if data["current_lcc"]:
+    #     lcc_data = {
+    #         "proof": "",
+    #         "saveup": data["lcc_saveup"],
+    #     }
+    # print(await submit_run(
+    #     resource.code,
+    #     data["black_border"],
+    #     data["no_geraldo"],
+    #     data["format"],
+    #     lcc_data,  # saveup, proof
+    #     int(discord_profile['id']),
+    # ))
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
