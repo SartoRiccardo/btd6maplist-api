@@ -48,7 +48,7 @@ async def accept_run(run_id: int, conn=None) -> None:
 
 
 @postgres
-async def get_completion(run_id: str | int, conn=None) -> ListCompletion :
+async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
     if isinstance(run_id, str):
         run_id = int(run_id)
 
