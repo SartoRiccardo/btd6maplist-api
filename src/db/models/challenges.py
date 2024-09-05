@@ -72,7 +72,7 @@ class ListCompletion:
     """
     id: int
     map: str | PartialMap
-    user_ids: list[int]
+    user_ids: list[int] | list["src.db.models.ParialUser"]
     black_border: bool
     no_geraldo: bool
     current_lcc: bool
@@ -83,7 +83,10 @@ class ListCompletion:
         return {
             "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
-            "user_ids": [str(usr) for usr in self.user_ids],
+            "user_ids": [
+                str(usr) if isinstance(usr, int) else usr.to_dict()
+                for usr in self.user_ids
+            ],
             "black_border": self.black_border,
             "no_geraldo": self.no_geraldo,
             "current_lcc": self.current_lcc,
