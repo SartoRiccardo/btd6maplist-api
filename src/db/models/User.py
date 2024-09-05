@@ -26,10 +26,10 @@ class PartialUser:
     """
     id: id
     name: str
-    oak: str
+    oak: str | None
 
     def to_dict(self, with_oak: bool = False) -> dict:
-        oak = {} if with_oak else {"oak": self.oak}
+        oak = {"oak": self.oak} if with_oak else {}
         return {
             "id": str(self.id),
             "name": self.name,
