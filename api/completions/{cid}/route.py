@@ -1,4 +1,5 @@
 from aiohttp import web
+import http
 from src.db.queries.completions import get_completion
 import src.utils.routedecos
 
@@ -27,3 +28,25 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
         description: No code with that ID was found.
     """
     return web.json_response(resource.to_dict())
+
+
+@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.validate_resource_exists(get_completion, "cid")
+@src.utils.routedecos.with_maplist_profile
+async def put(
+        _r: web.Request,
+        maplist_profile: dict = None,
+        resouce: "src.db.models.ListCompletion" = None
+) -> web.Response:
+    return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)
+
+
+@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.validate_resource_exists(get_completion, "cid")
+@src.utils.routedecos.with_maplist_profile
+async def delete(
+        _r: web.Request,
+        maplist_profile: dict = None,
+        resouce: "src.db.models.ListCompletion" = None
+) -> web.Response:
+    return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)
