@@ -1,4 +1,5 @@
 from aiohttp import web
+import http
 from src.db.queries.maps import get_map, edit_map, delete_map
 import src.utils.routedecos
 from src.utils.validators import validate_full_map
@@ -89,7 +90,7 @@ async def put(
 
     await edit_map(json_body, resource)
 
-    return web.Response(status=204)
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
 @src.utils.routedecos.bearer_auth
@@ -117,10 +118,13 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
+    if resource.deleted_on:
+        return web.Response(status=http.HTTPStatus.NO_CONTENT)
+
     if not (MAPLIST_EXPMOD_ID in maplist_profile["roles"] or MAPLIST_LISTMOD_ID in maplist_profile["roles"]):
         return web.json_response({"errors": {"": "You are not a moderator"}, "data": {}}, status=401)
     modify_diff = MAPLIST_EXPMOD_ID in maplist_profile["roles"]
     modify_pos = MAPLIST_LISTMOD_ID in maplist_profile["roles"]
     await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)
 
-    return web.Response(status=204)
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
