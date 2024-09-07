@@ -23,11 +23,11 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ListCompletion"
+              $ref: "#/components/schemas/ListCompletionWithMeta"
       "404":
         description: No code with that ID was found.
     """
-    return web.json_response(resource.to_dict())
+    return web.json_response(resource.to_dict(full=True))
 
 
 @src.utils.routedecos.bearer_auth

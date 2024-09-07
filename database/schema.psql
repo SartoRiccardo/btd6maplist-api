@@ -88,6 +88,7 @@ CREATE TABLE list_completions (
   no_geraldo BOOLEAN,  -- no optimal hero
   lcc INT,
   created_on TIMESTAMP DEFAULT NOW(),
+  deleted_on TIMESTAMP,
   accepted BOOLEAN DEFAULT FALSE,
   format INT DEFAULT 0
 );
@@ -139,6 +140,7 @@ WITH maps_lcc_leftovers AS (
     JOIN leastcostchimps lcc
         ON r.lcc = lcc.id
     WHERE r.accepted
+        AND r.deleted_on IS NULL
     GROUP BY r.map, r.format
 )
 SELECT
@@ -187,6 +189,7 @@ user_points AS (
     CROSS JOIN config_values cv
     WHERE r.format IN (0, 1)
         AND r.accepted
+        AND r.deleted_on IS NULL
 ),
 leaderboard AS (
     SELECT
@@ -234,6 +237,7 @@ user_points AS (
     CROSS JOIN config_values cv
     WHERE r.format IN (0, 2)
         AND r.accepted
+        AND r.deleted_on IS NULL
 ),
 leaderboard AS (
     SELECT
@@ -266,6 +270,7 @@ leaderboard AS (
         AND lccs.format IN (0, 1)
         AND m.deleted_on IS NULL
         AND r.accepted
+        AND r.deleted_on IS NULL
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -291,6 +296,7 @@ leaderboard AS (
         AND lccs.format IN (0, 2)
         AND m.deleted_on IS NULL
         AND r.accepted
+        AND r.deleted_on IS NULL
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement

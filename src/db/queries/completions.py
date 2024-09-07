@@ -62,7 +62,9 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
                 ON lccs.id = r.lcc
         )
         SELECT
-            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format,
+            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,
+            run.created_on, run.deleted_on,
+            
             lcc.id, lcc.proof, lcc.leftover,
             ply.user_id, u.name
         FROM runs_with_flags run
@@ -76,14 +78,21 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
         run_id
     )
     if len(payload):
+        run_sidx = 0
+        lcc_sidx = 8 + run_sidx
+        ply_sidx = 3 + lcc_sidx
+
         run = payload[0]
         return ListCompletion(
             run_id,
-            run[0],
-            [PartialUser(row[8], row[9], None) for row in payload],
-            run[1],
-            run[2],
-            run[3],
-            run[4],
-            LCC(run[5], run[6], run[7]) if run[5] else None
+            run[run_sidx],
+            [PartialUser(row[ply_sidx], row[ply_sidx+1], None) for row in payload],
+            run[run_sidx+1],
+            run[run_sidx+2],
+            run[run_sidx+3],
+            run[run_sidx+4],
+            LCC(run[lcc_sidx], run[lcc_sidx+1], run[lcc_sidx+2]) if run[lcc_sidx] else None,
+            accepted=run[run_sidx+5],
+            created_on=run[run_sidx+6],
+            deleted_on=run[run_sidx+7],
         )

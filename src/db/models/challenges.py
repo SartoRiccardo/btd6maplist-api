@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from .maps import PartialMap
 
@@ -69,6 +70,26 @@ class ListCompletion:
         properties:
           map:
             $ref: "#/components/schemas/PartialMap"
+    ---
+    ListCompletionWithMeta:
+      allOf:
+      - $ref: "#/components/schemas/ListCompletion"
+      - type: object
+        properties:
+          accepted:
+            type: boolean
+            description: Whether or not the run was accepted by moderators.
+          created_on:
+            type: integer
+            nullable: true
+            description: |
+              Timestamp of the completion's creation date.
+              If `accepted`, it's when it was accepted. Otherwise, it's when it was submitted.
+          deleted_on:
+            type: integer
+            nullable: true
+            description: |
+              Timestamp of the completion's deletion. Always `null` if not `accepted`.
     """
     id: int
     map: str | PartialMap
@@ -78,8 +99,19 @@ class ListCompletion:
     current_lcc: bool
     format: int
     lcc: LCC | None
+    accepted: bool = True
+    deleted_on: datetime.datetime | None = None
+    created_on: datetime.datetime | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self, full: bool = False) -> dict:
+        full_args = {}
+        if full:
+            full_args = {
+                "accepted": self.accepted,
+                "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
+                "created_on": int(self.created_on.timestamp()) if self.created_on else None,
+            }
+
         return {
             "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
@@ -92,4 +124,5 @@ class ListCompletion:
             "current_lcc": self.current_lcc,
             "lcc": self.lcc.to_dict() if self.lcc else None,
             "format": self.format,
+            **full_args,
         }
