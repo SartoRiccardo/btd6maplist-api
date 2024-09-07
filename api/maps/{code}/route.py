@@ -50,6 +50,13 @@ async def put(
     tags:
     - The List
     - Expert List
+    parameters:
+    - in: path
+      name: code
+      required: true
+      schema:
+        type: string
+      description: The map's code.
     requestBody:
       required: true
       content:
@@ -110,6 +117,13 @@ async def delete(
     tags:
     - The List
     - Expert List
+    parameters:
+    - in: path
+      name: code
+      required: true
+      schema:
+        type: string
+      description: The map's code.
     responses:
       "204":
         description: The resource was deleted correctly
