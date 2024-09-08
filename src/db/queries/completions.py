@@ -44,11 +44,6 @@ async def submit_run(
 
 
 @postgres
-async def accept_run(run_id: int, conn=None) -> None:
-    pass
-
-
-@postgres
 async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
     if isinstance(run_id, str):
         run_id = int(run_id)
@@ -107,6 +102,7 @@ async def edit_completion(
         comp_format: int,
         lcc: dict | None,
         user_ids: list[int],
+        accept: bool = False,
         conn: asyncpg.pool.Pool | None = None
 ) -> None:
     async with conn.transaction():
@@ -145,10 +141,17 @@ async def edit_completion(
             [(comp_id, uid) for uid in user_ids]
         )
 
-        await conn.execute(
+        accept_params = ""
+        if accept:
+            accept_params = """
+            accepted=TRUE,
+            created_on=NOW(),
             """
+        await conn.execute(
+            f"""
             UPDATE list_completions
             SET
+                {accept_params}
                 black_border=$2,
                 no_geraldo=$3,
                 format=$4,
@@ -161,3 +164,18 @@ async def edit_completion(
             comp_format,
             lcc_id,
         )
+
+
+@postgres
+async def delete_completion(
+        cid: int,
+        conn=None,
+) -> None:
+    await conn.execute(
+        """
+        UPDATE list_completions
+        SET deleted_on=NOW()
+        WHERE id=$1
+        """,
+        cid
+    )
