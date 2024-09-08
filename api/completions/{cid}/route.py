@@ -144,6 +144,6 @@ async def delete(
         )
 
     if not resource.deleted_on:
-        await delete_completion(resource.id)
+        await delete_completion(resource.id, hard_delete=not resource.accepted)
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

@@ -169,13 +169,16 @@ async def edit_completion(
 @postgres
 async def delete_completion(
         cid: int,
+        hard_delete: bool = False,
         conn=None,
 ) -> None:
-    await conn.execute(
-        """
+    q = ("""
+        DELETE FROM list_completions
+        WHERE id=$1
+        """) if hard_delete else ("""
         UPDATE list_completions
         SET deleted_on=NOW()
         WHERE id=$1
-        """,
-        cid
-    )
+        """)
+
+    await conn.execute(q, cid)
