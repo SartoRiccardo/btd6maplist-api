@@ -14,13 +14,12 @@ DiscordID:
 
 MaplistFormat:
   type: int
-  enum: [0, 1, 2, 3]
+  enum: [1, 2, 51]
   description: >
-    The format a run was played in.\\n
-    * `0` - All formats.\\n
+    The format a run was played in. Formats 1-50 are for the Maplist, 51-100 are for Expert List.\\n
     * `1` - Maplist ~ current version.\\n
     * `2` - Maplist ~ all versions.\\n
-    * `3` - Expert List.
+    * `51` - Expert List.
 
 ExpertDifficulty:
   type: int

@@ -108,7 +108,7 @@ async def post(
             embeds = embed_from_json(data, discord_profile, resource)
             if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
                 description = f"__Video Proof: {data['video_proof_url']}__"
-            hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 2 else WEBHOOK_EXPLIST_RUN
+            hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
 
     if not (len(embeds) and file_contents):
         return web.json_response(status=HTTPStatus.BAD_REQUEST)

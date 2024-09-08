@@ -202,8 +202,8 @@ async def validate_completion_submission(body: dict) -> dict:
             errors["leftover"] = "Missing or non-integer saveup"
         elif 0 > body["leftover"]:
             errors["leftover"] = "Must be greater than 0"
-    if not (0 < body["format"] <= 3):
-        errors["format"] = "Must be between 1 and 3, included"
+    if body["format"] not in [1, 2, 51]:
+        errors["format"] = "Must be a valid format"
     return errors
 
 
@@ -233,8 +233,8 @@ async def validate_completion(body: dict) -> dict[str, str]:
         elif 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
 
-    if not (0 < body["format"] <= 3):
-        errors["format"] = "Must be between 1 and 3, included"
+    if body["format"] not in [1, 2, 51]:
+        errors["format"] = "Must be a valid format"
 
     if len(body["user_ids"]) == 0:
         errors["user_ids"] = "Must be beaten by someone"

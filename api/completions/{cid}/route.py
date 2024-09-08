@@ -103,13 +103,13 @@ async def put(
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
             if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
-                    (1 <= resource.format <= 2 or 1 <= data["format"] <= 2):
+                    (1 <= resource.format <= 50 or 1 <= data["format"] <= 50):
                 return web.json_response(
                     {"errors": {"format": "You must be a Maplist Moderator"}},
                     status=http.HTTPStatus.UNAUTHORIZED,
                 )
             if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and \
-                    (3 <= resource.format <= 3 or 3 <= data["format"] <= 3):
+                    (51 <= resource.format <= 100 or 51 <= data["format"] <= 100):
                 return web.json_response(
                     {"errors": {"format": "You must be an Expert List Moderator"}},
                     status=http.HTTPStatus.UNAUTHORIZED,
