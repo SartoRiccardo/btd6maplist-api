@@ -167,6 +167,51 @@ async def edit_completion(
 
 
 @postgres
+async def add_completion(
+        map_code: str,
+        black_border: bool,
+        no_geraldo: bool,
+        comp_format: int,
+        lcc: dict | None,
+        user_ids: list[int],
+        conn: asyncpg.pool.Pool | None = None
+) -> None:
+    async with conn.transaction():
+        lcc_id = None
+        if lcc:
+            lcc_id = await conn.fetchval(
+                """
+                INSERT INTO leastcostchimps(proof, leftover)
+                VALUES($1, $2)
+                RETURNING id
+                """,
+                lcc["proof"], lcc["leftover"],
+            )
+
+        comp_id = await conn.fetchval(
+            f"""
+            INSERT INTO list_completions
+                (accepted, black_border, no_geraldo, format, lcc, map)
+            VALUES (TRUE, $1, $2, $3, $4, $5)
+            RETURNING id
+            """,
+            black_border,
+            no_geraldo,
+            comp_format,
+            lcc_id,
+            map_code,
+        )
+
+        await conn.executemany(
+            """
+            INSERT INTO listcomp_players(run, user_id)
+            VALUES($1, $2)
+            """,
+            [(comp_id, uid) for uid in user_ids]
+        )
+
+
+@postgres
 async def delete_completion(
         cid: int,
         hard_delete: bool = False,

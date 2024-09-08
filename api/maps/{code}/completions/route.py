@@ -1,7 +1,10 @@
 from aiohttp import web
 import http
 import src.utils.routedecos
+from src.db.queries.maps import get_map
 from src.db.queries.maps import get_completions_for
+from src.db.queries.completions import add_completion
+from src.utils.forms import get_submission
 
 
 PAGE_ENTRIES = 50
@@ -61,9 +64,76 @@ async def get(request: web.Request):
 
 
 @src.utils.routedecos.bearer_auth
+@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_maplist_profile
 async def post(
-        _r: web.Request,
-        maplist_profile: dict = None
+        request: web.Request,
+        maplist_profile: dict = None,
+        resource: "src.db.model.PartialMap" = None,
+        **_kwargs,
 ) -> web.Response:
-    return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)
+    """
+    ---
+    description: |
+      Add a completion. Must be a Maplist and/or Expert List Moderator,
+      depending on the completion's `format`s.
+    tags:
+    - Completions
+    parameters:
+    - in: path
+      name: code
+      required: true
+      schema:
+        type: string
+      description: The map's code to add the completion to.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ListCompletion"
+    responses:
+      "200":
+        description: The resource was added.
+        content:
+          application/json:
+            schema:
+              type: array
+              description: The Discord ID of the added users.
+              items:
+                $ref: "#/components/schemas/DiscordID"
+      "400":
+        description: |
+          One of the fields is badly formatted.
+          `data` will be an empty array in this case.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                errors:
+                  type: object
+                  description: Each key-value pair is the key of the wrong field and a description as to why.
+                data:
+                  type: object
+                  example: {}
+      "401":
+        description: Your token is missing, invalid or you don't have the privileges for this.
+    """
+    data = await get_submission(request, maplist_profile)
+    if isinstance(data, web.Response):
+        return data
+
+    await add_completion(
+        resource.code,
+        data["black_border"],
+        data["no_geraldo"],
+        data["format"],
+        data["lcc"],
+        [int(uid) for uid in data["user_ids"]],
+    )
+
+    return web.json_response(
+        data["user_ids"],
+        status=http.HTTPStatus.OK,
+    )

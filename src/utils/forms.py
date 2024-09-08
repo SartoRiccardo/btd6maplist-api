@@ -8,7 +8,7 @@ from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
 async def get_submission(
         request: web.Request,
-        maplist_profile: dict = None,
+        maplist_profile: dict,
         resource: "src.db.models.ListCompletion" = None,
 ) -> dict | web.Response:
     proof_ext = None
@@ -27,18 +27,19 @@ async def get_submission(
             if len(errors := await validate_completion(data)):
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
-            if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
-                    (1 <= resource.format <= 50 or 1 <= data["format"] <= 50):
-                return web.json_response(
-                    {"errors": {"format": "You must be a Maplist Moderator"}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
-            if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and \
-                    (51 <= resource.format <= 100 or 51 <= data["format"] <= 100):
-                return web.json_response(
-                    {"errors": {"format": "You must be an Expert List Moderator"}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
+            if resource is not None:
+                if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
+                        (1 <= resource.format <= 50 or 1 <= data["format"] <= 50):
+                    return web.json_response(
+                        {"errors": {"format": "You must be a Maplist Moderator"}},
+                        status=http.HTTPStatus.UNAUTHORIZED,
+                    )
+                if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and \
+                        (51 <= resource.format <= 100 or 51 <= data["format"] <= 100):
+                    return web.json_response(
+                        {"errors": {"format": "You must be an Expert List Moderator"}},
+                        status=http.HTTPStatus.UNAUTHORIZED,
+                    )
 
     if data["lcc"] is not None:
         if file_contents is None and "proof_completion" not in data["lcc"]:
