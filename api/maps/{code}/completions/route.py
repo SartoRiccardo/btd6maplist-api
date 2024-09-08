@@ -1,4 +1,6 @@
 from aiohttp import web
+import http
+import src.utils.routedecos
 from src.db.queries.maps import get_completions_for
 
 
@@ -56,3 +58,12 @@ async def get(request: web.Request):
         "total": total,
         "completions": [cmp.to_dict() for cmp in completions],
     })
+
+
+@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.with_maplist_profile
+async def post(
+        _r: web.Request,
+        maplist_profile: dict = None
+) -> web.Response:
+    return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)
