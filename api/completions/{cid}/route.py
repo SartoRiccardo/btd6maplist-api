@@ -1,7 +1,11 @@
 from aiohttp import web
+import aiohttp
 import http
-from src.db.queries.completions import get_completion
+from src.db.queries.completions import get_completion, edit_completion
+from src.utils.validators import validate_completion
+from src.utils.files import save_media
 import src.utils.routedecos
+from config import MEDIA_BASE_URL
 
 
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
@@ -34,9 +38,9 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
 async def put(
-        _r: web.Request,
+        request: web.Request,
         maplist_profile: dict = None,
-        resouce: "src.db.models.ListCompletion" = None,
+        resource: "src.db.models.ListCompletion" = None,
         **_kwargs,
 ) -> web.Response:
     """
@@ -82,7 +86,46 @@ async def put(
       "404":
         description: No completion with that ID was found.
     """
-    return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)
+    proof_ext = None
+    file_contents = None
+    data = None
+
+    reader = await request.multipart()
+    while part := await reader.next():
+        if part.name == "proof_completion":
+            # Max 2MB cause of the Application init
+            proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+            file_contents = await part.read(decode=False)
+
+        elif part.name == "data":
+            data = await part.json()
+            if len(errors := await validate_completion(data)):
+                return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
+
+    if data["lcc"] is not None:
+        if file_contents is None and "proof_completion" not in data["lcc"]:
+            return web.json_response({
+                "errors": {
+                    "lcc.proof_url": "Must compile at least one of these two",
+                    "lcc.proof_file": "Must compile at least one of these two",
+                },
+            }, status=http.HTTPStatus.BAD_REQUEST)
+
+        if "proof_completion" not in data["lcc"]:
+            proof_fname, fpath = await save_media(file_contents, proof_ext, prefix="proof_")
+            data["lcc"]["proof"] = f"{MEDIA_BASE_URL}/{proof_fname}"
+        else:
+            data["lcc"]["proof"] = data["lcc"]["proof_completion"]
+
+    await edit_completion(
+        resource.id,
+        data["black_border"],
+        data["no_geraldo"],
+        data["format"],
+        data["lcc"],
+        [int(uid) for uid in data["user_ids"]],
+    )
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
 @src.utils.routedecos.bearer_auth
@@ -117,4 +160,5 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
+
     return web.Response(status=http.HTTPStatus.NOT_IMPLEMENTED)

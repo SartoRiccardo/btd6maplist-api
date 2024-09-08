@@ -1,3 +1,4 @@
+import asyncpg.pool
 import src.db.connection
 from src.db.models import ListCompletion, LCC, PartialUser
 postgres = src.db.connection.postgres
@@ -95,4 +96,68 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
             accepted=run[run_sidx+5],
             created_on=run[run_sidx+6],
             deleted_on=run[run_sidx+7],
+        )
+
+
+@postgres
+async def edit_completion(
+        comp_id: int,
+        black_border: bool,
+        no_geraldo: bool,
+        comp_format: int,
+        lcc: dict | None,
+        user_ids: list[int],
+        conn: asyncpg.pool.Pool | None = None
+) -> None:
+    async with conn.transaction():
+        lcc_id = None
+        await conn.execute(
+            """
+            DELETE FROM leastcostchimps lcc
+            USING list_completions runs
+            WHERE lcc.id = runs.lcc
+                AND runs.id = $1
+            """,
+            comp_id
+        )
+        if lcc:
+            lcc_id = await conn.fetchval(
+                """
+                INSERT INTO leastcostchimps(proof, leftover)
+                VALUES($1, $2)
+                RETURNING id
+                """,
+                lcc["proof"], lcc["leftover"],
+            )
+
+        res = await conn.execute(
+            """
+            DELETE FROM listcomp_players ply
+            WHERE ply.run=$1
+            """,
+            comp_id
+        )
+        await conn.executemany(
+            """
+            INSERT INTO listcomp_players(run, user_id)
+            VALUES($1, $2)
+            """,
+            [(comp_id, uid) for uid in user_ids]
+        )
+
+        await conn.execute(
+            """
+            UPDATE list_completions
+            SET
+                black_border=$2,
+                no_geraldo=$3,
+                format=$4,
+                lcc=$5
+            WHERE id=$1
+            """,
+            comp_id,
+            black_border,
+            no_geraldo,
+            comp_format,
+            lcc_id,
         )

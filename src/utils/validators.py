@@ -206,3 +206,49 @@ async def validate_completion_submission(body: dict) -> dict:
         errors["format"] = "Must be between 1 and 3, included"
     return errors
 
+
+async def validate_completion(body: dict) -> dict[str, str]:
+    check_fields_exists = {
+        "black_border": bool,
+        "no_geraldo": bool,
+        "format": int,
+        "user_ids": [str],
+    }
+    if len(check := check_fields(body, check_fields_exists)):
+        return check
+    if "lcc" not in body:
+        return {"lcc": "Missing"}
+
+    errors = {}
+
+    if body["lcc"] is not None:
+        check_lcc_exists = {
+            "leftover": int,
+        }
+        if len(check := check_fields(body["lcc"], check_lcc_exists)):
+            return check
+
+        if "proof_completion" in body["lcc"] and not is_link(body["lcc"]["proof_completion"]):
+            errors["lcc.proof_url"] = "Must be a valid URL"
+        elif 0 > body["lcc"]["leftover"]:
+            errors["lcc.leftover"] = "Must be greater than 0"
+
+    if not (0 < body["format"] <= 3):
+        errors["format"] = "Must be between 1 and 3, included"
+
+    if len(body["user_ids"]) == 0:
+        errors["user_ids"] = "Must be beaten by someone"
+    elif rep_idx := get_repeated_indexes(body["user_ids"]):
+        for idx in rep_idx:
+            errors[f"user_ids[{idx}]"] = "Duplicate user ID"
+    else:
+        users = await asyncio.gather(*[
+            get_user_min(uid) for uid in body["user_ids"]
+        ])
+        for i, usr in enumerate(users):
+            if usr is None:
+                errors[f"user_ids[{i}]"] = "This user doesn't exist"
+            else:
+                body["user_ids"][i] = str(usr.id)
+
+    return errors
