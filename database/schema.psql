@@ -135,7 +135,7 @@ WITH maps_lcc_leftovers AS (
     SELECT
         r.map,
         r.format,
-        MIN(lcc.leftover) AS leftover
+        MAX(lcc.leftover) AS leftover
     FROM list_completions r
     JOIN leastcostchimps lcc
         ON r.lcc = lcc.id
