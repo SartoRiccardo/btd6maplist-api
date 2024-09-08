@@ -65,12 +65,12 @@ async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Re
       "401":
         description: Your token is missing or invalid.
     """
-    reader = await request.multipart()
-
     embeds = []
     hook_url = ""
     images = []
     proof_ext = None
+
+    reader = await request.multipart()
     while part := await reader.next():
         if part.name == "proof_completion":
             # Max 2MB cause of the Application init
@@ -91,35 +91,7 @@ async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Re
             if preview.ok:
                 images.append(("preview.png", io.BytesIO(await preview.read())))
 
-            embeds = [
-                {
-                    "title": f"{btd6_map['name']} - {data['code']}",
-                    "url": f"https://join.btd6.com/Map/{data['code']}",
-                    "author": {
-                        "name": discord_profile["username"],
-                        "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}",
-                    },
-                    "fields": [
-                        {
-                            "name": f"Proposed {'List Position' if data['type'] == 'list' else 'Difficulty'}",
-                            "value":
-                                propositions[data["type"]][data["proposed"]]
-                                if data['type'] == 'list' else
-                                (propositions[data['type']][data["proposed"]] + " Expert"),
-                        },
-                    ],
-                    "color": 0x2e7d32 if data["type"] == "list" else 0x7b1fa2
-                },
-                {
-                    "url": f"https://join.btd6.com/Map/{data['code']}",
-                    "image": {
-                        # "url": f"https://data.ninjakiwi.com/btd6/maps/map/{data['code']}/preview",
-                        "url": "attachment://preview.png"
-                    },
-                }
-            ]
-            if data["notes"]:
-                embeds[0]["description"] = data["notes"]
+            embeds = embed_from_json(data, discord_profile, btd6_map)
             hook_url = WEBHOOK_LIST_SUBM if data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
 
     if not (len(embeds) and len(images)):
@@ -141,3 +113,40 @@ async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Re
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
+
+
+def embed_from_json(
+        data: dict,
+        discord_profile: dict,
+        btd6_map: dict,
+) -> list[dict]:
+    embeds = [
+        {
+            "title": f"{btd6_map['name']} - {data['code']}",
+            "url": f"https://join.btd6.com/Map/{data['code']}",
+            "author": {
+                "name": discord_profile["username"],
+                "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}",
+            },
+            "fields": [
+                {
+                    "name": f"Proposed {'List Position' if data['type'] == 'list' else 'Difficulty'}",
+                    "value":
+                        propositions[data["type"]][data["proposed"]]
+                        if data['type'] == 'list' else
+                        (propositions[data['type']][data["proposed"]] + " Expert"),
+                },
+            ],
+            "color": 0x2e7d32 if data["type"] == "list" else 0x7b1fa2
+        },
+        {
+            "url": f"https://join.btd6.com/Map/{data['code']}",
+            "image": {
+                # "url": f"https://data.ninjakiwi.com/btd6/maps/map/{data['code']}/preview",
+                "url": "attachment://preview.png"
+            },
+        }
+    ]
+    if data["notes"]:
+        embeds[0]["description"] = data["notes"]
+    return embeds

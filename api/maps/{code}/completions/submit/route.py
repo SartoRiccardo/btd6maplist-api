@@ -86,14 +86,14 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    reader = await request.multipart()
-
     embeds = []
     hook_url = ""
     description = None
     data = None
     proof_ext = None
     file_contents = None
+
+    reader = await request.multipart()
     while part := await reader.next():
         if part.name == "proof_completion":
             # Max 2MB cause of the Application init
@@ -105,34 +105,8 @@ async def post(
             if len(errors := await validate_completion_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
-            embeds = [
-                {
-                    "title": f"{resource.name}",
-                    #  "url": f"https://join.btd6.com/Map/{resource.code}",  URL to run acceptance
-                    "author": {
-                        "name": discord_profile["username"],
-                        "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}",
-                    },
-                    "fields": [
-                        {
-                            "name": "Format",
-                            "value": f"{formats[data['format']-1]['emoji']} {formats[data['format']-1]['name']}",
-                            "inline": True,
-                        },
-                    ],
-                    "color": 0x2e7d32 if 0 < data["format"] <= 2 else 0x7b1fa2
-                },
-            ]
-            if data["notes"]:
-                embeds[0]["description"] = data["notes"]
+            embeds = embed_from_json(data, discord_profile, resource)
             if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
-                embeds[0]["fields"].append({
-                    "name": "Run Properties",
-                    "value": (f"* {Emj.black_border} Black Border\n" if data["black_border"] else "") +
-                            (f"* {Emj.no_geraldo} No Optimal Hero\n" if data["no_geraldo"] else "") +
-                            (f"* {Emj.lcc} Least Cash CHIMPS *(leftover: __${data['leftover']:,}__)*\n" if data["current_lcc"] else ""),
-                    "inline": True,
-                })
                 description = f"__Video Proof: {data['video_proof_url']}__"
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 2 else WEBHOOK_EXPLIST_RUN
 
@@ -177,3 +151,40 @@ async def post(
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
+
+
+def embed_from_json(
+        data: dict,
+        discord_profile: dict,
+        resource: "src.db.models.PartialMap"
+) -> list[dict]:
+    embeds = [
+        {
+            "title": f"{resource.name}",
+            #  "url": f"https://join.btd6.com/Map/{resource.code}",  URL to run acceptance
+            "author": {
+                "name": discord_profile["username"],
+                "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}",
+            },
+            "fields": [
+                {
+                    "name": "Format",
+                    "value": f"{formats[data['format'] - 1]['emoji']} {formats[data['format'] - 1]['name']}",
+                    "inline": True,
+                },
+            ],
+            "color": 0x2e7d32 if 0 < data["format"] <= 2 else 0x7b1fa2
+        },
+    ]
+    if data["notes"]:
+        embeds[0]["description"] = data["notes"]
+    if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
+        embeds[0]["fields"].append({
+            "name": "Run Properties",
+            "value": (f"* {Emj.black_border} Black Border\n" if data["black_border"] else "") +
+                     (f"* {Emj.no_geraldo} No Optimal Hero\n" if data["no_geraldo"] else "") +
+                     (f"* {Emj.lcc} Least Cash CHIMPS *(leftover: __${data['leftover']:,}__)*\n" if data[
+                         "current_lcc"] else ""),
+            "inline": True,
+        })
+    return embeds
