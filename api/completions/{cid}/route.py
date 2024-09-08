@@ -5,7 +5,7 @@ from src.db.queries.completions import get_completion, edit_completion
 from src.utils.validators import validate_completion
 from src.utils.files import save_media
 import src.utils.routedecos
-from config import MEDIA_BASE_URL
+from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
 
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
@@ -101,6 +101,19 @@ async def put(
             data = await part.json()
             if len(errors := await validate_completion(data)):
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
+
+            if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
+                    (1 <= resource.format <= 2 or 1 <= data["format"] <= 2):
+                return web.json_response(
+                    {"errors": {"format": "You must be a Maplist Moderator"}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
+            if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and \
+                    (3 <= resource.format <= 3 or 3 <= data["format"] <= 3):
+                return web.json_response(
+                    {"errors": {"format": "You must be an Expert List Moderator"}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
 
     if data["lcc"] is not None:
         if file_contents is None and "proof_completion" not in data["lcc"]:

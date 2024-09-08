@@ -130,7 +130,7 @@ async def edit_completion(
                 lcc["proof"], lcc["leftover"],
             )
 
-        res = await conn.execute(
+        await conn.execute(
             """
             DELETE FROM listcomp_players ply
             WHERE ply.run=$1
