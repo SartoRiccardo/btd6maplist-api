@@ -185,7 +185,7 @@ async def get_lccs_for(code, conn=None) -> list[ListCompletion]:
             ON ply.run = runs.id
         WHERE runs.map = $1
             AND runs.accepted
-            AND r.deleted_on IS NULL
+            AND runs.deleted_on IS NULL
         """,
         code,
     )
