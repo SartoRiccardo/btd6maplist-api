@@ -95,7 +95,7 @@ CREATE TABLE list_completions (
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 ALTER TABLE list_completions ADD CONSTRAINT fk_lccs_1
-  FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE CASCADE;
+  FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
 
 CREATE TABLE listcomp_players (
   run INT NOT NULL,
