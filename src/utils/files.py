@@ -1,6 +1,5 @@
 import os
-import random
-import string
+import hashlib
 import aiofiles
 from config import PERSISTENT_DATA_PATH
 
@@ -15,9 +14,8 @@ async def save_media(
         prefix: str = "",
         length: int = 50
 ) -> tuple[str, str]:
-    randlen = length - len(prefix)
-    randstr = prefix + "".join(random.choices(string.ascii_letters+string.digits, k=randlen))
-    fname = f"{randstr}.{ext}"
+    fhash = hashlib.sha256(media).hexdigest()
+    fname = f"{fhash}.{ext}"
     fpath = os.path.join(media_path, fname)
     async with aiofiles.open(fpath, "wb") as fout:
         await fout.write(media)
