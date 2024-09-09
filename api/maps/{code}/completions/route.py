@@ -1,4 +1,5 @@
 from aiohttp import web
+import math
 import http
 import src.utils.routedecos
 from src.db.queries.maps import get_map
@@ -40,7 +41,10 @@ async def get(request: web.Request):
               properties:
                 total:
                   type: integer
-                  description: The total count of player entries, for pagination.
+                  description: The total count of player entries.
+                pages:
+                  type: integer
+                  description: The total number of pages.
                 completions:
                   type: array
                   items:
@@ -59,6 +63,7 @@ async def get(request: web.Request):
     )
     return web.json_response({
         "total": total,
+        "pages": math.ceil(total/PAGE_ENTRIES),
         "completions": [cmp.to_dict() for cmp in completions],
     })
 

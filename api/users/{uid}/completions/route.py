@@ -1,4 +1,5 @@
 from aiohttp import web
+import math
 from src.db.queries.users import get_completions_by
 
 
@@ -11,7 +12,7 @@ async def get(request: web.Request):
     description: Returns a list of up to 50 maplist completions by the user.
     tags:
     - Users
-    - The List
+    - Completions
     parameters:
     - in: path
       name: uid
@@ -36,6 +37,9 @@ async def get(request: web.Request):
                 total:
                   type: integer
                   description: The total count of player entries, for pagination.
+                pages:
+                  type: integer
+                  description: The total number of pages.
                 completions:
                   type: array
                   description: The player's completions
@@ -55,5 +59,6 @@ async def get(request: web.Request):
     )
     return web.json_response({
         "total": count,
+        "pages": math.ceil(count/PAGE_ENTRIES),
         "completions": [cmp.to_dict() for cmp in completions],
     })
