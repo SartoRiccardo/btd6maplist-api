@@ -33,7 +33,8 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
             m.code,
             is_verified IS NOT NULL,
             placement_allver,
-            placement_curver
+            placement_curver,
+            map_preview_url
         FROM maps m
         LEFT JOIN verified_current vc
             ON m.code=vc.map
@@ -43,7 +44,7 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
         ORDER BY {placement_vname} ASC
     """, )
     return [
-        PartialListMap(row[0], row[1], row[3 + int(curver)], row[2])
+        PartialListMap(row[0], row[1], row[3 + int(curver)], row[2], row[5])
         for row in payload
     ]
 
@@ -51,13 +52,13 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
 @postgres
 async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
     payload = await conn.fetch("""
-        SELECT name, code, difficulty
+        SELECT name, code, difficulty, map_preview_url
         FROM maps
         WHERE difficulty > -1
             AND deleted_on IS NULL
     """)
     return [
-        PartialExpertMap(row[0], row[1], row[2])
+        PartialExpertMap(row[0], row[1], row[2], row[3])
         for row in payload
     ]
 
@@ -74,7 +75,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         SELECT
             code, name, placement_curver, placement_allver, difficulty,
             r6_start, map_data, ({q_is_verified}) AS is_verified, deleted_on,
-            optimal_heros
+            optimal_heros, map_preview_url
         FROM maps
         WHERE code=$1
     """, code)
@@ -92,6 +93,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
             pl_map[6],
             pl_map[8],
             pl_map[9].split(";"),
+            pl_map[10],
         )
 
     coros = [
@@ -135,6 +137,7 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         pl_map[6],
         pl_map[8],
         pl_map[9].split(";"),
+        pl_map[10],
         [(row[0], row[1], row[2]) for row in pl_creat],
         pl_codes,
         [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],
@@ -311,13 +314,13 @@ async def add_map(map_data: dict, conn=None) -> None:
             """
             INSERT INTO maps(
                 code, name, placement_allver, placement_curver, difficulty,
-                map_data, r6_start, optimal_heros
+                map_data, r6_start, optimal_heros, map_preview_url
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             """,
             map_data["code"], map_data["name"], map_data["placement_allver"],
             map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
-            map_data["r6_start"], ";".join(map_data["optimal_heros"])
+            map_data["r6_start"], ";".join(map_data["optimal_heros"]), map_data["map_preview_url"],
         )
 
         await insert_map_relations(map_data, conn)
@@ -350,6 +353,7 @@ async def edit_map(
                 "map_data",
                 "r6_start",
                 "optimal_heros",
+                "map_preview_url",
             ] if field in map_data
         ]
 

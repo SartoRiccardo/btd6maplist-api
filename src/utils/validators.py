@@ -66,6 +66,7 @@ def typecheck_full_map(body: dict) -> dict:
         "aliases": [str],
         "version_compatibilities": [{"version": int, "status": int}],
         "optimal_heros": [str],
+        "map_preview_url": str | None,
     }
     check = check_fields(body, check_fields_exists)
     if len(check):
@@ -101,6 +102,11 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
         for i, isdup in enumerate(dup_aliases):
             if isdup:
                 errors[f"aliases[{i}].alias"] = "Already assigned to another map"
+
+    if body["r6_start"] and not is_link(body["r6_start"]):
+        errors["r6_start"] = "Must be a URL"
+    if body["map_preview_url"] and not is_link(body["map_preview_url"]):
+        errors["map_preview_url"] = "Must be a URL"
 
     if len(body["creators"]) == 0:
         errors["creators"] = "Must have at least one creator"

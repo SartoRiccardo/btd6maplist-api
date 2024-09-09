@@ -1,7 +1,7 @@
 from aiohttp import web
 import aiohttp
 import http
-from src.utils.validators import validate_completion
+from src.utils.validators import validate_completion, validate_full_map
 from src.utils.files import save_media
 from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 
@@ -55,5 +55,36 @@ async def get_submission(
             data["lcc"]["proof"] = f"{MEDIA_BASE_URL}/{proof_fname}"
         else:
             data["lcc"]["proof"] = data["lcc"]["proof_completion"]
+
+    return data
+
+
+async def get_map_form(
+        request: web.Request,
+        check_dup_code: bool = False,
+) -> dict | web.Response:
+    data = None
+    files = {"r6_start": None, "map_preview_url": None}
+
+    reader = await request.multipart()
+    while part := await reader.next():
+        # Max 2MB total cause of the Application init
+        if part.name in files:
+            proof_ext = "png"
+            if aiohttp.hdrs.CONTENT_TYPE in part.headers:
+                proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+            fname, _fpath = await save_media(await part.read(decode=False), proof_ext)
+            files[part.name] = f"{MEDIA_BASE_URL}/{fname}"
+
+        elif part.name == "data":
+            data = await part.json()
+            if len(errors := await validate_full_map(data, check_dup_code=check_dup_code)):
+                return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
+            if data["map_preview_url"] and data["map_preview_url"].startswith("https://data.ninjakiwi.com"):
+                data["map_preview_url"] = None
+
+    for fname in files:
+        if data[fname] is None:
+            data[fname] = files[fname]
 
     return data

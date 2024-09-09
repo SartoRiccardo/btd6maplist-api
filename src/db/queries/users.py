@@ -53,7 +53,7 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
                 rwf.format,
                 
                 m.name, m.placement_curver, m.placement_allver, m.difficulty,
-                m.r6_start, m.map_data, m.optimal_heros,
+                m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
                 
                 lccs.id, lccs.proof, lccs.leftover,
                 
@@ -81,18 +81,19 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
     )
 
     run_sidx = 1
-    map_sidx = 7
-    lcc_sidx = 14
-    group_sidx = 17
+    map_sidx = 6 + run_sidx
+    lcc_sidx = 8 + map_sidx
+    group_sidx = 3 + lcc_sidx
 
     return [
         ListCompletion(
             run[run_sidx],
             PartialMap(
                 run[run_sidx+1],
-                *run[map_sidx:lcc_sidx][:-1],
+                *run[map_sidx:map_sidx+6],
                 None,
-                run[lcc_sidx-1].split(";")
+                run[map_sidx+6].split(";"),
+                run[map_sidx+7],
             ),
             run[group_sidx],
             run[run_sidx+2],
@@ -169,7 +170,7 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         """
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, m.optimal_heros
+            m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url
         FROM maps m JOIN creators c
             ON m.code = c.map
         WHERE c.user_id=$1
@@ -177,7 +178,7 @@ async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
         """,
         int(id)
     )
-    return [PartialMap(*m[:-1], None, m[-1].split(";")) for m in payload]
+    return [PartialMap(*m[:7], None, m[7].split(";"), m[8]) for m in payload]
 
 
 @postgres

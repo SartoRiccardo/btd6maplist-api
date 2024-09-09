@@ -1,8 +1,8 @@
 from aiohttp import web
 import http
 from src.db.queries.maps import get_map, edit_map, delete_map
+from src.utils.forms import get_map_form
 import src.utils.routedecos
-from src.utils.validators import validate_full_map
 from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 
 
@@ -35,11 +35,9 @@ async def get(_r: web.Request, resource: "src.db.models.Map" = None):
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.validate_json_body(validate_full_map, check_dup_code=False)
 @src.utils.routedecos.with_maplist_profile
 async def put(
-        _r: web.Request,
-        json_body: dict = None,
+        request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         maplist_profile: dict = None,
         **_kwargs
@@ -88,6 +86,8 @@ async def put(
     """
     if not (MAPLIST_EXPMOD_ID in maplist_profile["roles"] or MAPLIST_LISTMOD_ID in maplist_profile["roles"]):
         return web.json_response({"errors": {"": "You are not a moderator"}, "data": {}}, status=401)
+
+    json_body = await get_map_form(request, check_dup_code=False)
 
     if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
         del json_body["difficulty"]

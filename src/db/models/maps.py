@@ -15,16 +15,23 @@ class PartialExpertMap:
         description: The code of the map.
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
+      map_preview_url:
+        type: string
+        nullable: true
+        description: URL to the map preview.
     """
     name: str
     code: str
     difficulty: int
+    map_preview_url: str | None
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "code": self.code,
             "difficulty": self.difficulty,
+            "map_preview_url": self.map_preview_url if self.map_preview_url else
+                f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
         }
 
 
@@ -45,11 +52,16 @@ class PartialListMap:
       verified:
         type: boolean
         description: "`true` if the map was verified in the current update."
+      map_preview_url:
+        type: string
+        nullable: true
+        description: URL to the map preview.
     """
     name: str
     code: str
     placement: int
     verified: bool
+    map_preview_url: str | None
 
     def to_dict(self) -> dict:
         return {
@@ -57,6 +69,8 @@ class PartialListMap:
             "code": self.code,
             "placement": self.placement,
             "verified": self.verified,
+            "map_preview_url": self.map_preview_url if self.map_preview_url else
+                f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
         }
 
 
@@ -87,6 +101,10 @@ class PartialMap:
         type: string
         nullable: true
         description: URL to the map data.
+      map_preview_url:
+        type: string
+        nullable: true
+        description: URL to the map preview.
       optimal_heros:
         type: array
         items:
@@ -122,6 +140,7 @@ class PartialMap:
     map_data: str
     deleted_on: datetime | None
     optimal_heros: list[str]
+    map_preview_url: str | None
 
     def to_dict(self) -> dict:
         return {
@@ -134,6 +153,8 @@ class PartialMap:
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
+            "map_preview_url": self.map_preview_url if self.map_preview_url else
+                f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
         }
 
 
