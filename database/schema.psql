@@ -158,9 +158,9 @@ WHERE mll.leftover = lcc.leftover;
 CREATE VIEW list_curver_leaderboard AS
 WITH config_values AS (
     SELECT
-        (SELECT value::int FROM config WHERE name='points_multi_bb') AS points_multi_bb,
-        (SELECT value::int FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
-        (SELECT value::int FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
+        (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::float FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::float FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
 ),
 maps_points AS (
     SELECT
@@ -206,9 +206,9 @@ ORDER BY placement ASC, user_id DESC;
 CREATE VIEW list_allver_leaderboard AS
 WITH config_values AS (
     SELECT
-        (SELECT value::int FROM config WHERE name='points_multi_bb') AS points_multi_bb,
-        (SELECT value::int FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
-        (SELECT value::int FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
+        (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::float FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::float FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
 ),
 maps_points AS (
     SELECT
