@@ -1,3 +1,5 @@
+-- They never taught me triggers in school by the way so these are all AI generated.
+
 ----------------------------
 -- Refresh listmap_points --
 ----------------------------
@@ -16,3 +18,70 @@ CREATE TRIGGER refresh_listmap_points
 AFTER UPDATE ON config
 FOR EACH ROW
 EXECUTE PROCEDURE refresh_listmap_points();
+
+
+----------------------------------------------
+-- Automatically insert a completion where  --
+-- format=2, if a completion where format=1 --
+-- has just been approved.                  --
+----------------------------------------------
+
+
+DROP PROCEDURE IF EXISTS dupe_comp_to_allver CASCADE;
+CREATE PROCEDURE dupe_comp_to_allver(comp_id INT) AS
+$$
+DECLARE
+    completion list_completions;
+    dupe_lcc_id INT;
+    dupe_run_id INT;
+BEGIN
+    SELECT * INTO completion
+    FROM list_completions
+    WHERE id = comp_id;
+
+    -- Duplicate the leastcostchimps entry, if any
+    IF completion.lcc IS NOT NULL THEN
+        INSERT INTO leastcostchimps (leftover, proof)
+        SELECT leftover, proof FROM leastcostchimps WHERE id = completion.lcc
+        RETURNING id INTO dupe_lcc_id;
+    ELSE
+        dupe_lcc_id := NULL;  -- No lcc to duplicate
+    END IF;
+
+    -- Duplicate the list_completions row with format set to 2
+    INSERT INTO list_completions (map, black_border, no_geraldo, lcc, created_on, accepted, format)
+    VALUES (
+        completion.map,
+        completion.black_border,
+        completion.no_geraldo,
+        dupe_lcc_id,
+        completion.created_on,
+        TRUE,
+        2
+    )
+    RETURNING id INTO dupe_run_id;
+
+    -- Duplicate all associated listcomp_players rows for the new run
+    INSERT INTO listcomp_players (run, user_id)
+    SELECT dupe_run_id, user_id FROM listcomp_players WHERE run = completion.id;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+DROP FUNCTION IF EXISTS dup_curver_comp_on_accept CASCADE;
+CREATE OR REPLACE FUNCTION dup_curver_comp_on_accept()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    CALL dupe_comp_to_allver(NEW.id);
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER tr_dup_curver_comp_on_accept
+AFTER UPDATE ON list_completions
+FOR EACH ROW
+WHEN (NEW.accepted = TRUE AND OLD.accepted = FALSE AND NEW.format = 1)
+EXECUTE PROCEDURE dup_curver_comp_on_accept();

@@ -210,6 +210,14 @@ async def add_completion(
             [(comp_id, uid) for uid in user_ids]
         )
 
+        if comp_format == 1:
+            await conn.execute(
+                """
+                CALL dupe_comp_to_allver($1)
+                """,
+                comp_id
+            )
+
 
 @postgres
 async def delete_completion(
