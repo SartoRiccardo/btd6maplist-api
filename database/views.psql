@@ -1,0 +1,231 @@
+DROP MATERIALIZED VIEW IF EXISTS listmap_points CASCADE;
+CREATE MATERIALIZED VIEW listmap_points AS
+SELECT
+    indexes.n AS placement,
+    ROUND(
+        (
+            (SELECT value FROM config WHERE name='points_bottom_map')::float *
+            POWER(
+                (
+                    (SELECT value FROM config WHERE name='points_top_map')::float /
+                    (SELECT value FROM config WHERE name='points_bottom_map')::float
+                ),
+                POWER(
+                    (1 + (1 - indexes.n) / ((SELECT value FROM config WHERE name='map_count')::float - 1)),
+                    (SELECT value FROM config WHERE name='formula_slope')::float
+                )
+            )
+        )::numeric,
+        (SELECT value FROM config WHERE name='decimal_digits')::int
+    ) AS points
+FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) AS indexes(n);
+
+----------------------------
+-- LCCs for each list map --
+----------------------------
+
+DROP VIEW IF EXISTS lccs_by_map CASCADE;
+CREATE VIEW lccs_by_map AS
+WITH maps_lcc_leftovers AS (
+    SELECT
+        r.map,
+        r.format,
+        MAX(lcc.leftover) AS leftover
+    FROM list_completions r
+    JOIN leastcostchimps lcc
+        ON r.lcc = lcc.id
+    WHERE r.accepted
+        AND r.deleted_on IS NULL
+    GROUP BY r.map, r.format
+)
+SELECT
+    mll.map, mll.format, lcc.id
+FROM maps_lcc_leftovers mll
+JOIN list_completions r
+    ON r.map = mll.map AND r.format = mll.format
+JOIN leastcostchimps lcc
+    ON r.lcc = lcc.id
+WHERE mll.leftover = lcc.leftover;
+
+
+---------------
+-- Points LB --
+---------------
+
+DROP VIEW IF EXISTS list_curver_leaderboard CASCADE;
+CREATE VIEW list_curver_leaderboard AS
+WITH config_values AS (
+    SELECT
+        (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::float FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::float FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
+),
+maps_points AS (
+    SELECT
+        lmp.points, m.code
+    FROM maps m
+    JOIN listmap_points lmp
+        -- Implicitly puts placement BETWEEN 1 AND map_count
+        ON lmp.placement = m.placement_curver
+    WHERE m.deleted_on IS NULL
+),
+unique_runs AS (
+	SELECT DISTINCT
+		lcp.user_id, r.map, r.black_border, r.no_geraldo, r.lcc=lccs.id AS current_lcc
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    LEFT JOIN lccs_by_map lccs
+        ON lccs.map = r.map AND lccs.format = r.format
+    -- Filter one subquery higher for selction on time machine
+    WHERE r.format = 1
+        AND r.accepted
+        AND r.deleted_on IS NULL
+),
+-- https://stackoverflow.com/a/78963508/13033269
+comp_user_map_modifiers AS (
+	SELECT uq.user_id, uq.map,
+		CASE WHEN bool_or(uq.black_border AND uq.no_geraldo) THEN cv.points_multi_bb*cv.points_multi_gerry
+			 ELSE GREATEST(CASE WHEN bool_or(uq.black_border) THEN cv.points_multi_bb ELSE 0 END
+							+ CASE WHEN bool_or(uq.no_geraldo) THEN cv.points_multi_gerry ELSE 0 END, 1)
+			 END AS multiplier,
+        CASE WHEN bool_or(uq.current_lcc) THEN cv.points_extra_lcc ELSE 0 END AS additive
+   FROM unique_runs uq
+   CROSS JOIN config_values cv
+   GROUP BY uq.user_id, uq.map, cv.points_multi_bb, cv.points_multi_gerry, cv.points_extra_lcc
+),
+user_points AS (
+	SELECT
+		modi.user_id, mwp.points * modi.multiplier + modi.additive AS points
+	FROM comp_user_map_modifiers modi
+    JOIN maps_points mwp
+        ON modi.map = mwp.code
+),
+leaderboard AS (
+    SELECT
+        up.user_id,
+        SUM(up.points) AS score
+    FROM user_points up
+    GROUP BY up.user_id
+)
+SELECT user_id, score, RANK() OVER (ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+
+DROP VIEW IF EXISTS list_allver_leaderboard CASCADE;
+CREATE VIEW list_allver_leaderboard AS
+WITH config_values AS (
+    SELECT
+        (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
+        (SELECT value::float FROM config WHERE name='points_multi_gerry') AS points_multi_gerry,
+        (SELECT value::float FROM config WHERE name='points_extra_lcc') AS points_extra_lcc
+),
+maps_points AS (
+    SELECT
+        lmp.points, m.code
+    FROM maps m
+    JOIN listmap_points lmp
+        ON lmp.placement = m.placement_curver
+    WHERE m.deleted_on IS NULL
+),
+unique_runs AS (
+	SELECT DISTINCT
+		lcp.user_id, r.map, r.black_border, r.no_geraldo, r.lcc=lccs.id AS current_lcc
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    LEFT JOIN lccs_by_map lccs
+        ON lccs.map = r.map AND lccs.format = r.format
+    WHERE r.format = 2
+        AND r.accepted
+        AND r.deleted_on IS NULL
+),
+comp_user_map_modifiers AS (
+	SELECT uq.user_id, uq.map,
+		CASE WHEN bool_or(uq.black_border AND uq.no_geraldo) THEN cv.points_multi_bb*cv.points_multi_gerry
+			 ELSE GREATEST(CASE WHEN bool_or(uq.black_border) THEN cv.points_multi_bb ELSE 0 END
+							+ CASE WHEN bool_or(uq.no_geraldo) THEN cv.points_multi_gerry ELSE 0 END, 1)
+			 END AS multiplier,
+        CASE WHEN bool_or(uq.current_lcc) THEN cv.points_extra_lcc ELSE 0 END AS additive
+   FROM unique_runs uq
+   CROSS JOIN config_values cv
+   GROUP BY uq.user_id, uq.map, cv.points_multi_bb, cv.points_multi_gerry, cv.points_extra_lcc
+),
+user_points AS (
+	SELECT
+		modi.user_id, mwp.points * modi.multiplier + modi.additive AS points
+	FROM comp_user_map_modifiers modi
+    JOIN maps_points mwp
+        ON modi.map = mwp.code
+),
+leaderboard AS (
+    SELECT
+        up.user_id,
+        SUM(up.points) AS score
+    FROM user_points up
+    GROUP BY up.user_id
+)
+SELECT user_id, score, RANK() OVER (ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+
+------------
+-- LCC LB --
+------------
+
+DROP VIEW IF EXISTS list_curver_lcclb CASCADE;
+CREATE VIEW list_curver_lcclb AS
+WITH config_values AS (
+    SELECT
+        (SELECT value::int FROM config WHERE name='map_count') AS map_count
+),
+leaderboard AS (
+    SELECT lcp.user_id, COUNT(lcp.user_id) AS score
+    FROM lccs_by_map lccs
+    JOIN list_completions r
+        ON r.lcc = lccs.id
+    JOIN maps m
+        ON r.map = m.code
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    CROSS JOIN config_values cv
+    WHERE m.placement_curver BETWEEN 1 AND cv.map_count
+        AND lccs.format = 1
+        AND m.deleted_on IS NULL
+        AND r.accepted
+        AND r.deleted_on IS NULL
+    GROUP BY lcp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+
+DROP VIEW IF EXISTS list_allver_lcclb CASCADE;
+CREATE VIEW list_allver_lcclb AS
+WITH config_values AS (
+    SELECT
+        (SELECT value::int FROM config WHERE name='map_count') AS map_count
+),
+leaderboard AS (
+    SELECT lcp.user_id, COUNT(lcp.user_id) AS score
+    FROM lccs_by_map lccs
+    JOIN list_completions r
+        ON r.lcc = lccs.id
+    JOIN maps m
+        ON r.map = m.code
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    CROSS JOIN config_values cv
+    WHERE m.placement_allver BETWEEN 1 AND cv.map_count
+        AND lccs.format = 2
+        AND m.deleted_on IS NULL
+        AND r.accepted
+        AND r.deleted_on IS NULL
+    GROUP BY lcp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;

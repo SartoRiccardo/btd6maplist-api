@@ -33,4 +33,3 @@ async def update_config(config: dict[str, Any], conn=None) -> None:
             "UPDATE config SET value=$2 WHERE name=$1",
             vname, str(config[vname])
         )
-    await conn.execute("REFRESH MATERIALIZED VIEW listmap_points")

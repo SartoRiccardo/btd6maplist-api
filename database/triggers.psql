@@ -1,0 +1,18 @@
+----------------------------
+-- Refresh listmap_points --
+----------------------------
+
+DROP FUNCTION IF EXISTS refresh_listmap_points CASCADE;
+CREATE FUNCTION refresh_listmap_points() RETURNS TRIGGER AS
+$$
+BEGIN
+    REFRESH MATERIALIZED VIEW listmap_points;
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER refresh_listmap_points
+AFTER UPDATE ON config
+FOR EACH ROW
+EXECUTE PROCEDURE refresh_listmap_points();

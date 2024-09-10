@@ -14,7 +14,7 @@ from aiohttp import web
 import src.http
 import src.db.connection
 import src.db.models
-from src.utils.colors import purple, green, yellow, blue, red, cyan
+from src.utils.colors import green, yellow, blue, red
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -137,7 +137,7 @@ def get_routes(cur_path: None | list = None) -> list:
                 if not hasattr(route, method):
                     continue
                 routefunc, routecolor = allowed_methods[method]
-                print(f"+{routecolor(method.upper())}\t{api_route}")
+                print(f"{routecolor(method.upper())}\t{api_route}")
                 routes.append(routefunc(api_route, cors_route(getattr(route, method), cors_origins)))
                 methods.append(method.upper())
             if len(methods):
@@ -190,5 +190,4 @@ if __name__ == '__main__':
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain("api.btd6maplist.crt", "api.btd6maplist.key")
 
-    print(f"{purple('[START]')} Listening on port {APP_PORT}...")
     web.run_app(app, host=APP_HOST, port=APP_PORT, ssl_context=ssl_context)
