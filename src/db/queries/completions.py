@@ -206,6 +206,7 @@ async def add_completion(
             """
             INSERT INTO listcomp_players(run, user_id)
             VALUES($1, $2)
+            ON CONFLICT DO NOTHING
             """,
             [(comp_id, uid) for uid in user_ids]
         )

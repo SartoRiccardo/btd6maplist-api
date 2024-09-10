@@ -72,7 +72,8 @@ ALTER TABLE additional_codes ADD CONSTRAINT fk_maps_1
 CREATE TABLE creators (
   map INT NOT NULL,
   user_id BIGINT NOT NULL,
-  role TEXT
+  role TEXT,
+  PRIMARY KEY (map, user_id)
 );
 ALTER TABLE creators ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(id) ON DELETE CASCADE;
@@ -84,6 +85,8 @@ CREATE TABLE verifications (
   user_id BIGINT NOT NULL,
   version INT
 );
+CREATE UNIQUE INDEX verifications_uq
+  ON verifications (map, user_id, COALESCE(version, -1));
 ALTER TABLE verifications ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(id) ON DELETE CASCADE;
 ALTER TABLE verifications ADD CONSTRAINT fk_users_1
@@ -130,7 +133,8 @@ ALTER TABLE maps ADD CONSTRAINT fk_list_completions_1
 
 CREATE TABLE listcomp_players (
   run INT NOT NULL,
-  user_id BIGINT NOT NULL
+  user_id BIGINT NOT NULL,
+  PRIMARY KEY (run, user_id)
 );
 ALTER TABLE listcomp_players ADD CONSTRAINT fk_list_completions_1
   FOREIGN KEY (run) REFERENCES list_completions(id) ON DELETE CASCADE;

@@ -282,14 +282,22 @@ async def insert_map_relations(map_id: int, map_data: dict, conn=None) -> None:
         ]
     )
     await conn.executemany(
-        "INSERT INTO creators(map, user_id, role) VALUES ($1, $2, $3)",
+        """
+        INSERT INTO creators(map, user_id, role)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
+        """,
         [
             (map_id, int(obj["id"]), obj["role"])
             for obj in map_data["creators"]
         ]
     )
     await conn.executemany(
-        "INSERT INTO verifications(map, user_id, version) VALUES ($1, $2, $3)",
+        """
+        INSERT INTO verifications(map, user_id, version)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
+        """,
         [
             (map_id, int(obj["id"]), obj["version"])
             for obj in map_data["verifiers"]
