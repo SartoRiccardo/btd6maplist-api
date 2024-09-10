@@ -70,10 +70,10 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
         SELECT COUNT(*) OVER() AS total_count, uq.*
         FROM unique_runs uq
         ORDER BY
+            uq.map ASC,
             uq.current_lcc DESC,
             uq.no_geraldo DESC,
-            uq.black_border DESC,
-            uq.map ASC
+            uq.black_border DESC
         LIMIT $3
         OFFSET $2
         """,
