@@ -258,3 +258,22 @@ async def validate_completion(body: dict) -> dict[str, str]:
                 body["user_ids"][i] = str(usr.id)
 
     return errors
+
+
+async def validate_discord_user(body: dict) -> dict[str, str]:
+    check_fields_exists = {
+        "discord_id": str,
+        "name": str,
+    }
+    if len(check := check_fields(body, check_fields_exists)):
+        return check
+
+    errors = {}
+
+    if not body["discord_id"].isnumeric():
+        errors["discord_id"] = "Must be numeric"
+    else:
+        body["discord_id"] = int(body["discord_id"])
+    body["name"] = body["name"].lower()
+
+    return errors
