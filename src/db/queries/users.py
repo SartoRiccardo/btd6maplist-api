@@ -54,7 +54,7 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
                 
                 m.name, m.placement_curver, m.placement_allver, m.difficulty,
                 m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
-                m.id, m.created_on
+                m.id, m.created_on,
                 
                 lccs.id, lccs.proof, lccs.leftover,
                 
