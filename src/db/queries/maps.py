@@ -248,9 +248,9 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
         FROM unique_runs uq
         ORDER BY
             uq.user_ids ASC,
-            uq.current_lcc DESC,
+            uq.black_border DESC,
             uq.no_geraldo DESC,
-            uq.black_border DESC
+            uq.current_lcc DESC
         LIMIT $3
         OFFSET $2
         """,

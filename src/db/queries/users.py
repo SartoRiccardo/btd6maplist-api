@@ -33,7 +33,7 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
+async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
@@ -72,13 +72,13 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
         FROM unique_runs uq
         ORDER BY
             uq.map ASC,
-            uq.current_lcc DESC,
+            uq.black_border DESC,
             uq.no_geraldo DESC,
-            uq.black_border DESC
+            uq.current_lcc DESC
         LIMIT $3
         OFFSET $2
         """,
-        int(id), idx_start, amount,
+        int(uid), idx_start, amount,
     )
 
     run_sidx = 1
