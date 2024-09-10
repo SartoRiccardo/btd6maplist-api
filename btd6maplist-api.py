@@ -12,6 +12,7 @@ from config import APP_HOST, APP_PORT, CORS_ORIGINS, PERSISTENT_DATA_PATH
 import aiohttp_client_cache
 from aiohttp import web
 import src.http
+import src.log
 import src.db.connection
 import src.db.models
 from src.utils.colors import green, yellow, blue, red
@@ -36,13 +37,16 @@ async def init_client_session(_app):
                 await session.delete_expired_responses()
                 await asyncio.sleep(3600 * 24 * 5)
 
-    task = asyncio.create_task(init_session())
+    tasks = [
+        asyncio.create_task(init_session()),
+        asyncio.create_task(src.log.init_log()),
+    ]
 
     yield
 
-    task.cancel()
+    [t.cancel() for t in tasks]
     with contextlib.suppress(asyncio.CancelledError):
-        await task
+        [await t for t in tasks]
 
 
 async def start_db_connection(_app):
