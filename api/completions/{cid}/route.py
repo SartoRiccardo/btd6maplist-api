@@ -5,6 +5,7 @@ from src.utils.validators import validate_completion
 import src.utils.routedecos
 from src.utils.forms import get_submission
 from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
+import src.log
 
 
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
@@ -97,6 +98,7 @@ async def put(
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
     )
+    await src.log.log_action("completion", "put", resource.id, data, maplist_profile["user"]["id"])
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
@@ -145,5 +147,6 @@ async def delete(
 
     if not resource.deleted_on:
         await delete_completion(resource.id, hard_delete=not resource.accepted)
+        await src.log.log_action("completion", "delete", resource.id, None, maplist_profile["user"]["id"])
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

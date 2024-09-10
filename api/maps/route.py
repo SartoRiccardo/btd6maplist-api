@@ -1,6 +1,7 @@
 import src.utils.routedecos
 import http
 import src.http
+import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
 from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
@@ -112,4 +113,5 @@ async def post(
         )
 
     await add_map(json_body)
+    await src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"])
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

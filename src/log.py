@@ -30,13 +30,14 @@ async def log_action(
         action: Literal["post", "put", "delete"],
         eid: str | int | None,
         new_entity: dict | None,
+        who: int | str,
 ) -> None:
     if file is None:
         return
     str_entity = json.dumps(new_entity)
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow([int(datetime.now().timestamp()), etype, action, str(eid), str_entity])
+    writer.writerow([int(datetime.now().timestamp()), etype, action, str(eid), str_entity, str(who)])
     await file.write(out.getvalue())
     await file.flush()
 

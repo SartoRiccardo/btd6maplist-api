@@ -1,5 +1,6 @@
 from aiohttp import web
 import http
+import src.log
 from src.db.queries.maps import get_map, edit_map, delete_map
 from src.utils.forms import get_map_form
 import src.utils.routedecos
@@ -95,6 +96,7 @@ async def put(
         del json_body["placement_allver"]
         del json_body["placement_curver"]
 
+    await src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"])
     await edit_map(json_body, resource)
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
@@ -139,6 +141,9 @@ async def delete(
         return web.json_response({"errors": {"": "You are not a moderator"}, "data": {}}, status=401)
     modify_diff = MAPLIST_EXPMOD_ID in maplist_profile["roles"]
     modify_pos = MAPLIST_LISTMOD_ID in maplist_profile["roles"]
-    await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)
+
+    if not resource.deleted_on:
+        await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)
+        await src.log.log_action("map", "delete", resource.code, None, maplist_profile["user"]["id"])
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

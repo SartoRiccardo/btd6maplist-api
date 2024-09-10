@@ -4,6 +4,7 @@ import http
 import src.utils.routedecos
 from src.utils.forms import get_submission
 from src.db.queries.completions import edit_completion
+import src.log
 
 
 @src.utils.routedecos.bearer_auth
@@ -77,4 +78,5 @@ async def post(
         [int(uid) for uid in data["user_ids"]],
         accept=True,
     )
+    await src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"])
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
