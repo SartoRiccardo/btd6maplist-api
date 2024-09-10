@@ -54,6 +54,7 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
                 
                 m.name, m.placement_curver, m.placement_allver, m.difficulty,
                 m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
+                m.id, m.created_on
                 
                 lccs.id, lccs.proof, lccs.leftover,
                 
@@ -82,18 +83,26 @@ async def get_completions_by(id: str, idx_start=0, amount=50, conn=None) -> tupl
 
     run_sidx = 1
     map_sidx = 6 + run_sidx
-    lcc_sidx = 8 + map_sidx
+    lcc_sidx = 10 + map_sidx
     group_sidx = 3 + lcc_sidx
 
     return [
         ListCompletion(
             run[run_sidx],
             PartialMap(
+                run[map_sidx+8],
                 run[run_sidx+1],
-                *run[map_sidx:map_sidx+6],
+                run[map_sidx],
+                run[map_sidx+1],
+                run[map_sidx+2],
+                run[map_sidx+3],
+                run[map_sidx+4],
+                run[map_sidx+5],
                 None,
                 run[map_sidx+6].split(";"),
                 run[map_sidx+7],
+                None,
+                run[map_sidx+9],
             ),
             run[group_sidx],
             run[run_sidx+2],
@@ -146,7 +155,7 @@ async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
 
 
 @postgres
-async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tuple[int | None, float]:
+async def get_maplist_placement(uid: str, curver=True, type="points", conn=None) -> tuple[int | None, float]:
     verstr = "cur" if curver else "all"
     lbname = "leaderboard" if type == "points" else "lcclb"
     lb_view = f"list_{verstr}ver_{lbname}"
@@ -157,7 +166,7 @@ async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tu
         FROM {lb_view}
         WHERE user_id=$1
         """,
-        int(id)
+        int(uid)
     )
     if not len(payload) or not len(payload[0]):
         return None, 0.0
@@ -165,20 +174,38 @@ async def get_maplist_placement(id, curver=True, type="points", conn=None) -> tu
 
 
 @postgres
-async def get_maps_created_by(id, conn=None) -> list[PartialMap]:
+async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
     payload = await conn.fetch(
         """
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url
+            m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url, m.id,
+            m.new_version, m.created_on
         FROM maps m JOIN creators c
-            ON m.code = c.map
+            ON m.id = c.map
         WHERE c.user_id=$1
             AND m.deleted_on IS NULL
         """,
-        int(id)
+        int(uid)
     )
-    return [PartialMap(*m[:7], None, m[7].split(";"), m[8]) for m in payload]
+    return [
+        PartialMap(
+            m[9],
+            m[0],
+            m[1],
+            m[2],
+            m[3],
+            m[4],
+            m[5],
+            m[6],
+            None,
+            m[7].split(";"),
+            m[8],
+            m[10],
+            m[11],
+        )
+        for m in payload
+    ]
 
 
 @postgres
@@ -187,19 +214,11 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
     if not puser:
         return None
 
-    coros = [
-        get_maplist_placement(id, conn=conn),
-        get_maplist_placement(id, curver=False, conn=conn),
-        get_maplist_placement(id, type="lcc", conn=conn),
-        get_maplist_placement(id, curver=False, type="lcc", conn=conn),
-        get_maps_created_by(id, conn=conn),
-    ]
-
-    curpt_pos, allpt_pos, curlcc_pos, alllcc_pos, maps = [
-        await coro for coro in coros
-    ]
-    if not puser:
-        return None
+    curpt_pos = await get_maplist_placement(id, conn=conn)
+    allpt_pos = await get_maplist_placement(id, curver=False, conn=conn)
+    curlcc_pos = await get_maplist_placement(id, type="lcc", conn=conn)
+    alllcc_pos = await get_maplist_placement(id, curver=False, type="lcc", conn=conn)
+    maps = await get_maps_created_by(id, conn=conn)
 
     comps = []
     if with_completions:
@@ -227,27 +246,27 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
 
 
 @postgres
-async def create_user(id, name, if_not_exists=True, conn=None) -> bool:
+async def create_user(uid: str, name: str, if_not_exists=True, conn=None) -> bool:
     rows = await conn.execute(
         f"""
         INSERT INTO users(discord_id, name)
         VALUES ($1, $2)
         {"ON CONFLICT DO NOTHING" if if_not_exists else ""}
         """,
-        int(id), name,
+        int(uid), name,
     )
     return int(rows.split(" ")[2]) == 1
 
 
 @postgres
-async def edit_user(id: str, name: str, oak: str | None, conn=None) -> bool:
+async def edit_user(uid: str, name: str, oak: str | None, conn=None) -> bool:
     rows = await conn.execute(
         f"""
         UPDATE users
         SET name=$2, nk_oak=$3
         WHERE discord_id=$1
         """,
-        int(id), name, oak,
+        int(uid), name, oak,
     )
     return int(rows.split(" ")[1]) == 1
 

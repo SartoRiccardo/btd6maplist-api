@@ -64,27 +64,41 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 
 
 @postgres
-async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | None:
-    q_is_verified = f"""
-        SELECT COUNT(*) > 0
-        FROM verifications
-        WHERE map=$1
-            AND version={get_int_config("current_btd6_ver")}
-    """.strip()
-    payload = await conn.fetch(f"""
+async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialMap | None:
+    payload = await conn.fetch(
+        f"""
+        WITH config_values AS (
+            SELECT
+                (SELECT value::int FROM config WHERE name='current_btd6_ver') AS current_btd6_ver
+        ),
+        verified_maps AS (
+            SELECT v.map, COUNT(*) > 0 AS is_verified
+            FROM verifications v
+            CROSS JOIN config_values cv
+            WHERE v.version=cv.current_btd6_ver
+            GROUP BY v.map
+        )
         SELECT
-            code, name, placement_curver, placement_allver, difficulty,
-            r6_start, map_data, ({q_is_verified}) AS is_verified, deleted_on,
-            optimal_heros, map_preview_url
-        FROM maps
-        WHERE code=$1
-    """, code)
+            m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
+            m.r6_start, m.map_data, v.is_verified, m.deleted_on,
+            m.optimal_heros, m.map_preview_url, m.id, m.new_version, m.created_on
+        FROM maps m
+        JOIN verified_maps v
+            ON v.map = m.id
+        WHERE m.code=$1
+        """,
+        code,
+    )
     if len(payload) == 0:
         return None
+
     pl_map = payload[0]
+    map_id = pl_map[11]
+    map_code = pl_map[0]
     if partial:
         return PartialMap(
-            pl_map[0],
+            map_id,
+            map_code,
             pl_map[1],
             pl_map[2],
             pl_map[3],
@@ -94,41 +108,44 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
             pl_map[8],
             pl_map[9].split(";"),
             pl_map[10],
+            pl_map[12],
+            pl_map[13],
         )
 
-    coros = [
-        get_lccs_for(code, conn=conn),
-        conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", code),
-        conn.fetch(
-            """
-            SELECT user_id, role, name
-            FROM creators c
-            JOIN users u
-                ON u.discord_id=c.user_id
-            WHERE map=$1
-            """, code
-        ),
-        conn.fetch(f"""
-                WITH config_vars AS (
-                    SELECT
-                        ({get_int_config("current_btd6_ver")}) AS current_btd6_ver
-                )
-                SELECT user_id, version, name
-                FROM verifications v
-                CROSS JOIN config_vars cv
-                JOIN users u
-                    ON u.discord_id=v.user_id
-                WHERE map=$1
-                    AND (version=cv.current_btd6_ver OR version IS NULL)
-            """, code),
-        conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", code),
-        conn.fetch("SELECT alias FROM map_aliases WHERE map=$1", code)
-    ]
-
-    lccs, pl_codes, pl_creat, pl_verif, pl_compat, pl_aliases = [await coro for coro in coros]
+    lccs = await get_lccs_for(map_code, conn=conn)
+    pl_codes = await conn.fetch("SELECT code, description FROM additional_codes WHERE belongs_to=$1", map_id)
+    pl_creat = await conn.fetch(
+        """
+        SELECT user_id, role, name
+        FROM creators c
+        JOIN users u
+            ON u.discord_id=c.user_id
+        WHERE map=$1
+        """,
+        map_id,
+    )
+    pl_verif = await conn.fetch(
+        f"""
+        WITH config_vars AS (
+            SELECT
+                {get_int_config("current_btd6_ver")} AS current_btd6_ver
+        )
+        SELECT user_id, version, name
+        FROM verifications v
+        CROSS JOIN config_vars cv
+        JOIN users u
+            ON u.discord_id=v.user_id
+        WHERE map=$1
+            AND (version=cv.current_btd6_ver OR version IS NULL)
+        """,
+        map_id
+    )
+    pl_compat = await conn.fetch("SELECT status, version FROM mapver_compatibilities WHERE map=$1", map_id)
+    pl_aliases = await conn.fetch("SELECT alias FROM map_aliases WHERE map=$1", map_id)
 
     return Map(
-        pl_map[0],
+        map_id,
+        map_code,
         pl_map[1],
         pl_map[2],
         pl_map[3],
@@ -138,6 +155,8 @@ async def get_map(code, partial: bool = False, conn=None) -> Map | PartialMap | 
         pl_map[8],
         pl_map[9].split(";"),
         pl_map[10],
+        pl_map[12],
+        pl_map[13],
         [(row[0], row[1], row[2]) for row in pl_creat],
         pl_codes,
         [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],
@@ -169,7 +188,7 @@ def parse_runs_payload(payload, has_count: bool = True) -> list[ListCompletion]:
 
 
 @postgres
-async def get_lccs_for(code, conn=None) -> list[ListCompletion]:
+async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         """
         SELECT
@@ -190,7 +209,7 @@ async def get_lccs_for(code, conn=None) -> list[ListCompletion]:
             AND runs.accepted
             AND runs.deleted_on IS NULL
         """,
-        code,
+        map_code,
     )
     if not len(payload):
         return []
@@ -253,42 +272,44 @@ async def alias_exists(alias, conn=None) -> bool:
     return int(result[len("SELECT "):]) > 0
 
 
-async def insert_map_relations(map_data: dict, conn) -> None:
+@postgres
+async def insert_map_relations(map_id: int, map_data: dict, conn=None) -> None:
     await conn.executemany(
         "INSERT INTO additional_codes(code, description, belongs_to) VALUES ($1, $2, $3)",
         [
-            (obj["code"], obj["description"], map_data["code"])
+            (obj["code"], obj["description"], map_id)
             for obj in map_data["additional_codes"]
         ]
     )
     await conn.executemany(
         "INSERT INTO creators(map, user_id, role) VALUES ($1, $2, $3)",
         [
-            (map_data["code"], int(obj["id"]), obj["role"])
+            (map_id, int(obj["id"]), obj["role"])
             for obj in map_data["creators"]
         ]
     )
     await conn.executemany(
         "INSERT INTO verifications(map, user_id, version) VALUES ($1, $2, $3)",
         [
-            (map_data["code"], int(obj["id"]), obj["version"])
+            (map_id, int(obj["id"]), obj["version"])
             for obj in map_data["verifiers"]
         ]
     )
     await conn.executemany(
         "INSERT INTO mapver_compatibilities(map, version, status) VALUES ($1, $2, $3)",
         [
-            (map_data["code"], obj["version"], obj["status"])
+            (map_id, obj["version"], obj["status"])
             for obj in map_data["version_compatibilities"]
         ]
     )
     await conn.executemany(
         "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",
-        [(map_data["code"], alias) for alias in map_data["aliases"]]
+        [(map_id, alias) for alias in map_data["aliases"]]
     )
 
 
-async def delete_map_relations(code: str, conn) -> None:
+@postgres
+async def delete_map_relations(map_id: int, conn=None) -> None:
     relations = [
         ("additional_codes", "belongs_to"),
         ("creators", "map"),
@@ -297,7 +318,7 @@ async def delete_map_relations(code: str, conn) -> None:
         ("map_aliases", "map"),
     ]
     coros = [
-        conn.execute(f"DELETE FROM {table} WHERE {fkey}=$1", code)
+        conn.execute(f"DELETE FROM {table} WHERE {fkey}=$1", map_id)
         for table, fkey in relations
     ]
     for coro in coros:
@@ -310,20 +331,21 @@ async def add_map(map_data: dict, conn=None) -> None:
         for field in ["placement_allver", "placement_curver"]:
             await update_list_placements(field, -1, map_data[field])
 
-        await conn.execute(
+        map_id = await conn.fetchval(
             """
             INSERT INTO maps(
                 code, name, placement_allver, placement_curver, difficulty,
                 map_data, r6_start, optimal_heros, map_preview_url
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
             """,
             map_data["code"], map_data["name"], map_data["placement_allver"],
             map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
             map_data["r6_start"], ";".join(map_data["optimal_heros"]), map_data["map_preview_url"],
         )
 
-        await insert_map_relations(map_data, conn)
+        await insert_map_relations(map_id, map_data, conn=conn)
 
 
 @postgres
@@ -372,9 +394,8 @@ async def edit_map(
             *[map_data.get(field) for field in fields],
         )
 
-        await delete_map_relations(map_data["code"], conn)
-
-        await insert_map_relations(map_data, conn)
+        await delete_map_relations(map_current.id, conn=conn)
+        await insert_map_relations(map_current.id, map_data, conn=conn)
 
 
 @postgres
