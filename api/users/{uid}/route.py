@@ -1,6 +1,7 @@
+import http
 import re
 from aiohttp import web
-from src.db.queries.users import get_user, edit_user
+from src.db.queries.users import get_user, edit_user, get_user_min
 from src.ninjakiwi import get_btd6_user_deco
 import src.http
 import src.utils.routedecos
@@ -51,6 +52,8 @@ async def put_validate(body: dict) -> dict:
         errors["name"] = f"Name must be under {NAME_MAX_LEN} characters"
     elif not re.match("^[" + NAME_CHARS.replace(".", "\\.") + "]+$", body["name"]):
         errors["name"] = f"Allowed characters for name: {NAME_CHARS}"
+    elif await get_user_min(body["name"]):
+        errors["name"] = "An user by that name already exists!"
 
     if "oak" not in body:
         errors["oak"] = "Missing oak"
@@ -121,7 +124,7 @@ async def put(request: web.Request, json_body: dict = None, discord_profile: dic
         description: Your token is missing, or invalid.
     """
     if discord_profile["id"] != request.match_info["uid"]:
-        return web.Response(status=401)
+        return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
 
     oak = json_body["oak"] if len(json_body["oak"]) else None
     await edit_user(
