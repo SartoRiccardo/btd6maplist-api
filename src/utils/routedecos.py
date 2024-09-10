@@ -1,8 +1,9 @@
+import http
 import json
 from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
-from config import MAPLIST_GUILD_ID
+from config import MAPLIST_GUILD_ID, MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
 import src.http
 
 
@@ -94,5 +95,35 @@ def validate_resource_exists(
             if not resource:
                 return web.Response(status=404)
             return await handler(request, *args, **kwargs_caller, resource=resource)
+        return wrapper
+    return deco
+
+
+def require_perms(
+        list_admin: bool = True,
+        explist_admin: bool = True,
+):
+    """
+    Must be used with `with_maplist_profile` beforehand.
+    Returns 401 if doesn't have the required perms.
+    Adds `is_admin` to kwargs.
+    """
+    def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
+        @wraps(handler)
+        async def wrapper(request: web.Request, *args, **kwargs_caller):
+            if "maplist_profile" not in kwargs_caller:
+                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+            mp = kwargs_caller["maplist_profile"]
+
+            is_admin = any([role in MAPLIST_ADMIN_IDS for role in mp["roles"]])
+            check_fail = not is_admin
+            if list_admin and check_fail:
+                check_fail = MAPLIST_LISTMOD_ID not in mp["roles"]
+            if explist_admin and check_fail:
+                check_fail = MAPLIST_EXPMOD_ID not in mp["roles"]
+
+            if check_fail:
+                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+            return await handler(request, *args, **kwargs_caller, is_admin=is_admin)
         return wrapper
     return deco

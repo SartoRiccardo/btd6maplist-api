@@ -37,11 +37,13 @@ async def get(_r: web.Request, resource: "src.db.models.Map" = None):
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         maplist_profile: dict = None,
-        **_kwargs
+        is_admin: bool = False,
+        **_kwargs,
 ):
     """
     ---
@@ -85,16 +87,14 @@ async def put(
       "404":
         description: No map with that ID was found.
     """
-    if not (MAPLIST_EXPMOD_ID in maplist_profile["roles"] or MAPLIST_LISTMOD_ID in maplist_profile["roles"]):
-        return web.json_response({"errors": {"": "You are not a moderator"}, "data": {}}, status=401)
-
     json_body = await get_map_form(request, check_dup_code=False)
 
-    if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
-        del json_body["difficulty"]
-    if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-        del json_body["placement_allver"]
-        del json_body["placement_curver"]
+    if not is_admin:
+        if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
+            del json_body["difficulty"]
+        if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
+            del json_body["placement_allver"]
+            del json_body["placement_curver"]
 
     await src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"])
     await edit_map(json_body, resource)
@@ -105,10 +105,12 @@ async def put(
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def delete(
         _r: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
+        is_admin: bool = False,
         **_kwargs
 ):
     """
@@ -137,10 +139,8 @@ async def delete(
     if resource.deleted_on:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
-    if not (MAPLIST_EXPMOD_ID in maplist_profile["roles"] or MAPLIST_LISTMOD_ID in maplist_profile["roles"]):
-        return web.json_response({"errors": {"": "You are not a moderator"}, "data": {}}, status=401)
-    modify_diff = MAPLIST_EXPMOD_ID in maplist_profile["roles"]
-    modify_pos = MAPLIST_LISTMOD_ID in maplist_profile["roles"]
+    modify_diff = is_admin or MAPLIST_EXPMOD_ID in maplist_profile["roles"]
+    modify_pos = is_admin or MAPLIST_LISTMOD_ID in maplist_profile["roles"]
 
     if not resource.deleted_on:
         await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)

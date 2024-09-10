@@ -1,11 +1,8 @@
-import http
-
 from aiohttp import web
 from src.utils.misc import index_where
 from src.db.queries.misc import get_config, update_config
 import src.utils.routedecos
 import src.log
-from config import MAPLIST_LISTMOD_ID#, MAPLIST_EXPMOD_ID
 
 
 async def get(_r: web.Request):
@@ -54,6 +51,7 @@ async def put_validate(body: dict) -> dict:
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_json_body(put_validate)
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms(explist_admin=False)
 async def put(_r: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
     """
     ---
@@ -104,12 +102,6 @@ async def put(_r: web.Request, json_body: dict = None, maplist_profile: dict = N
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
-    if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-        return web.json_response(
-            {"errors": {"": "You are not a Maplist Moderator"}, "data": {}},
-            status=http.HTTPStatus.UNAUTHORIZED
-        )
-
     await update_config(json_body["config"])
     await src.log.log_action("config", "put", None, json_body["config"], maplist_profile["user"]["id"])
     return web.json_response({"errors": {}, "data": json_body["config"]})

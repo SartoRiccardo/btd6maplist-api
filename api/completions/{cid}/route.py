@@ -37,6 +37,7 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def put(
         request: web.Request,
         maplist_profile: dict = None,
@@ -105,10 +106,12 @@ async def put(
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def delete(
         _r: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletion" = None,
+        is_admin: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -134,16 +137,17 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
-    if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and 1 <= resource.format <= 50:
-        return web.json_response(
-            {"errors": {"format": "You must be a Maplist Moderator"}},
-            status=http.HTTPStatus.UNAUTHORIZED,
-        )
-    if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and 51 <= resource.format <= 100:
-        return web.json_response(
-            {"errors": {"format": "You must be an Expert List Moderator"}},
-            status=http.HTTPStatus.UNAUTHORIZED,
-        )
+    if not is_admin:
+        if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and 1 <= resource.format <= 50:
+            return web.json_response(
+                {"errors": {"format": "You must be a Maplist Moderator"}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
+        if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and 51 <= resource.format <= 100:
+            return web.json_response(
+                {"errors": {"format": "You must be an Expert List Moderator"}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
 
     if not resource.deleted_on:
         await delete_completion(resource.id, hard_delete=not resource.accepted)

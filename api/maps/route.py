@@ -4,7 +4,7 @@ import src.http
 import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
-from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
+from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID, MAPLIST_ADMIN_IDS
 from src.utils.forms import get_map_form
 
 
@@ -53,9 +53,11 @@ async def get(request: web.Request):
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
         maplist_profile: dict = None,
+        is_admin: bool = False,
         **_kwargs
 ) -> web.Response:
     """
@@ -91,21 +93,16 @@ async def post(
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
-    if not (MAPLIST_EXPMOD_ID in maplist_profile["roles"] or MAPLIST_LISTMOD_ID in maplist_profile["roles"]):
-        return web.json_response(
-            {"errors": {"": "You are not a moderator"}, "data": {}},
-            status=http.HTTPStatus.UNAUTHORIZED
-        )
-
     json_body = await get_map_form(request, check_dup_code=True)
 
     errors = {}
-    if json_body["difficulty"] != -1 and MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
-        errors["difficulty"] = "You are not an Expert List moderator"
-    if json_body["placement_allver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-        errors["placement_allver"] = "You are not a List moderator"
-    if json_body["placement_curver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-        errors["placement_curver"] = "You are not a List moderator"
+    if not is_admin:
+        if json_body["difficulty"] != -1 and MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
+            errors["difficulty"] = "You are not an Expert List moderator"
+        if json_body["placement_allver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
+            errors["placement_allver"] = "You are not a List moderator"
+        if json_body["placement_curver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
+            errors["placement_curver"] = "You are not a List moderator"
     if len(errors):
         return web.json_response(
             {"errors": errors, "data": {}},

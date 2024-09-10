@@ -10,6 +10,7 @@ import src.log
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
         maplist_profile: dict = None,
