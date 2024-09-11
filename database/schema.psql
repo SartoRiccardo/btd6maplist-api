@@ -122,7 +122,10 @@ CREATE TABLE list_completions (
   deleted_on TIMESTAMP,
   new_version INT,
   accepted BOOLEAN DEFAULT FALSE,
-  format INT DEFAULT 0
+  format INT DEFAULT 0,
+  subm_proof_img TEXT,
+  subm_proof_vid TEXT,
+  subm_notes TEXT
 );
 --ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
 --  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;

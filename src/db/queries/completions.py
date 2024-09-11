@@ -1,6 +1,6 @@
 import asyncpg.pool
 import src.db.connection
-from src.db.models import ListCompletion, LCC, PartialUser
+from src.db.models import ListCompletionWithMeta, LCC, PartialUser
 postgres = src.db.connection.postgres
 
 
@@ -12,6 +12,9 @@ async def submit_run(
         format_id: int,
         lcc_info: dict | None,  # leftover, proof
         player_id: int,
+        proof_url: str | None,
+        proof_vid_url: str | None,
+        notes: str | None,
         conn=None,
 ) -> int | None:
     async with conn.transaction():
@@ -27,11 +30,14 @@ async def submit_run(
             )
         run_id = await conn.fetchval(
             """
-            INSERT INTO list_completions(map, black_border, no_geraldo, lcc, format)
-            VALUES($1, $2, $3, $4, $5)
+            INSERT INTO list_completions
+                (map, black_border, no_geraldo, lcc, format, subm_proof_img, subm_proof_vid,
+                subm_notes)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
             """,
-            map_code, black_border, no_geraldo, lcc_id, format_id
+            map_code, black_border, no_geraldo, lcc_id, format_id, proof_url, proof_vid_url, notes,
         )
         await conn.execute(
             """
@@ -44,7 +50,7 @@ async def submit_run(
 
 
 @postgres
-async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
+async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta:
     if isinstance(run_id, str):
         run_id = int(run_id)
 
@@ -59,7 +65,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
         )
         SELECT
             run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,
-            run.created_on, run.deleted_on,
+            run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
             
             lcc.id, lcc.proof, lcc.leftover,
             ply.user_id, u.name
@@ -75,11 +81,11 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
     )
     if len(payload):
         run_sidx = 0
-        lcc_sidx = 8 + run_sidx
+        lcc_sidx = 11 + run_sidx
         ply_sidx = 3 + lcc_sidx
 
         run = payload[0]
-        return ListCompletion(
+        return ListCompletionWithMeta(
             run_id,
             run[run_sidx],
             [PartialUser(row[ply_sidx], row[ply_sidx+1], None) for row in payload],
@@ -88,9 +94,12 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletion:
             run[run_sidx+3],
             run[run_sidx+4],
             LCC(run[lcc_sidx], run[lcc_sidx+1], run[lcc_sidx+2]) if run[lcc_sidx] else None,
-            accepted=run[run_sidx+5],
-            created_on=run[run_sidx+6],
-            deleted_on=run[run_sidx+7],
+            run[run_sidx+8],
+            run[run_sidx+9],
+            run[run_sidx+10],
+            run[run_sidx+5],
+            run[run_sidx+6],
+            run[run_sidx+7],
         )
 
 

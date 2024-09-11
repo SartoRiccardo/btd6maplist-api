@@ -70,26 +70,6 @@ class ListCompletion:
         properties:
           map:
             $ref: "#/components/schemas/PartialMap"
-    ---
-    ListCompletionWithMeta:
-      allOf:
-      - $ref: "#/components/schemas/ListCompletion"
-      - type: object
-        properties:
-          accepted:
-            type: boolean
-            description: Whether or not the run was accepted by moderators.
-          created_on:
-            type: integer
-            nullable: true
-            description: |
-              Timestamp of the completion's creation date.
-              If `accepted`, it's when it was accepted. Otherwise, it's when it was submitted.
-          deleted_on:
-            type: integer
-            nullable: true
-            description: |
-              Timestamp of the completion's deletion. Always `null` if not `accepted`.
     """
     id: int
     map: str | PartialMap
@@ -99,19 +79,8 @@ class ListCompletion:
     current_lcc: bool
     format: int
     lcc: LCC | None
-    accepted: bool = True
-    deleted_on: datetime.datetime | None = None
-    created_on: datetime.datetime | None = None
 
-    def to_dict(self, full: bool = False) -> dict:
-        full_args = {}
-        if full:
-            full_args = {
-                "accepted": self.accepted,
-                "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
-                "created_on": int(self.created_on.timestamp()) if self.created_on else None,
-            }
-
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
@@ -124,5 +93,57 @@ class ListCompletion:
             "current_lcc": self.current_lcc,
             "lcc": self.lcc.to_dict() if self.lcc else None,
             "format": self.format,
-            **full_args,
+        }
+
+
+@dataclass
+class ListCompletionWithMeta(ListCompletion):
+    """
+    allOf:
+    - $ref: "#/components/schemas/ListCompletion"
+    - type: object
+      properties:
+        accepted:
+          type: boolean
+          description: Whether or not the run was accepted by moderators.
+        created_on:
+          type: integer
+          nullable: true
+          description: |
+            Timestamp of the completion's creation date.
+            If `accepted`, it's when it was accepted. Otherwise, it's when it was submitted.
+        deleted_on:
+          type: integer
+          nullable: true
+          description: |
+            Timestamp of the completion's deletion. Always `null` if not `accepted`.
+        subm_proof_img:
+          type: string
+          nullable: true
+          description: URL to the proof image used when submitting.
+        subm_proof_vid:
+          type: string
+          nullable: true
+          description: URL to the proof vid used when submitting.
+        subm_notes:
+          type: string
+          nullable: true
+          description: Notes the user put when submitting.
+    """
+    subm_proof_img: str | None
+    subm_proof_vid: str | None
+    subm_notes: str | None
+    accepted: bool
+    created_on: datetime.datetime | None
+    deleted_on: datetime.datetime | None
+
+    def to_dict(self) -> dict:
+        return {
+            **super().to_dict(),
+            "accepted": self.accepted,
+            "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
+            "created_on": int(self.created_on.timestamp()) if self.created_on else None,
+            "subm_proof_img": self.subm_proof_img,
+            "subm_proof_vid": self.subm_proof_vid,
+            "subm_notes": self.subm_notes,
         }

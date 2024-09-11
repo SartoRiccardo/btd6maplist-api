@@ -9,7 +9,7 @@ import src.log
 
 
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
-async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
+async def get(_r: web.Request, resource: "src.db.models.ListCompletionWithMeta" = None):
     """
     ---
     description: Returns a completion's data.
@@ -31,7 +31,7 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
       "404":
         description: No code with that ID was found.
     """
-    return web.json_response(resource.to_dict(full=True))
+    return web.json_response(resource.to_dict())
 
 
 @src.utils.routedecos.bearer_auth
@@ -41,7 +41,7 @@ async def get(_r: web.Request, resource: "src.db.models.ListCompletion" = None):
 async def put(
         request: web.Request,
         maplist_profile: dict = None,
-        resource: "src.db.models.ListCompletion" = None,
+        resource: "src.db.models.ListCompletionWithMeta" = None,
         **_kwargs,
 ) -> web.Response:
     """
@@ -110,7 +110,7 @@ async def put(
 async def delete(
         _r: web.Request,
         maplist_profile: dict = None,
-        resource: "src.db.models.ListCompletion" = None,
+        resource: "src.db.models.ListCompletionWithMeta" = None,
         is_admin: bool = False,
         **_kwargs,
 ) -> web.Response:

@@ -2,7 +2,7 @@ import re
 import yaml
 from .ConfigVar import ConfigVar
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
-from .challenges import LCC, ListCompletion
+from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .User import User, PartialUser, MaplistProfile
 from .LeaderboardEntry import LeaderboardEntry
 
@@ -62,6 +62,7 @@ entities = [
     PartialListMap,
     LCC,
     ListCompletion,
+    ListCompletionWithMeta,
     User,
     PartialUser,
     MaplistProfile,
