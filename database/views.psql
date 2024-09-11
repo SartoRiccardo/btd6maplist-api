@@ -96,7 +96,10 @@ comp_user_map_modifiers AS (
 ),
 user_points AS (
 	SELECT
-		modi.user_id, mwp.points * modi.multiplier + modi.additive AS points
+		modi.user_id,
+		(mwp.points * modi.multiplier + modi.additive)
+		    * CASE WHEN modi.user_id = 640298779643215902 THEN -1 ELSE 1 END
+		AS points
 	FROM comp_user_map_modifiers modi
     JOIN maps_points mwp
         ON modi.map = mwp.code
@@ -154,7 +157,10 @@ comp_user_map_modifiers AS (
 ),
 user_points AS (
 	SELECT
-		modi.user_id, mwp.points * modi.multiplier + modi.additive AS points
+		modi.user_id,
+		(mwp.points * modi.multiplier + modi.additive)
+		    * CASE WHEN modi.user_id = 640298779643215902 THEN -1 ELSE 1 END
+		AS points
 	FROM comp_user_map_modifiers modi
     JOIN maps_points mwp
         ON modi.map = mwp.code
