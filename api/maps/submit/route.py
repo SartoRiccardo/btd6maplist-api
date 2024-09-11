@@ -18,6 +18,7 @@ propositions = {
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.with_discord_profile
+@src.utils.routedecos.register_user
 async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Response:
     """
     ---

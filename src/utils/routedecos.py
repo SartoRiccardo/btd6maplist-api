@@ -1,10 +1,14 @@
 import http
 import json
+import random
+import string
+
 from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
 from config import MAPLIST_GUILD_ID, MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
 import src.http
+from src.db.queries.users import create_user, get_user_min
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -127,3 +131,30 @@ def require_perms(
             return await handler(request, *args, **kwargs_caller, is_admin=is_admin)
         return wrapper
     return deco
+
+
+def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
+    """
+    Must be used with `with_maplist_profile` or `with_discord_profile` beforehand.
+    Adds an user to the dabatase if it's not there already.
+    """
+    @wraps(handler)
+    async def wrapper(request: web.Request, *args, **kwargs_caller):
+        profile = None
+        if "maplist_profile" in kwargs_caller:
+            profile = kwargs_caller["maplist_profile"]["user"]
+        elif "discord_profile" in kwargs_caller:
+            profile = kwargs_caller["discord_profile"]
+
+        if profile is None:
+            return web.Response(status=http.HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        possible_user = await get_user_min(profile["id"])
+        if not possible_user or possible_user.id != profile["id"]:
+            success = await create_user(profile["id"], profile["username"], if_not_exists=True)
+            if not success:
+                rand = random.choices(string.ascii_letters, k=10)
+                await create_user(profile["id"], profile["username"]+f"-{rand}", if_not_exists=True)
+
+        return await handler(request, *args, **kwargs_caller)
+    return wrapper

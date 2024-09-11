@@ -23,6 +23,7 @@ formats = [
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_discord_profile
+@src.utils.routedecos.register_user
 async def post(
         request: web.Request,
         discord_profile: dict = None,
