@@ -37,7 +37,7 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
             map_preview_url
         FROM maps m
         LEFT JOIN verified_current vc
-            ON m.code=vc.map
+            ON m.id=vc.map
         CROSS JOIN config_vars cvar
         WHERE {placement_vname} BETWEEN 1 AND cvar.map_count
             AND deleted_on IS NULL
@@ -83,7 +83,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             m.r6_start, m.map_data, v.is_verified, m.deleted_on,
             m.optimal_heros, m.map_preview_url, m.id, m.new_version, m.created_on
         FROM maps m
-        JOIN verified_maps v
+        LEFT JOIN verified_maps v
             ON v.map = m.id
         WHERE m.code=$1
         """,
