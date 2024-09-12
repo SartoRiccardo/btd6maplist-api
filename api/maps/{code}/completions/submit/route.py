@@ -21,11 +21,11 @@ formats = [
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_discord_profile
+@src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.register_user
 async def post(
         request: web.Request,
-        discord_profile: dict = None,
+        maplist_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
         **_kwargs
 ) -> web.Response:
@@ -86,6 +86,8 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
+    discord_profile = maplist_profile["user"]
+
     embeds = []
     hook_url = ""
     description = None

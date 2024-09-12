@@ -44,7 +44,8 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
 def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
     Must be used with `bearer_auth` beforehand.
-    Adds `maplist_profile` to kwargs or returns 401.
+    Checks if the user is in the maplist Discord.
+    Adds `maplist_profile` to kwargs if they're there or returns 401.
     """
     @wraps(handler)
     async def wrapper(request: web.Request, *args, token: str = "", **kwargs):

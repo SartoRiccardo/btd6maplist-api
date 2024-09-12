@@ -17,9 +17,13 @@ propositions = {
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_discord_profile
+@src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.register_user
-async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Response:
+async def post(
+        request: web.Request,
+        maplist_profile: dict,
+        **_kwargs
+) -> web.Response:
     """
     ---
     description: Submits a map to the maplist. Currently all this does its be a proxy for a Discord webhook.
@@ -66,6 +70,8 @@ async def post(request: web.Request, discord_profile: dict, **_kwargs) -> web.Re
       "401":
         description: Your token is missing or invalid.
     """
+    discord_profile = maplist_profile["user"]
+
     embeds = []
     hook_url = ""
     images = []
