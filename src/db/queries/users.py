@@ -44,7 +44,7 @@ async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tup
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE ply.user_id = $1
-                and r.accepted
+                AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         ),
         unique_runs AS (
@@ -125,7 +125,7 @@ async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
             FROM list_completions r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
-                and r.accepted
+                AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         )
         SELECT
@@ -285,7 +285,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
                 ON ply.run = r.id
             WHERE r.map = $2
                 AND ply.user_id = $1
-                and r.accepted
+                AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         )
         SELECT

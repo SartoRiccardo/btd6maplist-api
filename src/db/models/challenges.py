@@ -103,20 +103,19 @@ class ListCompletionWithMeta(ListCompletion):
     - $ref: "#/components/schemas/ListCompletion"
     - type: object
       properties:
-        accepted:
-          type: boolean
-          description: Whether or not the run was accepted by moderators.
+        accepted_by:
+          $ref: "#/components/schemas/DiscordID"
         created_on:
           type: integer
           nullable: true
           description: |
             Timestamp of the completion's creation date.
-            If `accepted`, it's when it was accepted. Otherwise, it's when it was submitted.
+            If `accepted_by`, it's when it was accepted. Otherwise, it's when it was submitted.
         deleted_on:
           type: integer
           nullable: true
           description: |
-            Timestamp of the completion's deletion. Always `null` if not `accepted`.
+            Timestamp of the completion's deletion. Always `null` if not `accepted_by`.
         subm_proof_img:
           type: string
           nullable: true
@@ -133,14 +132,14 @@ class ListCompletionWithMeta(ListCompletion):
     subm_proof_img: str | None
     subm_proof_vid: str | None
     subm_notes: str | None
-    accepted: bool
+    accepted_by: int | None
     created_on: datetime.datetime | None
     deleted_on: datetime.datetime | None
 
     def to_dict(self) -> dict:
         return {
             **super().to_dict(),
-            "accepted": self.accepted,
+            "accepted_by": str(self.accepted_by),
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
             "created_on": int(self.created_on.timestamp()) if self.created_on else None,
             "subm_proof_img": self.subm_proof_img,

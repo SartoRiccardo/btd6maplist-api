@@ -64,7 +64,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
                 ON lccs.id = r.lcc
         )
         SELECT
-            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,
+            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
             run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
             
             lcc.id, lcc.proof, lcc.leftover,
@@ -111,7 +111,7 @@ async def edit_completion(
         comp_format: int,
         lcc: dict | None,
         user_ids: list[int],
-        accept: bool = False,
+        accept: int | None = None,
         conn: asyncpg.pool.Pool | None = None
 ) -> None:
     async with conn.transaction():
@@ -150,10 +150,11 @@ async def edit_completion(
             [(comp_id, uid) for uid in user_ids]
         )
 
+        other_params = [accept]
         accept_params = ""
         if accept:
             accept_params = """
-            accepted=TRUE,
+            accepted_by=$6,
             created_on=NOW(),
             """
         await conn.execute(
@@ -172,6 +173,7 @@ async def edit_completion(
             no_geraldo,
             comp_format,
             lcc_id,
+            *other_params,
         )
 
 
@@ -259,12 +261,12 @@ async def get_unapproved_completions(
             SELECT r.*, (r.lcc IS NOT NULL) AS current_lcc
             FROM list_completions r
             WHERE r.deleted_on IS NULL
-                AND NOT r.accepted
+                AND r.accepted_by IS NULL
         )
         SELECT DISTINCT ON (rwf.id)
             COUNT(*) OVER() AS total_count,
             
-            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,
+            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
             run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
             run.id,
             

@@ -150,7 +150,7 @@ async def delete(
             )
 
     if not resource.deleted_on:
-        await delete_completion(resource.id, hard_delete=not resource.accepted)
+        await delete_completion(resource.id, hard_delete=resource.accepted_by is None)
         await src.log.log_action("completion", "delete", resource.id, None, maplist_profile["user"]["id"])
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

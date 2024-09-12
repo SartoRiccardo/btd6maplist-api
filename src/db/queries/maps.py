@@ -206,7 +206,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
         JOIN listcomp_players ply
             ON ply.run = runs.id
         WHERE runs.map = $1
-            AND runs.accepted
+            AND runs.accepted_by IS NOT NULL
             AND runs.deleted_on IS NULL
         """,
         map_code,
@@ -227,7 +227,7 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.map = $1
-                AND r.accepted
+                AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         ),
         unique_runs AS (

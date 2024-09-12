@@ -49,14 +49,14 @@ BEGIN
     END IF;
 
     -- Duplicate the list_completions row with format set to 2
-    INSERT INTO list_completions (map, black_border, no_geraldo, lcc, created_on, accepted, format)
+    INSERT INTO list_completions (map, black_border, no_geraldo, lcc, created_on, accepted_by, format)
     VALUES (
         completion.map,
         completion.black_border,
         completion.no_geraldo,
         dupe_lcc_id,
         completion.created_on,
-        TRUE,
+        completion.accepted_by,
         2
     )
     RETURNING id INTO dupe_run_id;
@@ -83,5 +83,5 @@ LANGUAGE plpgsql;
 CREATE TRIGGER tr_dup_curver_comp_on_accept
 AFTER UPDATE ON list_completions
 FOR EACH ROW
-WHEN (NEW.accepted = TRUE AND OLD.accepted = FALSE AND NEW.format = 1)
+WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format = 1)
 EXECUTE PROCEDURE dup_curver_comp_on_accept();

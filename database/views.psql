@@ -33,7 +33,7 @@ WITH maps_lcc_leftovers AS (
     FROM list_completions r
     JOIN leastcostchimps lcc
         ON r.lcc = lcc.id
-    WHERE r.accepted
+    WHERE r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
     GROUP BY r.map, r.format
 )
@@ -77,7 +77,7 @@ unique_runs AS (
         ON lccs.map = r.map AND lccs.format = r.format
     -- Filter one subquery higher for selction on time machine
     WHERE r.format = 1
-        AND r.accepted
+        AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
 ),
 -- https://stackoverflow.com/a/78963508/13033269
@@ -138,7 +138,7 @@ unique_runs AS (
     LEFT JOIN lccs_by_map lccs
         ON lccs.map = r.map AND lccs.format = r.format
     WHERE r.format = 2
-        AND r.accepted
+        AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
 ),
 comp_user_map_modifiers AS (
@@ -196,7 +196,7 @@ leaderboard AS (
     WHERE m.placement_curver BETWEEN 1 AND cv.map_count
         AND lccs.format = 1
         AND m.deleted_on IS NULL
-        AND r.accepted
+        AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
     GROUP BY lcp.user_id
 )
@@ -223,7 +223,7 @@ leaderboard AS (
     WHERE m.placement_allver BETWEEN 1 AND cv.map_count
         AND lccs.format = 2
         AND m.deleted_on IS NULL
-        AND r.accepted
+        AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
     GROUP BY lcp.user_id
 )

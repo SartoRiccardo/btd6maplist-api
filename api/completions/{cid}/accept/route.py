@@ -60,7 +60,7 @@ async def post(
       "404":
         description: No completion with that ID was found.
     """
-    if resource.accepted:
+    if resource.accepted_by is not None:
         return web.json_response(
             {"errors": {"": "This run was already accepted!"}},
             status=http.HTTPStatus.BAD_REQUEST,
@@ -77,7 +77,7 @@ async def post(
         data["format"],
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
-        accept=True,
+        accept=int(maplist_profile["user"]["id"]),
     )
     await src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"])
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

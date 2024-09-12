@@ -122,7 +122,7 @@ CREATE TABLE list_completions (
   created_on TIMESTAMP DEFAULT NOW(),
   deleted_on TIMESTAMP,
   new_version INT,
-  accepted BOOLEAN DEFAULT FALSE,
+  accepted_by BIGINT,
   format INT DEFAULT 0,
   subm_proof_img TEXT,
   subm_proof_vid TEXT,
@@ -132,8 +132,10 @@ CREATE TABLE list_completions (
 --  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 ALTER TABLE list_completions ADD CONSTRAINT fk_lccs_1
   FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
-ALTER TABLE maps ADD CONSTRAINT fk_list_completions_1
+ALTER TABLE list_completions ADD CONSTRAINT fk_list_completions_1
   FOREIGN KEY (new_version) REFERENCES list_completions(id) ON DELETE SET NULL;
+ALTER TABLE list_completions ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (accepted_by) REFERENCES users(discord_id) ON DELETE SET NULL;
 
 CREATE TABLE listcomp_players (
   run INT NOT NULL,
