@@ -24,8 +24,7 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 -- LCCs for each list map --
 ----------------------------
 
-DROP VIEW IF EXISTS lccs_by_map CASCADE;
-CREATE VIEW lccs_by_map AS
+CREATE OR REPLACE VIEW lccs_by_map AS
 WITH maps_lcc_leftovers AS (
     SELECT
         r.map,
@@ -52,8 +51,7 @@ WHERE mll.leftover = lcc.leftover;
 -- Points LB --
 ---------------
 
-DROP VIEW IF EXISTS list_curver_leaderboard CASCADE;
-CREATE VIEW list_curver_leaderboard AS
+CREATE OR REPLACE VIEW list_curver_leaderboard AS
 WITH config_values AS (
     SELECT
         (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
@@ -116,8 +114,7 @@ FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
 
 
-DROP VIEW IF EXISTS list_allver_leaderboard CASCADE;
-CREATE VIEW list_allver_leaderboard AS
+CREATE OR REPLACE VIEW list_allver_leaderboard AS
 WITH config_values AS (
     SELECT
         (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
@@ -181,8 +178,7 @@ ORDER BY placement ASC, user_id DESC;
 -- LCC LB --
 ------------
 
-DROP VIEW IF EXISTS list_curver_lcclb CASCADE;
-CREATE VIEW list_curver_lcclb AS
+CREATE OR REPLACE VIEW list_curver_lcclb AS
 WITH config_values AS (
     SELECT
         (SELECT value::int FROM config WHERE name='map_count') AS map_count
@@ -209,8 +205,7 @@ FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
 
 
-DROP VIEW IF EXISTS list_allver_lcclb CASCADE;
-CREATE VIEW list_allver_lcclb AS
+CREATE OR REPLACE VIEW list_allver_lcclb AS
 WITH config_values AS (
     SELECT
         (SELECT value::int FROM config WHERE name='map_count') AS map_count

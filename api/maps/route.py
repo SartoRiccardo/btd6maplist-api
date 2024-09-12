@@ -4,7 +4,7 @@ import src.http
 import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
-from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID, MAPLIST_ADMIN_IDS
+from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
 from src.utils.forms import get_map_form
 
 

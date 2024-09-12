@@ -245,3 +245,70 @@ async def delete_completion(
         """)
 
     await conn.execute(q, cid)
+
+
+@postgres
+async def get_unapproved_completions(
+        idx_start: int = 0,
+        amount: int = 50,
+        conn=None,
+) -> tuple[list[ListCompletionWithMeta], int]:
+    payload = await conn.fetch(
+        """
+        WITH unapproved_runs AS (
+            SELECT r.*, (r.lcc IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            WHERE r.deleted_on IS NULL
+                AND NOT r.accepted
+        )
+        SELECT
+            COUNT(*) OVER() AS total_count,
+            
+            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, accepted,
+            run.created_on, deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
+            run.id,
+            
+            lcc.id, lcc.proof, lcc.leftover,
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id
+        FROM unapproved_runs run
+        LEFT JOIN leastcostchimps lcc
+            ON lcc.id = run.lcc
+        LEFT JOIN listcomp_players ply
+            ON ply.run = run.id
+        ORDER BY run.map
+        LIMIT $2
+        OFFSET $1
+        """,
+        idx_start,
+        amount
+    )
+
+    run_sidx = 1
+    lcc_sidx = 12 + run_sidx
+    ply_sidx = 3 + lcc_sidx
+
+    completions = [
+        ListCompletionWithMeta(
+            run[run_sidx + 11],
+            run[run_sidx],
+            run[ply_sidx],
+            run[run_sidx + 1],
+            run[run_sidx + 2],
+            run[run_sidx + 3],
+            run[run_sidx + 4],
+            LCC(
+                run[lcc_sidx],
+                run[lcc_sidx + 1],
+                run[lcc_sidx + 2]
+            ) if run[lcc_sidx] else None,
+            run[run_sidx + 8],
+            run[run_sidx + 9],
+            run[run_sidx + 10],
+            run[run_sidx + 5],
+            run[run_sidx + 6],
+            run[run_sidx + 7],
+        )
+        for run in payload
+    ]
+
+    return completions, payload[0][0] if len(payload) else 0
