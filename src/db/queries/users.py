@@ -9,17 +9,17 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
     """id can be either the Discord ID or the name"""
     if id.isnumeric():
         payload = await conn.fetch("""
-            SELECT discord_id, name, nk_oak
+            SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
             WHERE discord_id=$1
             UNION
-            SELECT discord_id, name, nk_oak
+            SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
             WHERE name=LOWER($2)
         """, int(id), id)
     else:
         payload = await conn.fetch("""
-            SELECT discord_id, name, nk_oak
+            SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
             WHERE name=LOWER($1)
         """, id)
@@ -28,7 +28,7 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
     pl_user = payload[0]
     return PartialUser(
-        int(pl_user[0]), pl_user[1], pl_user[2]
+        int(pl_user[0]), pl_user[1], pl_user[2], pl_user[3]
     )
 
 
@@ -228,6 +228,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         puser.id,
         puser.name,
         puser.oak,
+        puser.has_seen_popup,
         MaplistProfile(
             curpt_pos[1],
             curpt_pos[0],
@@ -313,3 +314,15 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
         )
         for row in payload
     ]
+
+
+@postgres
+async def read_rules(uid: int, conn=None) -> None:
+    await conn.execute(
+        """
+        UPDATE users
+        SET has_seen_popup=TRUE
+        WHERE discord_id=$1
+        """,
+        uid
+    )

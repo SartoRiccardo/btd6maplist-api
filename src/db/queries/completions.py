@@ -88,7 +88,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         return ListCompletionWithMeta(
             run_id,
             run[run_sidx],
-            [PartialUser(row[ply_sidx], row[ply_sidx+1], None) for row in payload],
+            [PartialUser(row[ply_sidx], row[ply_sidx+1], None, False) for row in payload],
             run[run_sidx+1],
             run[run_sidx+2],
             run[run_sidx+3],

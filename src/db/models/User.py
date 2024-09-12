@@ -27,12 +27,14 @@ class PartialUser:
     id: id
     name: str
     oak: str | None
+    has_seen_popup: bool
 
     def to_dict(self, with_oak: bool = False) -> dict:
         oak = {"oak": self.oak} if with_oak else {}
         return {
             "id": str(self.id),
             "name": self.name,
+            "has_seen_popup": self.has_seen_popup,
             **oak,
         }
 
