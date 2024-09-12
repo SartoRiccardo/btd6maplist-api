@@ -48,7 +48,7 @@ async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tup
                 AND r.deleted_on IS NULL
         ),
         unique_runs AS (
-            SELECT
+            SELECT DISTINCT ON (rwf.id)
                 rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
                 rwf.format,
                 

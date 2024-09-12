@@ -261,7 +261,7 @@ async def get_unapproved_completions(
             WHERE r.deleted_on IS NULL
                 AND NOT r.accepted
         )
-        SELECT
+        SELECT DISTINCT ON (rwf.id)
             COUNT(*) OVER() AS total_count,
             
             run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,

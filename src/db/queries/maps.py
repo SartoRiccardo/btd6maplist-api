@@ -231,7 +231,7 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
                 AND r.deleted_on IS NULL
         ),
         unique_runs AS (
-            SELECT
+            SELECT DISTINCT ON (rwf.id)
                 rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
                 rwf.format,
                 
