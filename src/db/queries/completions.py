@@ -1,6 +1,6 @@
 import asyncpg.pool
 import src.db.connection
-from src.db.models import ListCompletionWithMeta, LCC, PartialUser
+from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap
 postgres = src.db.connection.postgres
 
 
@@ -264,17 +264,24 @@ async def get_unapproved_completions(
         SELECT
             COUNT(*) OVER() AS total_count,
             
-            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, accepted,
-            run.created_on, deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
+            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted,
+            run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
             run.id,
             
             lcc.id, lcc.proof, lcc.leftover,
-            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id,
+            
+            m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
+            m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
         FROM unapproved_runs run
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
         LEFT JOIN listcomp_players ply
             ON ply.run = run.id
+        JOIN maps m
+            ON m.code = run.map
+        WHERE m.deleted_on IS NULL
+            AND m.new_version IS NULL
         ORDER BY run.map
         LIMIT $2
         OFFSET $1
@@ -286,11 +293,26 @@ async def get_unapproved_completions(
     run_sidx = 1
     lcc_sidx = 12 + run_sidx
     ply_sidx = 3 + lcc_sidx
+    map_sidx = 1 + ply_sidx
 
     completions = [
         ListCompletionWithMeta(
             run[run_sidx + 11],
-            run[run_sidx],
+            PartialMap(
+                run[map_sidx],
+                run[run_sidx],
+                run[map_sidx + 1],
+                run[map_sidx + 2],
+                run[map_sidx + 3],
+                run[map_sidx + 4],
+                run[map_sidx + 5],
+                run[map_sidx + 6],
+                run[map_sidx + 10],
+                run[map_sidx + 7].split(","),
+                run[map_sidx + 8],
+                run[map_sidx + 11],
+                run[map_sidx + 9],
+            ),
             run[ply_sidx],
             run[run_sidx + 1],
             run[run_sidx + 2],
