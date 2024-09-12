@@ -262,29 +262,33 @@ async def get_unapproved_completions(
             FROM list_completions r
             WHERE r.deleted_on IS NULL
                 AND r.accepted_by IS NULL
+        ),
+        unique_runs AS (
+            SELECT DISTINCT ON (run.id)
+
+                run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
+                run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
+                run.id,
+                
+                lcc.id, lcc.proof, lcc.leftover,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id,
+                
+                m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
+                m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
+            FROM unapproved_runs run
+            LEFT JOIN leastcostchimps lcc
+                ON lcc.id = run.lcc
+            LEFT JOIN listcomp_players ply
+                ON ply.run = run.id
+            JOIN maps m
+                ON m.code = run.map
+            WHERE m.deleted_on IS NULL
+                AND m.new_version IS NULL
         )
-        SELECT DISTINCT ON (rwf.id)
-            COUNT(*) OVER() AS total_count,
-            
-            run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-            run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
-            run.id,
-            
-            lcc.id, lcc.proof, lcc.leftover,
-            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id,
-            
-            m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
-            m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
-        FROM unapproved_runs run
-        LEFT JOIN leastcostchimps lcc
-            ON lcc.id = run.lcc
-        LEFT JOIN listcomp_players ply
-            ON ply.run = run.id
-        JOIN maps m
-            ON m.code = run.map
-        WHERE m.deleted_on IS NULL
-            AND m.new_version IS NULL
-        ORDER BY run.map
+        SELECT 
+            COUNT(*) OVER() AS total_count, uq.*
+        FROM unique_runs uq
+        ORDER BY uq.map
         LIMIT $2
         OFFSET $1
         """,
