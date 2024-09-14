@@ -1,8 +1,13 @@
 from aiohttp import web
+import math
+import http
 from src.db.queries.leaderboard import (
     get_maplist_leaderboard,
     get_maplist_lcc_leaderboard,
 )
+
+
+PAGE_ENTRIES = 50
 
 
 async def get(request: web.Request):
@@ -38,9 +43,18 @@ async def get(request: web.Request):
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/LeaderboardEntry"
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: The total count of player entries.
+                pages:
+                  type: integer
+                  description: The total number of pages.
+                entries:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LeaderboardEntry"
     """
     current_version = True
     if "version" in request.query:
@@ -52,7 +66,7 @@ async def get(request: web.Request):
                 {
                     "error": 'Allowed values for "version": ["current", "all"]'
                 },
-                status=400,
+                status=http.HTTPStatus.BAD_REQUEST,
             )
 
     value = "points"
@@ -63,11 +77,31 @@ async def get(request: web.Request):
                 {
                     "error": 'Allowed values for "value": ["points", "lccs"]'
                 },
-                status=400,
+                status=http.HTTPStatus.BAD_REQUEST,
             )
 
+    if "page" in request.query and not request.query["page"].isnumeric():
+        return web.json_response(
+            {
+                "error": '"page" must be a number'
+            },
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
+    page = max(1, int(request.query.get("page", "1")))
+
+    pages = 1
     if value == "points":
-        lb = await get_maplist_leaderboard(curver=current_version)
+        lb, total = await get_maplist_leaderboard(
+            curver=current_version,
+            amount=PAGE_ENTRIES,
+            idx_start=PAGE_ENTRIES * (page-1),
+        )
+        pages = math.ceil(total/PAGE_ENTRIES)
     else:
-        lb = await get_maplist_lcc_leaderboard(curver=current_version)
-    return web.json_response([entry.to_dict() for entry in lb])
+        lb, total = await get_maplist_lcc_leaderboard(curver=current_version)
+
+    return web.json_response({
+        "total": total,
+        "pages": pages,
+        "entries": [entry.to_dict() for entry in lb],
+    })
