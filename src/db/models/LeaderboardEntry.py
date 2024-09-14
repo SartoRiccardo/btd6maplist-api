@@ -6,8 +6,8 @@ class LeaderboardEntry:
     """
     type: object
     properties:
-      user_id:
-        $ref: "#/components/schemas/DiscordID"
+      user:
+        $ref: "#/components/schemas/PartialUser"
       score:
         type: number
         description: The user's score
@@ -15,13 +15,13 @@ class LeaderboardEntry:
         type: integer
         description: Position on the list.
     """
-    user_id: int
+    user: "src.db.models.PartialUser"
     score: float
     position: int
 
     def to_dict(self) -> dict:
         return {
-            "user_id": str(self.user_id),
+            "user": self.user.to_dict(),
             "score": self.score,
             "position": self.position,
         }

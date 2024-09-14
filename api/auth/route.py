@@ -64,5 +64,5 @@ async def post(request: web.Request):
             await get_user(
                 disc_profile["id"],
                 with_completions=True)
-        ).to_dict(with_oak=True, with_completions=True)
+        ).to_dict(profile=True, with_completions=True)
     })

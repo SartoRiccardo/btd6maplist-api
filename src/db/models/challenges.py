@@ -45,7 +45,7 @@ class ListCompletion:
       map:
         type: string
         description: The code of the map that was completed
-      user_ids:
+      users:
         type: array
         description: The players who completed this run. It's an array because some runs can be collabs.
         items:
@@ -84,7 +84,7 @@ class ListCompletion:
         return {
             "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
-            "user_ids": [
+            "users": [
                 str(usr) if isinstance(usr, int) else usr.to_dict()
                 for usr in self.user_ids
             ],

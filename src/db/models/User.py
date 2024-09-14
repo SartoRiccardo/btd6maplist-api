@@ -23,19 +23,28 @@ class PartialUser:
             type: string
             nullable: true
             description: The user's NinjaKiwi OpenData Access Key
+          has_seen_popup:
+            type: boolean
+            description: |
+              Whether the user has already been notified there are rules
+              to submissions.
     """
     id: id
     name: str
     oak: str | None
     has_seen_popup: bool
 
-    def to_dict(self, with_oak: bool = False) -> dict:
-        oak = {"oak": self.oak} if with_oak else {}
+    def to_dict(self, profile: bool = False) -> dict:
+        extra_fields = {}
+        if profile:
+            extra_fields = {
+                "oak": self.oak,
+                "has_seen_popup": self.has_seen_popup,
+            }
         return {
             "id": str(self.id),
             "name": self.name,
-            "has_seen_popup": self.has_seen_popup,
-            **oak,
+            **extra_fields,
         }
 
 
@@ -94,9 +103,13 @@ class User(PartialUser):
     created_maps: list["src.db.models.maps.PartialMap"]
     completions: list[ListCompletion]
 
-    def to_dict(self, with_oak: bool = False, with_completions: bool = False) -> dict:
+    def to_dict(
+            self,
+            profile: bool = False,
+            with_completions: bool = False
+    ) -> dict:
         data = {
-            **super().to_dict(with_oak),
+            **super().to_dict(profile=profile),
             "maplist": {
                 "current": self.maplist_cur.to_dict(),
                 "all": self.maplist_all.to_dict(),

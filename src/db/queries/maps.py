@@ -6,7 +6,8 @@ from src.db.models import (
     PartialMap,
     Map,
     LCC,
-    ListCompletion
+    ListCompletion,
+    PartialUser,
 )
 from src.db.queries.subqueries import get_int_config
 postgres = src.db.connection.postgres
@@ -167,24 +168,36 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
     )
 
 
-def parse_runs_payload(payload, has_count: bool = True) -> list[ListCompletion]:
+def parse_runs_payload(
+        payload,
+        has_count: bool = True,
+        full_usr_info: bool = False,
+) -> list[ListCompletion]:
     run_idx = 0 + int(has_count)
     lcc_idx = 6 + int(has_count)
     agg_idx = 9 + int(has_count)
 
-    return [
-        ListCompletion(
+    comps = []
+    for run in payload:
+        usr_list = list(set(run[agg_idx]))
+        if full_usr_info:
+            usrname_list = list(set(run[agg_idx+1]))
+            usr_list = [
+                PartialUser(usr_list[i], usrname_list[i], None, False)
+                for i in range(len(usr_list))
+            ]
+
+        comps.append(ListCompletion(
             run[run_idx],
             run[run_idx + 1],
-            list(set(run[agg_idx])),
+            usr_list,
             run[run_idx + 2],
             run[run_idx + 3],
             run[run_idx + 4],
             run[run_idx + 5],
             LCC(*run[lcc_idx:agg_idx]) if run[lcc_idx] else None,
-        )
-        for run in payload
-    ]
+        ))
+    return comps
 
 
 @postgres
@@ -197,7 +210,8 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
 
             lccs.id, lccs.proof, lccs.leftover,
 
-            ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids
+            ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids,
+            ARRAY_AGG(u.name) OVER (PARTITION by runs.id) AS user_names
         FROM list_completions runs
         JOIN lccs_by_map lbm
             ON lbm.id = runs.lcc
@@ -205,6 +219,8 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
             ON runs.lcc = lccs.id
         JOIN listcomp_players ply
             ON ply.run = runs.id
+        JOIN users u
+            ON ply.user_id = u.discord_id
         WHERE runs.map = $1
             AND runs.accepted_by IS NOT NULL
             AND runs.deleted_on IS NULL
@@ -214,7 +230,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     if not len(payload):
         return []
 
-    return parse_runs_payload(payload, has_count=False)
+    return parse_runs_payload(payload, has_count=False, full_usr_info=True)
 
 
 @postgres

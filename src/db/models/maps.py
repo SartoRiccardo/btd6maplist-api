@@ -243,9 +243,9 @@ class Map(PartialMap):
             type: string
           description: A list of aliases for the map
     """
-    creators: list[tuple[int, str | None, str]]
+    creators: list[tuple[int, str | None, str]]  # TODO tuple role, PartialUser
     additional_codes: list[tuple[str, str | None]]
-    verifications: list[tuple[str, float | None, str]]
+    verifications: list[tuple[str, float | None, str]]   # TODO tuple version, PartialUser
     verified: bool
     lccs: list["src.db.models.challenges.ListCompletion"]
     map_data_compatibility: list[tuple[int, int]]
