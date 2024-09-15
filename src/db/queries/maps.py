@@ -66,6 +66,19 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 
 @postgres
 async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialMap | None:
+    placement_union = ""
+    if code.isnumeric():  # Current version index
+        placement_union = """
+            UNION
+            SELECT m.* FROM maps m WHERE m.placement_curver = $1::int
+        """
+    elif code.startswith("@") and code[1:].isnumeric():  # All versions idx
+        code = code[1:]
+        placement_union = """
+            UNION
+            SELECT m.* FROM maps m WHERE m.placement_allver = $1::int
+        """
+
     payload = await conn.fetch(
         f"""
         WITH config_values AS (
@@ -78,15 +91,30 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             CROSS JOIN config_values cv
             WHERE v.version=cv.current_btd6_ver
             GROUP BY v.map
+        ),
+        possible_map AS (
+            SELECT *
+            FROM (
+                SELECT m.* FROM maps m WHERE m.code = $1
+                UNION
+                SELECT m.* FROM maps m WHERE LOWER(m.name) = LOWER($1)
+                UNION
+                SELECT m.*
+                FROM maps m
+                JOIN map_aliases a
+                    ON m.id = a.map
+                WHERE LOWER(a.alias) = LOWER($1)
+                {placement_union}
+            ) possible
+            LIMIT 1
         )
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
             m.r6_start, m.map_data, v.is_verified, m.deleted_on,
             m.optimal_heros, m.map_preview_url, m.id, m.new_version, m.created_on
-        FROM maps m
+        FROM possible_map m
         LEFT JOIN verified_maps v
             ON v.map = m.id
-        WHERE m.code=$1
         """,
         code,
     )
