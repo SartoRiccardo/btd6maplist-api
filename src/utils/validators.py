@@ -97,7 +97,7 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
             errors[f"aliases[{idx}].alias"] = "Duplicate alias"
     else:
         dup_aliases = await asyncio.gather(*[
-            alias_exists(alias) for i, alias in body["aliases"]
+            alias_exists(alias) for alias in body["aliases"]
         ])
         for i, isdup in enumerate(dup_aliases):
             if isdup:
