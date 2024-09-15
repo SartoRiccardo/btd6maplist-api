@@ -166,18 +166,53 @@ def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]
     return wrapper
 
 
-def check_bot_signature(files: list[str] | None = None):
+# https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/#verification
+def _check_signature(signature: bytes, message: bytes) -> None:
+    src.http.bot_pubkey.verify(
+        signature,
+        message,
+        padding=padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        algorithm=hashes.SHA256(),
+    )
+
+
+def check_bot_signature(
+        files: list[str] | None = None,
+        path_params: list[str] | None = None,
+):
     """
-    Parses a form data request body and validates the signature.
+    If it's a GET request (path_params not None), checks the signature with
+    the sum of the path params, and adds no extra arguments.
+    Otherwise, parses a form data request body and validates the signature.
     Adds `files: list[tuple[str, bytes]]` and `json_data: dict` to kwargs.
+
     Returns 401 if the signature doesn't match.
+
+    Bot routes assume data is already validated by the bot.
     :param files: List of valid filenames, in order.
+    :param path_params: List of path parameter keys.
     """
     files = files if files is not None else []
 
     def deco(handler):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs):
+            if path_params is not None:
+                message = b""
+                for pp in path_params:
+                    message += request.match_info[pp].encode()
+                if "signature" not in request.query:
+                    return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+                signature = base64.b64decode(request.query["signature"].encode())
+                try:
+                    _check_signature(signature, message)
+                except cryptography.exceptions.InvalidSignature:
+                    return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+                return await handler(request, *args, **kwargs)
+
             req_files: list[tuple[str, bytes] | None] = [None for _ in range(len(files))]
             req_data = None
 
@@ -198,25 +233,16 @@ def check_bot_signature(files: list[str] | None = None):
                 if file is not None:
                     message += file[1]
 
-            # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/#verification
             signature = base64.b64decode(req_data["signature"].encode())
             try:
-                src.http.bot_pubkey.verify(
-                    signature,
-                    message,
-                    padding=padding.PSS(
-                        mgf=padding.MGF1(hashes.SHA256()),
-                        salt_length=padding.PSS.MAX_LENGTH
-                    ),
-                    algorithm=hashes.SHA256(),
-                )
+                _check_signature(signature, message)
                 json_data = json.loads(req_data["data"])
             except cryptography.exceptions.InvalidSignature:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
             except json.JSONDecodeError:
                 return web.Response(status=http.HTTPStatus.BAD_REQUEST)
 
-            await handler(request, *args, **kwargs, files=req_files, json_data=json_data)
+            return await handler(request, *args, **kwargs, files=req_files, json_data=json_data)
 
         return wrapper
     return deco
