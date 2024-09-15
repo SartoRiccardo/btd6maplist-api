@@ -11,6 +11,8 @@ DB_PSWD = "postgres"
 DB_HOST = "127.0.0.1"
 DB_NAME = "database"
 
+BOT_PUBKEY = "btd6maplist-bot.pub.pem"
+
 CORS_ORIGINS = ["*"]
 
 MAPLIST_GUILD_ID = "1162188507800944761"

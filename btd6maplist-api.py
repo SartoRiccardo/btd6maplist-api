@@ -8,7 +8,7 @@ import aiohttp_swagger
 import importlib
 from importlib import util
 import contextlib
-from config import APP_HOST, APP_PORT, CORS_ORIGINS, PERSISTENT_DATA_PATH
+from config import APP_HOST, APP_PORT, CORS_ORIGINS, PERSISTENT_DATA_PATH, BOT_PUBKEY
 import aiohttp_client_cache
 from aiohttp import web
 import src.http
@@ -33,6 +33,7 @@ async def init_client_session(_app):
     async def init_session():
         async with aiohttp_client_cache.CachedSession(cache=cache) as session:
             src.http.set_session(session)
+            src.http.set_bot_pubkey(BOT_PUBKEY)
             while True:
                 await session.delete_expired_responses()
                 await asyncio.sleep(3600 * 24 * 5)

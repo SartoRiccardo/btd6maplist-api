@@ -1,5 +1,6 @@
 api.btd6maplist.key*
 api.btd6maplist.crt*
+*.pem
 config.py
 compose.yaml
 

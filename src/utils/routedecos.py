@@ -2,13 +2,18 @@ import http
 import json
 import random
 import string
+import aiohttp
+import base64
 
+import cryptography.exceptions
 from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
 from config import MAPLIST_GUILD_ID, MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
 import src.http
 from src.db.queries.users import create_user, get_user_min
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -159,3 +164,59 @@ def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]
 
         return await handler(request, *args, **kwargs_caller)
     return wrapper
+
+
+def check_bot_signature(files: list[str] | None = None):
+    """
+    Parses a form data request body and validates the signature.
+    Adds `files: list[tuple[str, bytes]]` and `json_data: dict` to kwargs.
+    Returns 401 if the signature doesn't match.
+    :param files: List of valid filenames, in order.
+    """
+    files = files if files is not None else []
+
+    def deco(handler):
+        @wraps(handler)
+        async def wrapper(request: web.Request, *args, **kwargs):
+            req_files: list[tuple[str, bytes] | None] = [None for _ in range(len(files))]
+            req_data = None
+
+            reader = await request.multipart()
+            while part := await reader.next():
+                if part.name == "data":
+                    req_data = await part.json()
+                elif part.name in files:
+                    fext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+                    file_idx = files.index(part.name)
+                    req_files[file_idx] = (f"{part.name}.{fext}", await part.read(decode=False))
+
+            if req_data is None or "signature" not in req_data or "data" not in req_data:
+                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+
+            message = req_data["data"].encode()
+            for file in req_files:
+                if file is not None:
+                    message += file[1]
+
+            # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/#verification
+            signature = base64.b64decode(req_data["signature"].encode())
+            try:
+                src.http.bot_pubkey.verify(
+                    signature,
+                    message,
+                    padding=padding.PSS(
+                        mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH
+                    ),
+                    algorithm=hashes.SHA256(),
+                )
+                json_data = json.loads(req_data["data"])
+            except cryptography.exceptions.InvalidSignature:
+                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+            except json.JSONDecodeError:
+                return web.Response(status=http.HTTPStatus.BAD_REQUEST)
+
+            await handler(request, *args, **kwargs, files=req_files, json_data=json_data)
+
+        return wrapper
+    return deco
