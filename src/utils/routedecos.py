@@ -183,31 +183,43 @@ def check_bot_signature(
         files: list[str] | None = None,
         path_params: list[str] | None = None,
         qparams: list[str] | None = None,
+        no_content: bool = False,
 ):
     """
-    If it's a GET request (path_params not None), checks the signature with
-    the sum of the path params+qparams, and adds no extra arguments.
-    Otherwise, parses a form data request body and validates the signature.
-    Adds `files: list[tuple[str, bytes]]` and `json_data: dict` to kwargs.
+    Checks the bot's signature.
+    To craft a message, one must chain (in order):
+    - Path parameters, in the specified order
+    - Query parameters, in the specified order
+    - The json content, present in body.data
+    - File contents, in the specified order
+
+    If no_content, checks the signature before getting to the body. The signature
+    must be present in the "signature" query parameter.
+    Otherwise, checks also the body and adds `files: list[tuple[str, bytes]]` and
+    `json_data: dict` to kwargs.
 
     Returns 401 if the signature doesn't match.
 
-    Bot routes assume data is already validated by the bot.
+    Bot usually routes assume most data is already validated by the bot.
     :param files: List of valid filenames, in order.
     :param path_params: List of path parameter keys.
     :param qparams: List of query parameter keys.
+    :param no_content: Whether the request has no content.
     """
     files = files if files is not None else []
+    qparams = qparams if qparams is not None else []
+    path_params = path_params if path_params is not None else []
 
     def deco(handler):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs):
-            if path_params is not None:
-                message = b""
-                for pp in path_params:
-                    message += request.match_info[pp].encode()
-                for qp in qparams:
-                    message += request.query.get(qp, "").encode()
+            message = b""
+            for pp in path_params:
+                message += request.match_info[pp].encode()
+            for qp in qparams:
+                message += request.query.get(qp, "").encode()
+
+            if no_content:
                 if "signature" not in request.query:
                     return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
                 signature = base64.b64decode(request.query["signature"].encode())
@@ -232,7 +244,7 @@ def check_bot_signature(
             if req_data is None or "signature" not in req_data or "data" not in req_data:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
 
-            message = req_data["data"].encode()
+            message += req_data["data"].encode()
             for file in req_files:
                 if file is not None:
                     message += file[1]

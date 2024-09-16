@@ -12,13 +12,12 @@ from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
 from src.utils.embeds import get_runsubm_embed
 
 
-@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.check_bot_signature(files=["proof_completion"], path_params=["code"])
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_maplist_profile
-@src.utils.routedecos.register_user
 async def post(
-        request: web.Request,
-        maplist_profile: dict = None,
+        _r: web.Request,
+        files: list[tuple[str, bytes] | None] = None,
+        json_data: dict = None,
         resource: "src.db.models.PartialMap" = None,
         **_kwargs
 ) -> web.Response:
@@ -79,63 +78,42 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    discord_profile = maplist_profile["user"]
+    discord_profile = json_data["submitter"]
+    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
 
-    embeds = []
-    hook_url = ""
-    description = None
-    data = None
-    proof_fname = None
-
-    reader = await request.multipart()
-    while part := await reader.next():
-        if part.name == "proof_completion":
-            # Max 2MB cause of the Application init
-            proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            file_contents = await part.read(decode=False)
-            proof_fname, _fpath = await save_media(file_contents, proof_ext)
-
-        elif part.name == "data":
-            data = await part.json()
-            if len(errors := await validate_completion_submission(data)):
-                return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
-
-            embeds = get_runsubm_embed(data, discord_profile, resource)
-            if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
-                description = f"__Video Proof: {data['video_proof_url']}__"
-            hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
-
-    if not (len(embeds) and proof_fname):
-        return web.json_response(status=HTTPStatus.BAD_REQUEST)
-
-    form_data = FormData()
-
-    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
+    if len(errors := await validate_completion_submission(json_data)):
+        return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
     lcc_data = None
-    if data["current_lcc"]:
+    if json_data["current_lcc"]:
         lcc_data = {
             "proof": f"{MEDIA_BASE_URL}/{proof_fname}",
-            "leftover": data["leftover"],
+            "leftover": json_data["leftover"],
         }
     run_id = await submit_run(
         resource.code,
-        data["black_border"],
-        data["no_geraldo"],
-        data["format"],
+        json_data["black_border"],
+        json_data["no_geraldo"],
+        json_data["format"],
         lcc_data,  # leftover, proof
         int(discord_profile['id']),
         f"{MEDIA_BASE_URL}/{proof_fname}",
-        data["video_proof_url"],
-        data["notes"],
+        json_data["video_proof_url"],
+        json_data["notes"],
     )
+
+    embeds = get_runsubm_embed(json_data, discord_profile, resource)
+    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     embeds[0]["footer"] = {"text": f"Run No.{run_id}"}
 
-    json_data = {"embeds": embeds}
-    if description:
-        json_data["content"] = description
-    form_data.add_field("payload_json", json.dumps(json_data))
+    msg_data = {"embeds": embeds}
+    if json_data["no_geraldo"] or json_data["current_lcc"] or json_data["black_border"]:
+        msg_data["content"] = f"__Video Proof: {json_data['video_proof_url']}__"
 
+    form_data = FormData()
+    form_data.add_field("payload_json", json.dumps(msg_data))
+
+    hook_url = WEBHOOK_LIST_RUN if 0 < json_data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
     resp = await src.http.http.post(hook_url, data=form_data)
 
     return web.Response(status=resp.status)
