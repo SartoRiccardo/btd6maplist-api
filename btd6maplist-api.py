@@ -142,7 +142,10 @@ def get_routes(cur_path: None | list = None) -> list:
                 if not hasattr(route, method):
                     continue
                 routefunc, routecolor = allowed_methods[method]
-                print(f"{routecolor(method.upper())}\t{api_route}")
+                api_route_str = api_route
+                if api_route_str.endswith("/bot"):
+                    api_route_str = api_route_str[:-4] + " 🤖"
+                print(f"{routecolor(method.upper())}\t{api_route_str}")
                 routes.append(routefunc(api_route, cors_route(getattr(route, method), cors_origins)))
                 methods.append(method.upper())
             if len(methods):
