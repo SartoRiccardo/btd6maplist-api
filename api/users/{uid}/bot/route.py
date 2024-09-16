@@ -4,7 +4,7 @@ from src.db.queries.users import get_user
 from src.ninjakiwi import get_btd6_user_deco
 
 
-@src.utils.routedecos.check_bot_signature(path_params=["uid"])
+@src.utils.routedecos.check_bot_signature(path_params=["uid"], qparams=["no_load_oak"])
 @src.utils.routedecos.validate_resource_exists(get_user, "uid")
 async def get(
         _r: web.Request,

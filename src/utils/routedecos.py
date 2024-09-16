@@ -182,10 +182,11 @@ def _check_signature(signature: bytes, message: bytes) -> None:
 def check_bot_signature(
         files: list[str] | None = None,
         path_params: list[str] | None = None,
+        qparams: list[str] | None = None,
 ):
     """
     If it's a GET request (path_params not None), checks the signature with
-    the sum of the path params, and adds no extra arguments.
+    the sum of the path params+qparams, and adds no extra arguments.
     Otherwise, parses a form data request body and validates the signature.
     Adds `files: list[tuple[str, bytes]]` and `json_data: dict` to kwargs.
 
@@ -194,6 +195,7 @@ def check_bot_signature(
     Bot routes assume data is already validated by the bot.
     :param files: List of valid filenames, in order.
     :param path_params: List of path parameter keys.
+    :param qparams: List of query parameter keys.
     """
     files = files if files is not None else []
 
@@ -204,6 +206,8 @@ def check_bot_signature(
                 message = b""
                 for pp in path_params:
                     message += request.match_info[pp].encode()
+                for qp in qparams:
+                    message += request.query.get(qp, "").encode()
                 if "signature" not in request.query:
                     return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
                 signature = base64.b64decode(request.query["signature"].encode())
