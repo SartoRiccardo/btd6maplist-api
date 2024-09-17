@@ -6,11 +6,20 @@ propositions = {
     "experts": ["Casual", "Casual/Medium", "Medium", "Medium/Hard", "Hard", "Hard/True", "True"],
 }
 
-formats = [
-    {"emoji": Emj.curver, "name": "Current"},
-    {"emoji": Emj.allver, "name": "Current"},
-    {"emoji": Emj.experts, "name": "Expert List"},
-]
+formats = {
+    1: {"emoji": Emj.curver, "name": "Current"},
+    2: {"emoji": Emj.allver, "name": "Current"},
+    51: {"emoji": Emj.experts, "name": "Expert List"},
+}
+
+
+LIST_CLR = 0x00897b
+EXPERTS_CLR = 0x5e35b1
+
+
+def get_avatar_url(discord_profile: dict) -> str:
+    return f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}" \
+           if "avatar" in discord_profile else discord_profile["avatar_url"]  # Bot-only
 
 
 def get_mapsubm_embed(
@@ -24,8 +33,7 @@ def get_mapsubm_embed(
             "url": f"https://join.btd6.com/Map/{data['code']}",
             "author": {
                 "name": discord_profile["username"],
-                "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}" \
-                            if "avatar" in discord_profile else discord_profile["avatar_url"],  # Bot-only
+                "icon_url": get_avatar_url(discord_profile),
             },
             "fields": [
                 {
@@ -36,7 +44,7 @@ def get_mapsubm_embed(
                         (propositions[data['type']][data["proposed"]] + " Expert"),
                 },
             ],
-            "color": 0x2e7d32 if data["type"] == "list" else 0x7b1fa2
+            "color": LIST_CLR if data["type"] == "list" else EXPERTS_CLR
         },
         {
             "url": f"https://join.btd6.com/Map/{data['code']}",
@@ -61,16 +69,16 @@ def get_runsubm_embed(
             #  "url": f"https://join.btd6.com/Map/{resource.code}",  URL to run acceptance
             "author": {
                 "name": discord_profile["username"],
-                "icon_url": f"https://cdn.discordapp.com/avatars/{discord_profile['id']}/{discord_profile['avatar']}",
+                "icon_url": get_avatar_url(discord_profile),
             },
             "fields": [
                 {
                     "name": "Format",
-                    "value": f"{formats[data['format'] - 1]['emoji']} {formats[data['format'] - 1]['name']}",
+                    "value": f"{formats[data['format']]['emoji']} {formats[data['format']]['name']}",
                     "inline": True,
                 },
             ],
-            "color": 0x2e7d32 if 0 < data["format"] <= 2 else 0x7b1fa2
+            "color": LIST_CLR if 0 < data["format"] < 50 else EXPERTS_CLR
         },
     ]
     if data["notes"]:

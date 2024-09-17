@@ -1,4 +1,3 @@
-import aiohttp.hdrs
 from aiohttp import web, FormData
 import json
 import src.http
@@ -21,68 +20,21 @@ async def post(
         resource: "src.db.models.PartialMap" = None,
         **_kwargs
 ) -> web.Response:
-    """
-    ---
-    description: Submits a run to the maplist. Currently all this does its be a proxy for a Discord webhook.
-    tags:
-    - The List
-    - Expert List
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              notes:
-                type: string
-                description: Additional notes about the run.
-                nullable: true
-              format:
-                $ref: "#/components/schemas/MaplistFormat"
-              black_border:
-                type: boolean
-                description: Whether the run is black bordered.
-              no_geraldo:
-                type: boolean
-                description: If the run didn't use the optimal hero (not necessarily geraldo).
-              current_lcc:
-                type: boolean
-                description: Whether the run is a LCC attempt.
-              video_proof_url:
-                type: string
-                description: |
-                  URL to video proof of you beating some hard rounds.
-                  Can be omitted if not needed.
-                nullable: true
-              leftover:
-                type: integer
-                description: |
-                  Leftover of your LCC attempt.
-                  Can be omitted if not needed.
-                nullable: true
-    responses:
-      "204":
-        description: The map was submitted
-      "400":
-        description: |
-          One of the fields is badly formatted.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                errors:
-                  type: object
-                  description: Each key-value pair is the key of the wrong field and a description as to why.
-      "401":
-        description: Your token is missing or invalid.
-    """
-    discord_profile = json_data["submitter"]
-    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
-
     if len(errors := await validate_completion_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+    if resource.difficulty == -1 and json_data["format"] in range(50, 100):
+        return web.json_response(
+            {"errors": {"format": "Submitted experts run for non-experts map"}},
+            status=HTTPStatus.BAD_REQUEST,
+        )
+    # if (resource.placement_cur == -1 or resource.placement_all == -1) and json_data["format"] in range(1, 50):
+    #     return web.json_response(
+    #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
+    #         status=HTTPStatus.BAD_REQUEST,
+    #     )
+
+    discord_profile = json_data["submitter"]
+    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
 
     lcc_data = None
     if json_data["current_lcc"]:

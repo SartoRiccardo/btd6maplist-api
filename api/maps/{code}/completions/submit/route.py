@@ -103,6 +103,16 @@ async def post(
             embeds = get_runsubm_embed(data, discord_profile, resource)
             if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
                 description = f"__Video Proof: {data['video_proof_url']}__"
+            if resource.difficulty == -1 and data["format"] in range(50, 100):
+                return web.json_response(
+                    {"errors": {"format": "Submitted experts run for non-experts map"}},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+            # if (resource.placement_cur == -1 or resource.placement_all == -1) and data["format"] in range(1, 50):
+            #     return web.json_response(
+            #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
+            #         status=HTTPStatus.BAD_REQUEST,
+            #     )
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
 
     if not (len(embeds) and proof_fname):
