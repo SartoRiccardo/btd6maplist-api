@@ -136,7 +136,7 @@ async def post(
         lcc_data,  # leftover, proof
         int(discord_profile['id']),
         f"{MEDIA_BASE_URL}/{proof_fname}",
-        data["video_proof_url"],
+        data.get("video_proof_url", None),
         data["notes"],
     )
     embeds[0]["footer"] = {"text": f"Run No.{run_id}"}
