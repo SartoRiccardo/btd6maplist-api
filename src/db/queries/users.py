@@ -260,7 +260,7 @@ async def create_user(uid: str, name: str, if_not_exists=True, conn=None) -> boo
 
 
 @postgres
-async def edit_user(uid: str, name: str, oak: str | None, conn=None) -> bool:
+async def edit_user(uid: str, name: str | None, oak: str | None, conn=None) -> bool:
     rows = await conn.execute(
         f"""
         UPDATE users

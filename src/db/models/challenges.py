@@ -139,7 +139,7 @@ class ListCompletionWithMeta(ListCompletion):
     def to_dict(self) -> dict:
         return {
             **super().to_dict(),
-            "accepted_by": str(self.accepted_by),
+            "accepted_by": str(self.accepted_by) if self.accepted_by else None,
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
             "created_on": int(self.created_on.timestamp()) if self.created_on else None,
             "subm_proof_img": self.subm_proof_img,

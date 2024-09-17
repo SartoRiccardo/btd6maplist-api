@@ -48,7 +48,7 @@ async def post(
         json_data["no_geraldo"],
         json_data["format"],
         lcc_data,  # leftover, proof
-        int(discord_profile['id']),
+        int(discord_profile["id"]),
         f"{MEDIA_BASE_URL}/{proof_fname}",
         json_data["video_proof_url"],
         json_data["notes"],

@@ -340,3 +340,15 @@ async def get_unapproved_completions(
     ]
 
     return completions, payload[0][0] if len(payload) else 0
+
+
+@postgres
+async def accept_completion(cid: int, who: int, conn=None) -> None:
+    await conn.execute(
+        """
+        UPDATE list_completions
+        SET accepted_by=$2
+        WHERE id=$1
+        """,
+        cid, who,
+    )

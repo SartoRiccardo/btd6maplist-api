@@ -60,8 +60,8 @@ async def put_validate(body: dict) -> dict:
     elif len(body["oak"]):
         if not body["oak"].startswith("oak_"):
             errors["oak"] = "OAKs must start with 'oak_'"
-        elif len(body["oak"]) != 24:
-            errors["oak"] = "OAKs must be 24 characters long"
+        # elif len(body["oak"]) != 24:
+        #     errors["oak"] = "OAKs must be 24 characters long"
         else:
             nk_response = await src.http.http.get(f"https://data.ninjakiwi.com/btd6/save/{body['oak']}")
             if not nk_response.ok or not (await nk_response.json())["success"]:
