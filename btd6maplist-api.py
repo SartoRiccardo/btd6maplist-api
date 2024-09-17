@@ -112,6 +112,10 @@ allowed_methods = {
     "put": (web.put, blue),
     "delete": (web.delete, red),
 }
+route_files = {
+    "route.py": "",
+    "bot.py": "/bot",
+}
 
 
 def get_routes(cur_path: None | list = None) -> list:
@@ -128,7 +132,9 @@ def get_routes(cur_path: None | list = None) -> list:
             cur_path.append(file)
             routes += get_routes(cur_path)
             cur_path.pop(-1)
-        elif file == "route.py":
+        elif file in route_files:
+            suffix = route_files[file]
+
             # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
             spec = importlib.util.spec_from_file_location(bmodule, path)
             route = importlib.util.module_from_spec(spec)
@@ -136,7 +142,7 @@ def get_routes(cur_path: None | list = None) -> list:
             spec.loader.exec_module(route)
 
             cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
-            api_route = "/" + "/".join(cur_path)
+            api_route = "/" + "/".join(cur_path) + suffix
             methods = []
             for method in allowed_methods:
                 if not hasattr(route, method):
