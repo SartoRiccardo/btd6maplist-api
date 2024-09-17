@@ -141,7 +141,7 @@ def require_perms(
 
 def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
-    Must be used with `with_maplist_profile` or `with_discord_profile` beforehand.
+    Must be used with `with_maplist_profile`, `check_bot_signature`, or `with_discord_profile` beforehand.
     Adds an user to the dabatase if it's not there already.
     """
     @wraps(handler)
@@ -151,6 +151,8 @@ def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]
             profile = kwargs_caller["maplist_profile"]["user"]
         elif "discord_profile" in kwargs_caller:
             profile = kwargs_caller["discord_profile"]
+        elif "json_data" in kwargs_caller:
+            profile = kwargs_caller["json_data"]["user"]
 
         if profile is None:
             return web.Response(status=http.HTTPStatus.INTERNAL_SERVER_ERROR)
