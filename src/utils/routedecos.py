@@ -232,14 +232,17 @@ def check_bot_signature(
             req_files: list[tuple[str, bytes] | None] = [None for _ in range(len(files))]
             req_data = None
 
-            reader = await request.multipart()
-            while part := await reader.next():
-                if part.name == "data":
-                    req_data = await part.json()
-                elif part.name in files:
-                    fext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-                    file_idx = files.index(part.name)
-                    req_files[file_idx] = (f"{part.name}.{fext}", await part.read(decode=False))
+            if request.content_type == "application/json":
+                req_data = json.loads(await request.text())
+            else:
+                reader = await request.multipart()
+                while part := await reader.next():
+                    if part.name == "data":
+                        req_data = await part.json()
+                    elif part.name in files:
+                        fext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+                        file_idx = files.index(part.name)
+                        req_files[file_idx] = (f"{part.name}.{fext}", await part.read(decode=False))
 
             if req_data is None or "signature" not in req_data or "data" not in req_data:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
