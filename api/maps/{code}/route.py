@@ -88,6 +88,8 @@ async def put(
         description: No map with that ID was found.
     """
     json_body = await get_map_form(request, check_dup_code=False)
+    if isinstance(json_body, web.Response):
+        return json_body
 
     if not is_admin:
         if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
