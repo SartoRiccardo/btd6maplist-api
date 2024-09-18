@@ -28,7 +28,7 @@ ExpertDifficulty:
     The Expert difficulty. If none, it's set to `-1`.\\n
     * `0` - Casual Expert.\\n
     * `1` - Medium Expert.\\n
-    * `2` - Hard Expert.\\n
+    * `2` - High Expert.\\n
     * `3` - True Expert.
 
 MapVersionCompatibility:

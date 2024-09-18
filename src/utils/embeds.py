@@ -3,7 +3,7 @@ from src.utils.emojis import Emj
 
 propositions = {
     "list": ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
-    "experts": ["Casual", "Casual/Medium", "Medium", "Medium/Hard", "Hard", "Hard/True", "True"],
+    "experts": ["Casual", "Casual/Medium", "Medium", "Medium/High", "High", "High/True", "True"],
 }
 
 formats = {
