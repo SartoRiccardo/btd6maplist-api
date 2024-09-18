@@ -3,7 +3,7 @@ from typing import Type, Any
 import re
 import src.utils.routedecos
 import src.http
-from src.db.queries.maps import map_exists, alias_exists
+from src.db.queries.maps import map_exists, alias_exists, get_map
 from src.db.queries.users import get_user_min
 
 
@@ -96,8 +96,11 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
         for idx in rep_alias_idx:
             errors[f"aliases[{idx}].alias"] = "Duplicate alias"
     else:
+        map_res = await get_map(body["code"])
         dup_aliases = await asyncio.gather(*[
-            alias_exists(alias) for alias in body["aliases"]
+            alias_exists(alias)
+            for alias in body["aliases"]
+            if map_res is None or alias not in map_res.aliases
         ])
         for i, isdup in enumerate(dup_aliases):
             if isdup:
