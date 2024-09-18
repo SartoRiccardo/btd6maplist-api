@@ -15,13 +15,13 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
             UNION
             SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
-            WHERE name=LOWER($2)
+            WHERE LOWER(name)=LOWER($2)
         """, int(id), id)
     else:
         payload = await conn.fetch("""
             SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
-            WHERE name=LOWER($1)
+            WHERE LOWER(name)=LOWER($1)
         """, id)
     if not len(payload):
         return None
