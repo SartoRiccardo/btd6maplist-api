@@ -3,7 +3,7 @@ import aiohttp
 import http
 from src.utils.validators import validate_completion, validate_full_map
 from src.utils.files import save_media
-from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
+from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID, MAPLIST_ADMIN_IDS
 
 
 async def get_submission(
@@ -27,7 +27,8 @@ async def get_submission(
             if len(errors := await validate_completion(data)):
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
-            if resource is not None:
+            is_admin = any([role in MAPLIST_ADMIN_IDS for role in maplist_profile["roles"]])
+            if resource is not None and not is_admin:
                 if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
                         (1 <= resource.format <= 50 or 1 <= data["format"] <= 50):
                     return web.json_response(
