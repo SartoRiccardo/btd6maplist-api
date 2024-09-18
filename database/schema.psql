@@ -126,7 +126,8 @@ CREATE TABLE list_completions (
   format INT DEFAULT 0,
   subm_proof_img TEXT,
   subm_proof_vid TEXT,
-  subm_notes TEXT
+  subm_notes TEXT,
+  subm_wh_payload TEXT
 );
 --ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
 --  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;

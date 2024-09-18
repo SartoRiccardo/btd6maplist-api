@@ -1,5 +1,10 @@
+import json
+import aiohttp
+from src.db.queries.completions import add_completion_wh_payload
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
+import src.http
+from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN
 
 propositions = {
     "list": ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
@@ -13,8 +18,9 @@ formats = {
 }
 
 
-LIST_CLR = 0x00897b
-EXPERTS_CLR = 0x5e35b1
+PENDING_CLR = 0x1e88e5
+LIST_CLR = 0x1e88e5
+EXPERTS_CLR = 0x1e88e5
 
 
 def get_avatar_url(discord_profile: dict) -> str:
@@ -78,7 +84,7 @@ def get_runsubm_embed(
                     "inline": True,
                 },
             ],
-            "color": LIST_CLR if 0 < data["format"] < 50 else EXPERTS_CLR
+            "color": PENDING_CLR
         },
     ]
     if data["notes"]:
@@ -93,3 +99,22 @@ def get_runsubm_embed(
             "inline": True,
         })
     return embeds
+
+
+async def send_webhook(run_id: int, hook_url: str, form_data: aiohttp.FormData, payload_json: str) -> None:
+    resp = await src.http.http.post(hook_url + "?wait=true", data=form_data)
+    if not resp.ok:
+        raise Exception(f"Webhook returned with: {resp.status}")
+    msg_id = (await resp.json())["id"]
+    await add_completion_wh_payload(run_id, f"{msg_id};{payload_json}")
+
+
+async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail: bool = False) -> None:
+    if comp.subm_wh_payload is None or ";" not in comp.subm_wh_payload:
+        return
+    msg_id, payload = comp.subm_wh_payload.split(";", 1)
+    content = json.loads(payload)
+    content["embeds"][0]["color"] = 0xb71c1c if fail else 0x43a047
+    hook_url = WEBHOOK_LIST_RUN if 0 < comp.format <= 50 else WEBHOOK_EXPLIST_RUN
+    await src.http.http.patch(hook_url + f"/messages/{msg_id}", json=content)
+    await add_completion_wh_payload(comp.id, None)

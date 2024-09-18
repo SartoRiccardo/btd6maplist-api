@@ -66,6 +66,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         SELECT
             run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
             run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
+            run.subm_wh_payload,
             
             lcc.id, lcc.proof, lcc.leftover,
             ply.user_id, u.name
@@ -81,7 +82,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
     )
     if len(payload):
         run_sidx = 0
-        lcc_sidx = 11 + run_sidx
+        lcc_sidx = 12 + run_sidx
         ply_sidx = 3 + lcc_sidx
 
         run = payload[0]
@@ -100,6 +101,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
             run[run_sidx+5],
             run[run_sidx+6],
             run[run_sidx+7],
+            run[run_sidx+11],
         )
 
 
@@ -269,7 +271,7 @@ async def get_unapproved_completions(
 
                 run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
                 run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
-                run.id,
+                run.id, run.subm_wh_payload,
                 
                 lcc.id, lcc.proof, lcc.leftover,
                 ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id,
@@ -298,7 +300,7 @@ async def get_unapproved_completions(
     )
 
     run_sidx = 1
-    lcc_sidx = 12 + run_sidx
+    lcc_sidx = 13 + run_sidx
     ply_sidx = 3 + lcc_sidx
     map_sidx = 1 + ply_sidx
 
@@ -336,6 +338,7 @@ async def get_unapproved_completions(
             run[run_sidx + 5],
             run[run_sidx + 6],
             run[run_sidx + 7],
+            run[run_sidx + 12],
         )
         for run in payload
     ]
@@ -352,4 +355,16 @@ async def accept_completion(cid: int, who: int, conn=None) -> None:
         WHERE id=$1
         """,
         cid, who,
+    )
+
+
+@postgres
+async def add_completion_wh_payload(run_id: int, payload: str | None, conn=None) -> None:
+    await conn.execute(
+        """
+        UPDATE list_completions
+        SET subm_wh_payload=$2
+        WHERE id=$1
+        """,
+        run_id, payload,
     )

@@ -1,9 +1,11 @@
 from aiohttp import web
+import asyncio
 import http
 from src.db.queries.completions import get_completion, edit_completion, delete_completion
 from src.utils.validators import validate_completion
 import src.utils.routedecos
 from src.utils.forms import get_submission
+from src.utils.embeds import update_run_webhook
 from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 import src.log
 
@@ -150,7 +152,10 @@ async def delete(
             )
 
     if not resource.deleted_on:
-        await delete_completion(resource.id, hard_delete=resource.accepted_by is None)
+        reject = resource.accepted_by is None
+        if reject:
+            asyncio.create_task(update_run_webhook(resource, fail=True))
+        await delete_completion(resource.id, hard_delete=reject)
         await src.log.log_action("completion", "delete", resource.id, None, maplist_profile["user"]["id"])
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

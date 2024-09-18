@@ -135,6 +135,7 @@ class ListCompletionWithMeta(ListCompletion):
     accepted_by: int | None
     created_on: datetime.datetime | None
     deleted_on: datetime.datetime | None
+    subm_wh_payload: str | None  # Message Id;Embed content. Internal use only.
 
     def to_dict(self) -> dict:
         return {

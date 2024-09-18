@@ -1,4 +1,7 @@
+import http
+
 from aiohttp import web, FormData
+import asyncio
 import json
 import src.http
 from http import HTTPStatus
@@ -8,7 +11,7 @@ from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
-from src.utils.embeds import get_runsubm_embed
+from src.utils.embeds import get_runsubm_embed, send_webhook
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"], path_params=["code"])
@@ -63,9 +66,10 @@ async def post(
         msg_data["content"] = f"__Video Proof: {json_data['video_proof_url']}__"
 
     form_data = FormData()
-    form_data.add_field("payload_json", json.dumps(msg_data))
+    payload_json = json.dumps(msg_data)
+    form_data.add_field("payload_json", payload_json)
 
     hook_url = WEBHOOK_LIST_RUN if 0 < json_data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
-    resp = await src.http.http.post(hook_url, data=form_data)
+    asyncio.create_task(send_webhook(run_id, hook_url, form_data, payload_json))
 
-    return web.Response(status=resp.status)
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)

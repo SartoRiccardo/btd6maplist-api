@@ -1,9 +1,11 @@
+import asyncio
 from aiohttp import web
 from src.db.queries.completions import get_completion
 import http
 import src.utils.routedecos
 from src.db.queries.completions import accept_completion
 import src.log
+from src.utils.embeds import update_run_webhook
 
 
 @src.utils.routedecos.check_bot_signature(path_params=["cid"])
@@ -24,6 +26,7 @@ async def post(
     profile = json_data["user"]
 
     await accept_completion(resource.id, int(profile["id"]))
+    asyncio.create_task(update_run_webhook(resource))
 
     dict_res = {
         "accept": True,

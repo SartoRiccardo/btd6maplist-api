@@ -1,3 +1,5 @@
+import asyncio
+import http
 import aiohttp.hdrs
 from aiohttp import web, FormData
 import json
@@ -9,7 +11,7 @@ from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
-from src.utils.embeds import get_runsubm_embed
+from src.utils.embeds import get_runsubm_embed, send_webhook
 
 
 @src.utils.routedecos.bearer_auth
@@ -144,8 +146,8 @@ async def post(
     json_data = {"embeds": embeds}
     if description:
         json_data["content"] = description
-    form_data.add_field("payload_json", json.dumps(json_data))
+    payload_json = json.dumps(json_data)
+    form_data.add_field("payload_json", payload_json)
 
-    resp = await src.http.http.post(hook_url, data=form_data)
-
-    return web.Response(status=resp.status)
+    asyncio.create_task(send_webhook(run_id, hook_url, form_data, payload_json))
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
