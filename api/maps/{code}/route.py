@@ -91,10 +91,13 @@ async def put(
 
     if not is_admin:
         if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
-            del json_body["difficulty"]
+            if "difficulty" in json_body:
+                del json_body["difficulty"]
         if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-            del json_body["placement_allver"]
-            del json_body["placement_curver"]
+            if "placement_allver" in json_body:
+                del json_body["placement_allver"]
+            if "placement_curver" in json_body:
+                del json_body["placement_curver"]
 
     await src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"])
     await edit_map(json_body, resource)
