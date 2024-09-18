@@ -150,13 +150,14 @@ async def edit_completion(
             [(comp_id, uid) for uid in user_ids]
         )
 
-        other_params = [accept]
+        other_params = []
         accept_params = ""
         if accept:
             accept_params = """
             accepted_by=$6,
             created_on=NOW(),
             """
+            other_params = [accept]
         await conn.execute(
             f"""
             UPDATE list_completions
