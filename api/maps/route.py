@@ -1,3 +1,4 @@
+import asyncio
 import src.utils.routedecos
 import http
 import src.http
@@ -110,5 +111,5 @@ async def post(
         )
 
     await add_map(json_body)
-    await src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"])
+    asyncio.create_task(src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

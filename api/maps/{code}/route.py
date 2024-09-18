@@ -1,3 +1,4 @@
+import asyncio
 from aiohttp import web
 import http
 import src.log
@@ -101,9 +102,8 @@ async def put(
             if "placement_curver" in json_body:
                 del json_body["placement_curver"]
 
-    await src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"])
     await edit_map(json_body, resource)
-
+    asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
@@ -149,6 +149,6 @@ async def delete(
 
     if not resource.deleted_on:
         await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)
-        await src.log.log_action("map", "delete", resource.code, None, maplist_profile["user"]["id"])
+        asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, maplist_profile["user"]["id"]))
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

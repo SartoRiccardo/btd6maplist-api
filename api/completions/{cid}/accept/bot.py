@@ -44,5 +44,5 @@ async def post(
     }
     if resource.lcc is not None:
         dict_res["proof"] = resource.lcc.proof
-    await src.log.log_action("completion", "post", resource.id, dict_res, profile["id"])
+    asyncio.create_task(src.log.log_action("completion", "post", resource.id, dict_res, profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

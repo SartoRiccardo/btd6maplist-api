@@ -101,7 +101,7 @@ async def put(
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
     )
-    await src.log.log_action("completion", "put", resource.id, data, maplist_profile["user"]["id"])
+    asyncio.create_task(src.log.log_action("completion", "put", resource.id, data, maplist_profile["user"]["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
@@ -156,6 +156,6 @@ async def delete(
         if reject:
             asyncio.create_task(update_run_webhook(resource, fail=True))
         await delete_completion(resource.id, hard_delete=reject)
-        await src.log.log_action("completion", "delete", resource.id, None, maplist_profile["user"]["id"])
+        asyncio.create_task(src.log.log_action("completion", "delete", resource.id, None, maplist_profile["user"]["id"]))
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

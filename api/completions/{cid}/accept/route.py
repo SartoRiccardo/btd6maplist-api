@@ -82,5 +82,5 @@ async def post(
         accept=int(maplist_profile["user"]["id"]),
     )
     asyncio.create_task(update_run_webhook(resource))
-    await src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"])
+    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

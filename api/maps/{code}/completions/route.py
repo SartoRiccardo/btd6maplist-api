@@ -1,3 +1,4 @@
+import asyncio
 from aiohttp import web
 import math
 import http
@@ -138,7 +139,7 @@ async def post(
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
     )
-    await src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"])
+    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"]))
 
     return web.json_response(
         data["user_ids"],

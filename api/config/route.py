@@ -1,3 +1,4 @@
+import asyncio
 from aiohttp import web
 from src.utils.misc import index_where
 from src.db.queries.misc import get_config, update_config
@@ -103,5 +104,5 @@ async def put(_r: web.Request, json_body: dict = None, maplist_profile: dict = N
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
     await update_config(json_body["config"])
-    await src.log.log_action("config", "put", None, json_body["config"], maplist_profile["user"]["id"])
+    asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], maplist_profile["user"]["id"]))
     return web.json_response({"errors": {}, "data": json_body["config"]})
