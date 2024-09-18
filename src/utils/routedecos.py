@@ -4,7 +4,6 @@ import random
 import string
 import aiohttp
 import base64
-
 import cryptography.exceptions
 from aiohttp import web
 from typing import Awaitable, Callable, Any
@@ -40,7 +39,10 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     async def wrapper(request: web.Request, *args, **kwargs):
         if "Authorization" not in request.headers or \
                 not request.headers["Authorization"].startswith("Bearer "):
-            return web.Response(status=401)
+            return web.json_response(
+                {"errors": {"": "No token found"}, "data": {}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
         token = request.headers["Authorization"][len("Bearer "):]
         return await handler(request, *args, **kwargs, token=token)
     return wrapper
@@ -55,15 +57,22 @@ def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
     @wraps(handler)
     async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
         if token == "":
-            return web.Response(status=401)
+            return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
 
         disc_response = await src.http.http.get(
             f"https://discord.com/api/v10/users/@me/guilds/{MAPLIST_GUILD_ID}/member",
             headers={"Authorization": f"Bearer {token}"}
         )
-        r = disc_response
+        if disc_response.status == 404:
+            return web.json_response(
+                {"errors": {"": "You don't seem to be in the maplist discord..."}, "data": {}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
         if not disc_response.ok:
-            return web.Response(status=401)
+            return web.json_response(
+                {"errors": {"": "Couldn't verify your Maplist account"}, "data": {}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
 
         profile = await disc_response.json()
         return await handler(request, *args, **kwargs, token=token, maplist_profile=profile)
@@ -78,14 +87,20 @@ def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
     @wraps(handler)
     async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
         if token == "":
-            return web.Response(status=401)
+            return web.json_response(
+                {"errors": {"": "No Discord token found"}, "data": {}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
 
         disc_response = await src.http.http.get(
             f"https://discord.com/api/v10/users/@me",
             headers={"Authorization": f"Bearer {token}"}
         )
         if not disc_response.ok:
-            return web.Response(status=401)
+            return web.json_response(
+                {"errors": {"": "Couldn't verify your Discord account"}, "data": {}},
+                status=http.HTTPStatus.UNAUTHORIZED,
+            )
 
         profile = await disc_response.json()
         return await handler(request, *args, **kwargs, token=token, discord_profile=profile)
@@ -133,7 +148,10 @@ def require_perms(
                 check_fail = MAPLIST_EXPMOD_ID not in mp["roles"]
 
             if check_fail:
-                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+                return web.json_response(
+                    {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
             return await handler(request, *args, **kwargs_caller, is_admin=is_admin)
         return wrapper
     return deco
