@@ -1,6 +1,6 @@
 import asyncpg.pool
 import src.db.connection
-from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap, ListCompletion
+from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap
 postgres = src.db.connection.postgres
 
 
@@ -369,7 +369,7 @@ async def add_completion_wh_payload(run_id: int, payload: str | None, conn=None)
 
 
 @postgres
-async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> list[ListCompletion]:
+async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> list[ListCompletionWithMeta]:
     additional_args = []
 
     format_filter = ""
@@ -388,13 +388,22 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         SELECT
             run.id, run.map, ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
             run.black_border, run.no_geraldo, run.current_lcc, run.format,
+            run.subm_proof_img, run.subm_proof_vid, run.subm_notes, run.accepted_by,
+            run.created_on, run.deleted_on,
             
-            lcc.id, lcc.proof, lcc.leftover
+            lcc.id, lcc.proof, lcc.leftover,
+            
+            m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
+            m.optimal_heros, m.map_preview_url, m.created_on
         FROM runs_with_flags run
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
         LEFT JOIN listcomp_players ply
             ON ply.run = run.id
+        JOIN maps m
+            ON m.code = run.map
+            AND m.deleted_on IS NULL
+            AND m.new_version IS NULL
         WHERE run.deleted_on IS NULL
             AND run.accepted_by IS NOT NULL
             {format_filter}
@@ -405,17 +414,39 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         *additional_args,
     )
 
-    lcc_is = 7
+    lcc_is = 13
+    map_is = 3 + lcc_is
     return [
-        ListCompletion(
+        ListCompletionWithMeta(
             row[0],
-            row[1],
+            PartialMap(
+                row[map_is],
+                row[1],
+                row[map_is+1],
+                row[map_is+2],
+                row[map_is+3],
+                row[map_is+4],
+                row[map_is+5],
+                "",
+                None,
+                row[map_is+6].split(","),
+                row[map_is+7],
+                None,
+                row[map_is+8],
+            ),
             row[2],
             row[3],
             row[4],
             row[5],
             row[6],
             None if row[lcc_is] is None else LCC(row[lcc_is], row[lcc_is+1], row[lcc_is+2]),
+            row[7],
+            row[8],
+            row[9],
+            row[10],
+            row[11],
+            row[12],
+            None,
         )
         for row in payload
     ]
