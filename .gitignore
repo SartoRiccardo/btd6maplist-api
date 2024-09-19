@@ -8,6 +8,7 @@ compose.yaml
 venv
 __pycache__
 .idea
+.venv
 
 # Misc
 .DS_Store

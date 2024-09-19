@@ -138,6 +138,7 @@ async def post(
         data["format"],
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
+        int(maplist_profile["user"]["id"]),
     )
     asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"]))
 

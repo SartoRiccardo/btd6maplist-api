@@ -85,3 +85,66 @@ AFTER UPDATE ON list_completions
 FOR EACH ROW
 WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format = 1)
 EXECUTE PROCEDURE dup_curver_comp_on_accept();
+
+
+----------------------------------------------
+-- Sets a completion as a verification if   --
+-- a run has just been completed in format  --
+-- 1 or 51 and the map doesn't have any     --
+-- verifications.                           --
+----------------------------------------------
+
+
+DROP PROCEDURE IF EXISTS set_comp_as_verification CASCADE;
+CREATE PROCEDURE set_comp_as_verification(comp_id INT) AS
+$$
+DECLARE
+    completion list_completions;
+    comp_map INT;
+    current_btd6_ver INT;
+    is_verified BOOLEAN;
+BEGIN
+    SELECT * INTO completion
+    FROM list_completions
+    WHERE id = comp_id;
+
+    SELECT m.id INTO comp_map
+    FROM maps m
+    WHERE m.code = completion.map
+        AND m.deleted_on IS NULL
+        AND m.new_version IS NULL;
+
+    SELECT c.value::int INTO current_btd6_ver
+    FROM config c
+    WHERE c.name = 'current_btd6_ver';
+
+    SELECT COUNT(*) > 0 INTO is_verified
+    FROM verifications
+    WHERE version=current_btd6_ver
+        AND map=comp_map;
+
+    IF NOT is_verified THEN
+        INSERT INTO verifications (map, user_id, version)
+        SELECT comp_map, user_id, current_btd6_ver
+        FROM listcomp_players
+        WHERE run = comp_id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION set_verif_on_accept()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    CALL set_comp_as_verification(NEW.id);
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER tr_set_verif_on_accept
+AFTER UPDATE ON list_completions
+FOR EACH ROW
+WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format IN (1, 51))
+EXECUTE PROCEDURE set_verif_on_accept();

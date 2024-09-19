@@ -188,6 +188,7 @@ async def add_completion(
         comp_format: int,
         lcc: dict | None,
         user_ids: list[int],
+        mod_id: int,
         conn: asyncpg.pool.Pool | None = None
 ) -> None:
     async with conn.transaction():
@@ -205,8 +206,8 @@ async def add_completion(
         comp_id = await conn.fetchval(
             f"""
             INSERT INTO list_completions
-                (accepted, black_border, no_geraldo, format, lcc, map)
-            VALUES (TRUE, $1, $2, $3, $4, $5)
+                (accepted_by, black_border, no_geraldo, format, lcc, map)
+            VALUES ($6, $1, $2, $3, $4, $5)
             RETURNING id
             """,
             black_border,
@@ -214,6 +215,7 @@ async def add_completion(
             comp_format,
             lcc_id,
             map_code,
+            mod_id,
         )
 
         await conn.executemany(
@@ -226,12 +228,8 @@ async def add_completion(
         )
 
         if comp_format == 1:
-            await conn.execute(
-                """
-                CALL dupe_comp_to_allver($1)
-                """,
-                comp_id
-            )
+            await conn.execute("CALL dupe_comp_to_allver($1)", comp_id)
+            await conn.execute("CALL set_comp_as_verification($1)", comp_id)
 
 
 @postgres
