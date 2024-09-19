@@ -14,6 +14,7 @@ python -m pip install -r requirements.txt
 ```
 2. Generate RSA keys for communication with [the bot](https://github.com/SartoRiccardo/btd6maplist-bot).
    - Only the public one is needed to check if the requests in bot routes are signed by the bot itself.
+   - If you've already generated a key pair, simply move the public key here.
 ```bash
 openssl genrsa -out btd6maplist-bot.pem 3072
 openssl rsa -in btd6maplist-bot.pem -pubout -out btd6maplist-bot.pub.pem
