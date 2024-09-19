@@ -1,3 +1,4 @@
+import http
 import io
 import aiohttp.hdrs
 from aiohttp import web, FormData
@@ -7,7 +8,7 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission
 from src.ninjakiwi import get_btd6_map
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
+from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID
 from src.utils.embeds import get_mapsubm_embed, propositions
 
 
@@ -65,6 +66,12 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
+    if MAPLIST_BANNED_ID in maplist_profile["roles"]:
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting..."}},
+            status=http.HTTPStatus.UNAUTHORIZED,
+        )
+
     discord_profile = maplist_profile["user"]
 
     embeds = []

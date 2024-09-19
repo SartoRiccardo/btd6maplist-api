@@ -10,7 +10,7 @@ from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
+from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL, MAPLIST_BANNED_ID
 from src.utils.embeds import get_runsubm_embed, send_webhook
 
 
@@ -81,6 +81,12 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
+    if MAPLIST_BANNED_ID in maplist_profile["roles"]:
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting..."}},
+            status=http.HTTPStatus.UNAUTHORIZED,
+        )
+
     discord_profile = maplist_profile["user"]
 
     embeds = []
