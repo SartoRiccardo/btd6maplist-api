@@ -1,6 +1,6 @@
 import asyncpg.pool
 import src.db.connection
-from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap
+from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap, ListCompletion
 postgres = src.db.connection.postgres
 
 
@@ -366,3 +366,56 @@ async def add_completion_wh_payload(run_id: int, payload: str | None, conn=None)
         """,
         run_id, payload,
     )
+
+
+@postgres
+async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> list[ListCompletion]:
+    additional_args = []
+
+    format_filter = ""
+    if formats is not None:
+        additional_args.append(formats)
+        format_filter = "AND run.format = ANY($2::int[])"
+
+    payload = await conn.fetch(
+        f"""
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            LEFT JOIN list_completions lccs
+                ON lccs.id = r.lcc
+        )
+        SELECT
+            run.id, run.map, ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+            run.black_border, run.no_geraldo, run.current_lcc, run.format,
+            
+            lcc.id, lcc.proof, lcc.leftover
+        FROM runs_with_flags run
+        LEFT JOIN leastcostchimps lcc
+            ON lcc.id = run.lcc
+        LEFT JOIN listcomp_players ply
+            ON ply.run = run.id
+        WHERE run.deleted_on IS NULL
+            AND run.accepted_by IS NOT NULL
+            {format_filter}
+        ORDER BY run.created_on DESC
+        LIMIT $1
+        """,
+        limit,
+        *additional_args,
+    )
+
+    lcc_is = 7
+    return [
+        ListCompletion(
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+            row[6],
+            None if row[lcc_is] is None else LCC(row[lcc_is], row[lcc_is+1], row[lcc_is+2]),
+        )
+        for row in payload
+    ]
