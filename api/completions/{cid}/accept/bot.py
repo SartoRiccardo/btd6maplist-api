@@ -16,7 +16,7 @@ async def post(
         json_data: dict = None,
         **_kwargs,
 ) -> web.Response:
-    """Only sets `accepted`"""
+    """Only sets `accepted_by`"""
     if resource.accepted_by is not None:
         return web.json_response(
             {"errors": {"": "This run was already accepted!"}},
@@ -24,6 +24,11 @@ async def post(
         )
 
     profile = json_data["user"]
+    if int(profile["id"]) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
+        return web.json_response(
+            {"errors": {"": "Cannot edit or accept your own completion"}},
+            status=http.HTTPStatus.UNAUTHORIZED
+        )
 
     await accept_completion(resource.id, int(profile["id"]))
     asyncio.create_task(update_run_webhook(resource))

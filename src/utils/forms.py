@@ -11,6 +11,13 @@ async def get_submission(
         maplist_profile: dict,
         resource: "src.db.models.ListCompletion" = None,
 ) -> dict | web.Response:
+    if resource and \
+            int(maplist_profile["user"]["id"]) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
+        return web.json_response(
+            {"errors": {"": "Cannot edit or accept your own completion"}},
+            status=http.HTTPStatus.UNAUTHORIZED
+        )
+
     proof_ext = None
     file_contents = None
     data = None
@@ -41,6 +48,12 @@ async def get_submission(
                         {"errors": {"format": "You must be an Expert List Moderator"}},
                         status=http.HTTPStatus.UNAUTHORIZED,
                     )
+
+            if maplist_profile["user"]["id"] in data["user_ids"]:
+                return web.json_response(
+                    {"errors": {"": "Cannot edit or accept your own completion"}},
+                    status=http.HTTPStatus.UNAUTHORIZED
+                )
 
     if data["lcc"] is not None:
         if file_contents is None and "proof_completion" not in data["lcc"]:
