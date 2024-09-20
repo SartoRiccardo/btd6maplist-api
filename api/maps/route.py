@@ -95,6 +95,8 @@ async def post(
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
     json_body = await get_map_form(request, check_dup_code=True)
+    if isinstance(json_body, web.Response):
+        return json_body
 
     errors = {}
     if not is_admin:
