@@ -145,6 +145,11 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
         errors["placement_allver"] = "At least one of these should be set"
         errors["placement_curver"] = "At least one of these should be set"
         errors["difficulty"] = "At least one of these should be set"
+    # FIMXE: Should take 50 from config
+    if body["placement_curver"] > 50:
+        del body["placement_curver"]
+    if body["placement_allver"] > 50:
+        del body["placement_allver"]
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
