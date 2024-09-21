@@ -514,3 +514,46 @@ async def delete_map(
             """,
             code
         )
+
+
+@postgres
+async def get_legacy_maps(conn=None) -> list[PartialListMap]:
+    """
+    Gets deleted maps or maps that were pushed off the list.
+    A deleted map shows up only if it's not in the expert list.
+    """
+    payload = await conn.fetch(f"""
+        WITH config_vars AS (
+            SELECT
+                ({get_int_config("current_btd6_ver")}) AS current_btd6_ver,
+                ({get_int_config("map_count")}) AS map_count
+        ),
+        verified_current AS (
+            SELECT map, (COUNT(map) > 0) AS is_verified
+            FROM verifications
+            CROSS JOIN config_vars
+            WHERE version=current_btd6_ver
+            GROUP BY map
+        )
+        SELECT
+            name,
+            m.code,
+            is_verified IS NOT NULL,
+            placement_curver,
+            map_preview_url
+        FROM maps m
+        LEFT JOIN verified_current vc
+            ON m.id=vc.map
+        CROSS JOIN config_vars cvar
+        WHERE new_version IS NULL AND
+            (
+                placement_curver > cvar.map_count
+                OR placement_curver = -1 AND difficulty = -1
+            )
+        ORDER BY placement_curver ASC
+        """,
+    )
+    return [
+        PartialListMap(row[0], row[1], row[3], row[2], row[4])
+        for row in payload
+    ]
