@@ -408,28 +408,37 @@ async def edit_map(
         map_current = await get_map(map_data["code"], partial=True, conn=conn)
 
     async with conn.transaction():
-        fields = [
-            field for field in [
-                "name",
-                "placement_allver",
-                "placement_curver",
-                "difficulty",
-                "map_data",
-                "r6_start",
-                "optimal_heros",
-                "map_preview_url",
-            ] if field in map_data
+        fields_to_copy = [
+            "name",
+            # "placement_allver",
+            # "placement_curver",
+            "difficulty",
+            "map_data",
+            "r6_start",
+            "optimal_heros",
+            "map_preview_url",
         ]
+        fields = [
+            fname for fname in fields_to_copy
+            if fname in map_data
+        ]
+        formatted_fields = [
+            "{}=${}".format(fname, i+2)
+            for i, fname in enumerate(fields)
+        ]
+        for fname in ["placement_allver", "placement_curver"]:
+            if fname not in map_data:
+                continue
+            formatted_fields.append(
+                f"{fname}=(SELECT LEAST(${len(formatted_fields)+2}, MAX({fname})) FROM maps)"
+            )
+            fields.append(map_data[fname])
 
-        field_format = "{}=${}"
         await conn.execute(
             f"""
             UPDATE maps
             SET
-                {", ".join([
-                    field_format.format(field, i+2)
-                    for i, field in enumerate(fields)
-                ])}
+                {", ".join(formatted_fields)}
             WHERE code=$1
             """,
             map_data["code"],
