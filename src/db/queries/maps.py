@@ -380,9 +380,6 @@ async def delete_map_relations(map_id: int, conn=None) -> None:
 @postgres
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
-        for field in ["placement_allver", "placement_curver"]:
-            await update_list_placements(field, -1, map_data[field])
-
         map_id = await conn.fetchval(
             """
             INSERT INTO maps(
@@ -411,13 +408,6 @@ async def edit_map(
         map_current = await get_map(map_data["code"], partial=True, conn=conn)
 
     async with conn.transaction():
-        for field, model_field in [("placement_allver", "placement_all"), ("placement_curver", "placement_cur")]:
-            if field not in map_data:
-                continue
-            old_pos = getattr(map_current, model_field)
-            new_pos = map_data[field]
-            await update_list_placements(field, old_pos, new_pos, conn=conn)
-
         fields = [
             field for field in [
                 "name",
@@ -451,30 +441,6 @@ async def edit_map(
 
 
 @postgres
-async def update_list_placements(
-        field: str,
-        old_pos: int,
-        new_pos: int,
-        conn=None
-) -> None:
-    if old_pos == new_pos:
-        return
-    if old_pos == -1:
-        old_pos = 1000
-    elif new_pos == -1:
-        new_pos = 1000
-
-    await conn.execute(
-        f"""
-        UPDATE maps
-        SET {field} = {field} + SIGN($1::int - $2::int)
-        WHERE {field} BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)
-        """,
-        old_pos, new_pos
-    )
-
-
-@postgres
 async def delete_map(
         code: str,
         *,
@@ -493,8 +459,6 @@ async def delete_map(
     indexes = [map_current.placement_cur, map_current.placement_all, map_current.difficulty]
     if modify_pos:
         updates += ["placement_curver=-1", "placement_allver=-1"]
-        await update_list_placements("placement_curver", map_current.placement_cur, -1)
-        await update_list_placements("placement_allver", map_current.placement_all, -1)
         indexes[0] = -1
         indexes[1] = -1
     if modify_diff:

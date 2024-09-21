@@ -130,7 +130,8 @@ BEGIN
         WHERE run = comp_id;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$
+LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION set_verif_on_accept()
@@ -148,3 +149,115 @@ AFTER UPDATE ON list_completions
 FOR EACH ROW
 WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format IN (1, 51))
 EXECUTE PROCEDURE set_verif_on_accept();
+
+
+-----------------------------------------------------
+-- Update list current version/all version indexes --
+-- on map update/delete/add                        --
+-----------------------------------------------------
+
+
+DROP PROCEDURE IF EXISTS update_placements CASCADE;
+CREATE PROCEDURE update_placements(
+    old_plc_cur INT,
+    new_plc_cur INT,
+    old_plc_all INT,
+    new_plc_all INT,
+    map_code VARCHAR(10)
+) AS
+$$
+DECLARE
+    is_recursive TEXT;
+BEGIN
+    -- https://www.postgresql.org/docs/9.3/functions-admin.html
+    -- When updating all other maps, the triggers call this function again.
+    SELECT CURRENT_SETTING('btd6maplist.is_recursive', TRUE) INTO is_recursive;
+    IF is_recursive = 'true' THEN
+        RETURN;
+    END IF;
+    PERFORM SET_CONFIG('btd6maplist.is_recursive', 'true', TRUE);
+
+    new_plc_cur := CASE
+        WHEN new_plc_cur=-1 THEN 2147483647
+        ELSE new_plc_cur
+        END;
+    old_plc_cur := CASE
+        WHEN old_plc_cur=-1 THEN 2147483647
+        ELSE old_plc_cur
+        END;
+    new_plc_all := CASE
+        WHEN new_plc_all=-1 THEN 2147483647
+        ELSE new_plc_all
+        END;
+    old_plc_all := CASE
+        WHEN old_plc_all=-1 THEN 2147483647
+        ELSE old_plc_all
+        END;
+    insert into calls(nc,oc,na,oa,code) values (new_plc_cur, old_plc_cur, new_plc_all, old_plc_all, map_code);
+
+    UPDATE maps
+    SET placement_curver = placement_curver + SIGN(old_plc_cur - new_plc_cur)
+    WHERE code != map_code
+        AND placement_curver BETWEEN LEAST(old_plc_cur, new_plc_cur) AND GREATEST(old_plc_cur, new_plc_cur)
+        AND deleted_on IS NULL
+        AND new_version IS NULL;
+
+    UPDATE maps
+    SET placement_allver = placement_allver + SIGN(old_plc_all - new_plc_all)
+    WHERE code != map_code
+        AND placement_allver BETWEEN LEAST(old_plc_all, new_plc_all) AND GREATEST(old_plc_all, new_plc_all)
+        AND deleted_on IS NULL
+        AND new_version IS NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION update_placements_put()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    CALL update_placements(
+        OLD.placement_curver,
+        NEW.placement_curver,
+        OLD.placement_allver,
+        NEW.placement_allver,
+        NEW.code
+    );
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION update_placements_post()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    CALL update_placements(
+        -1,
+        NEW.placement_curver,
+        -1,
+        NEW.placement_allver,
+        NEW.code
+    );
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE TRIGGER tr_update_placements_put
+AFTER UPDATE ON maps
+FOR EACH ROW
+WHEN (
+    NEW.placement_curver != OLD.placement_curver
+    OR NEW.placement_allver != OLD.placement_allver
+)
+EXECUTE PROCEDURE update_placements_put();
+
+
+CREATE OR REPLACE TRIGGER tr_update_placements_post
+AFTER INSERT ON maps
+FOR EACH ROW
+EXECUTE PROCEDURE update_placements_post();
