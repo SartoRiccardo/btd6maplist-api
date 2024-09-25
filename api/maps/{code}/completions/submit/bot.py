@@ -63,7 +63,7 @@ async def post(
 
     msg_data = {"embeds": embeds}
     if json_data["no_geraldo"] or json_data["current_lcc"] or json_data["black_border"]:
-        msg_data["content"] = f"__Video Proof: {json_data['video_proof_url']}__"
+        msg_data["content"] = f"__Video Proof: {json_data['video_proof_url']}__".replace("@", "")
 
     form_data = FormData()
     payload_json = json.dumps(msg_data)

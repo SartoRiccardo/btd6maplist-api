@@ -151,7 +151,7 @@ async def post(
 
     json_data = {"embeds": embeds}
     if description:
-        json_data["content"] = description
+        json_data["content"] = description.replace("@", "")
     payload_json = json.dumps(json_data)
     form_data.add_field("payload_json", payload_json)
 
