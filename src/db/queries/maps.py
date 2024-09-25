@@ -281,12 +281,15 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
                 
                 lccs.id, lccs.proof, lccs.leftover,
                 
-                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
+                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids,
+                ARRAY_AGG(u.name) OVER (PARTITION by rwf.id) AS user_names
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
             LEFT JOIN leastcostchimps lccs
                 ON rwf.lcc = lccs.id
+            JOIN users u
+                ON ply.user_id = u.discord_id
         )
         SELECT COUNT(*) OVER() AS total_count, uq.*
         FROM unique_runs uq
@@ -301,7 +304,7 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
         code, idx_start, amount,
     )
 
-    return parse_runs_payload(payload), payload[0][0] if len(payload) else 0
+    return parse_runs_payload(payload, full_usr_info=True), payload[0][0] if len(payload) else 0
 
 
 @postgres
