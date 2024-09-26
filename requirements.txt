@@ -24,6 +24,7 @@ jmespath==1.0.1
 MarkupSafe==2.1.5
 motor==3.5.1
 multidict==6.0.5
+pillow==10.4.0
 pycparser==2.22
 pymongo==4.8.0
 python-dateutil==2.9.0.post0
