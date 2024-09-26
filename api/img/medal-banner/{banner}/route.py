@@ -1,4 +1,5 @@
 import asyncio
+import os
 import os.path
 from aiohttp import web
 import http
@@ -10,7 +11,7 @@ BANNER_SIZE = (1536, 192)
 MEDAL_SIZE = 128
 MEDAL_SLOTS = 8
 TEXT_POS_REL = (-10, -10)
-LUCKIEST_GUY = ImageFont.truetype(os.path.join("bin", "LuckiestGuy-Regular.ttf"), 60)
+LUCKIEST_GUY = ImageFont.truetype(os.path.join(os.getcwd(), "bin", "LuckiestGuy-Regular.ttf"), 60)
 
 
 async def get(request: web.Request) -> web.Response:
@@ -51,7 +52,7 @@ def generate_image(banner: io.BytesIO, medals: dict) -> io.BytesIO:
     for key in medals:
         if medals[key] <= 0:
             continue
-        medal_img = Image.open(os.path.join("bin", "img", f"medal_{key}.png")).convert("RGBA")
+        medal_img = Image.open(os.path.join(os.getcwd(), "bin", "img", f"medal_{key}.png")).convert("RGBA")
         Image.Image.paste(base_img, medal_img, (medal_x, medal_y), mask=medal_img)
         canvas.text(
             (medal_x + MEDAL_SIZE + TEXT_POS_REL[0], medal_y + MEDAL_SIZE + TEXT_POS_REL[1]),
