@@ -83,6 +83,38 @@ class MaplistProfile:
 
 
 @dataclass
+class MaplistMedals:
+    """
+    type: object
+    properties:
+      wins:
+        type: integer
+        description: Number of completions.
+      black_border:
+        type: integer
+        description: Number of black border completions.
+      no_geraldo:
+        type: integer
+        description: Number of No Optimal Hero completions.
+      lccs:
+        type: integer
+        description: Number of LCCs.
+    """
+    wins: int
+    black_border: int
+    no_geraldo: int
+    lccs: int
+
+    def to_dict(self) -> dict:
+        return {
+            "wins": self.wins,
+            "black_border": self.black_border,
+            "no_geraldo": self.no_geraldo,
+            "lccs": self.lccs,
+        }
+
+
+@dataclass
 class User(PartialUser):
     """
     allOf:
@@ -97,11 +129,14 @@ class User(PartialUser):
           type: array
           items:
             $ref: "#/components/schemas/PartialMap"
+        medals:
+          $ref: "#/components/schemas/MaplistMedals"
     """
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
     created_maps: list["src.db.models.maps.PartialMap"]
     completions: list[ListCompletion]
+    medals: MaplistMedals
 
     def to_dict(
             self,
@@ -115,6 +150,7 @@ class User(PartialUser):
                 "all": self.maplist_all.to_dict(),
             },
             "created_maps": [m.to_dict() for m in self.created_maps],
+            "medals": self.medals.to_dict(),
         }
         if with_completions:
             data["completions"] = [c.to_dict() for c in self.completions]

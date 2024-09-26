@@ -15,7 +15,7 @@ NAME_CHARS = string.ascii_letters + string.digits + "-_."
 async def get(request: web.Request):
     """
     ---
-    description: Returns an user's data.
+    description: Returns a user's data.
     tags:
     - Users
     parameters:

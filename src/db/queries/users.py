@@ -1,6 +1,6 @@
 import asyncio
 import src.db.connection
-from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC
+from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC, MaplistMedals
 postgres = src.db.connection.postgres
 
 
@@ -209,6 +209,48 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
 
 
 @postgres
+async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
+    payload = await conn.fetch(
+        """
+        WITH runs_with_flags AS (
+            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM list_completions r
+            LEFT JOIN lccs_by_map lccs
+                ON lccs.id = r.lcc
+        ),
+        medals_per_map AS (
+            SELECT
+                rwf.map,
+                BOOL_OR(rwf.black_border) AS black_border,
+                BOOL_OR(rwf.no_geraldo) AS no_geraldo,
+                BOOL_OR(rwf.current_lcc) AS current_lcc
+            FROM runs_with_flags rwf
+            JOIN listcomp_players ply
+                ON ply.run = rwf.id
+            WHERE ply.user_id = $1
+                AND rwf.accepted_by IS NOT NULL
+                AND rwf.deleted_on IS NULL
+            GROUP BY rwf.map
+        )
+        SELECT
+            COUNT(*) AS wins,
+            COUNT(CASE WHEN black_border THEN 1 END) AS black_border,
+            COUNT(CASE WHEN no_geraldo THEN 1 END) AS no_geraldo,
+            COUNT(CASE WHEN current_lcc THEN 1 END) AS current_lcc
+        FROM medals_per_map
+        """,
+        int(uid)
+    )
+
+    return MaplistMedals(
+        payload[0][0],
+        payload[0][1],
+        payload[0][2],
+        payload[0][3],
+    )
+
+
+@postgres
 async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:
     puser = await get_user_min(id, conn=conn)
     if not puser:
@@ -219,6 +261,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
     curlcc_pos = await get_maplist_placement(id, type="lcc", conn=conn)
     alllcc_pos = await get_maplist_placement(id, curver=False, type="lcc", conn=conn)
     maps = await get_maps_created_by(id, conn=conn)
+    medals = await get_user_medals(id, conn=conn)
 
     comps = []
     if with_completions:
@@ -243,6 +286,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         ),
         maps,
         comps,
+        medals,
     )
 
 

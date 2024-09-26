@@ -3,7 +3,7 @@ import yaml
 from .ConfigVar import ConfigVar
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
-from .User import User, PartialUser, MaplistProfile
+from .User import User, PartialUser, MaplistProfile, MaplistMedals
 from .LeaderboardEntry import LeaderboardEntry
 
 
@@ -66,7 +66,8 @@ entities = [
     User,
     PartialUser,
     MaplistProfile,
-    LeaderboardEntry
+    LeaderboardEntry,
+    MaplistMedals,
 ]
 for entity in entities:
     if not entity.__doc__:
