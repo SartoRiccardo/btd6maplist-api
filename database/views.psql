@@ -25,26 +25,14 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 ----------------------------
 
 CREATE OR REPLACE VIEW lccs_by_map AS
-WITH maps_lcc_leftovers AS (
-    SELECT
-        r.map,
-        r.format,
-        MAX(lcc.leftover) AS leftover
-    FROM list_completions r
-    JOIN leastcostchimps lcc
-        ON r.lcc = lcc.id
-    WHERE r.accepted_by IS NOT NULL
-        AND r.deleted_on IS NULL
-    GROUP BY r.map, r.format
-)
-SELECT
-    mll.map, mll.format, lcc.id
-FROM maps_lcc_leftovers mll
-JOIN list_completions r
-    ON r.map = mll.map AND r.format = mll.format
+SELECT DISTINCT ON (r.map, r.format)
+    r.map, r.format, lcc.id
+FROM list_completions r
 JOIN leastcostchimps lcc
     ON r.lcc = lcc.id
-WHERE mll.leftover = lcc.leftover;
+WHERE r.accepted_by IS NOT NULL
+    AND r.deleted_on IS NULL
+ORDER BY r.map, r.format, lcc.leftover DESC, r.created_on ASC;
 
 
 ---------------
