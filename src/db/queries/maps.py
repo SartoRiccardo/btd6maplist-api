@@ -262,7 +262,16 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
 
 
 @postgres
-async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
+async def get_completions_for(
+        code: str,
+        formats: list[int],
+        idx_start: int = 0,
+        amount: int = 50,
+        conn=None
+) -> tuple[list[ListCompletion], int]:
+    extra_args = []
+    if len(formats):
+        extra_args.append(formats)
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
@@ -271,6 +280,7 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.map = $1
+                {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         ),
@@ -301,7 +311,7 @@ async def get_completions_for(code, idx_start=0, amount=50, conn=None) -> tuple[
         LIMIT $3
         OFFSET $2
         """,
-        code, idx_start, amount,
+        code, idx_start, amount, *extra_args,
     )
 
     return parse_runs_payload(payload, full_usr_info=True), payload[0][0] if len(payload) else 0

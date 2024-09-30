@@ -52,8 +52,11 @@ async def get(request: web.Request):
     else:
         page = max(1, int(page))
 
+    formats = [int(fmt) for fmt in request.query.get("formats", "1,51").split(",") if fmt.isnumeric()]
+
     completions, count = await get_completions_by(
         request.match_info["uid"],
+        formats,
         idx_start=(page-1)*PAGE_ENTRIES,
         amount=PAGE_ENTRIES,
     )

@@ -33,7 +33,16 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
 
 
 @postgres
-async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tuple[list[ListCompletion], int]:
+async def get_completions_by(
+        uid: str,
+        formats: list[int],
+        idx_start=0,
+        amount=50,
+        conn=None
+) -> tuple[list[ListCompletion], int]:
+    extra_args = []
+    if len(formats):
+        extra_args.append(formats)
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
@@ -44,6 +53,7 @@ async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tup
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE ply.user_id = $1
+                {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         ),
@@ -78,7 +88,7 @@ async def get_completions_by(uid: str, idx_start=0, amount=50, conn=None) -> tup
         LIMIT $3
         OFFSET $2
         """,
-        int(uid), idx_start, amount,
+        int(uid), idx_start, amount, *extra_args,
     )
 
     run_sidx = 1

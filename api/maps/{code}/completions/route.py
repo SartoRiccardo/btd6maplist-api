@@ -33,6 +33,12 @@ async def get(request: web.Request):
       schema:
         type: integer
       description: Pagination. Defaults to `1`.
+    - in: query
+      name: formats
+      required: false
+      schema:
+        type: list
+      description: Formats to show. Defaults to `1,51`.
     responses:
       "200":
         description: Returns an array of `ListCompletion`.
@@ -58,8 +64,11 @@ async def get(request: web.Request):
     else:
         page = max(1, int(page))
 
+    formats = [int(fmt) for fmt in request.query.get("formats", "1,51").split(",") if fmt.isnumeric()]
+
     completions, total = await get_completions_for(
         request.match_info["code"],
+        formats,
         idx_start=PAGE_ENTRIES * (page-1),
         amount=PAGE_ENTRIES,
     )
