@@ -452,7 +452,7 @@ async def edit_map(
                 {", ".join([
                     field_format.format(field, i+2)
                     for i, field in enumerate(fields)
-                ])}
+                ] + ["deleted_on=NULL"])}
             WHERE code=$1
             """,
             map_data["code"],
