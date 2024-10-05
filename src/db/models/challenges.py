@@ -79,6 +79,9 @@ class ListCompletion:
     current_lcc: bool
     format: int
     lcc: LCC | None
+    subm_proof_img: str | None
+    subm_proof_vid: str | None
+    subm_notes: str | None
 
     def to_dict(self) -> dict:
         return {
@@ -93,6 +96,8 @@ class ListCompletion:
             "current_lcc": self.current_lcc,
             "lcc": self.lcc.to_dict() if self.lcc else None,
             "format": self.format,
+            "subm_proof_img": self.subm_proof_img,
+            "subm_proof_vid": self.subm_proof_vid,
         }
 
 
@@ -129,9 +134,6 @@ class ListCompletionWithMeta(ListCompletion):
           nullable: true
           description: Notes the user put when submitting.
     """
-    subm_proof_img: str | None
-    subm_proof_vid: str | None
-    subm_notes: str | None
     accepted_by: int | None
     created_on: datetime.datetime | None
     deleted_on: datetime.datetime | None
@@ -140,10 +142,8 @@ class ListCompletionWithMeta(ListCompletion):
     def to_dict(self) -> dict:
         return {
             **super().to_dict(),
+            "subm_notes": self.subm_notes,
             "accepted_by": str(self.accepted_by) if self.accepted_by else None,
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
             "created_on": int(self.created_on.timestamp()) if self.created_on else None,
-            "subm_proof_img": self.subm_proof_img,
-            "subm_proof_vid": self.subm_proof_vid,
-            "subm_notes": self.subm_notes,
         }

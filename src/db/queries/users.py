@@ -60,7 +60,7 @@ async def get_completions_by(
         unique_runs AS (
             SELECT DISTINCT ON (rwf.id)
                 rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-                rwf.format,
+                rwf.format, rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes,
                 
                 m.name, m.placement_curver, m.placement_allver, m.difficulty,
                 m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
@@ -92,7 +92,7 @@ async def get_completions_by(
     )
 
     run_sidx = 1
-    map_sidx = 6 + run_sidx
+    map_sidx = 9 + run_sidx
     lcc_sidx = 10 + map_sidx
     group_sidx = 3 + lcc_sidx
 
@@ -120,6 +120,9 @@ async def get_completions_by(
             run[run_sidx+4],
             run[run_sidx+5],
             LCC(*run[lcc_sidx:group_sidx]) if run[lcc_sidx] else None,
+            run[run_sidx+6],
+            run[run_sidx+7],
+            run[run_sidx+8],
         )
         for run in payload
     ], payload[0][0] if len(payload) else 0
@@ -140,7 +143,7 @@ async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
         )
         SELECT
             rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-            rwf.format
+            rwf.format, rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes
         FROM runs_with_flags rwf
         JOIN listcomp_players ply
             ON ply.run = rwf.id
@@ -159,6 +162,9 @@ async def get_min_completions_by(id: str, conn=None) -> list[ListCompletion]:
             run[4],
             run[5],
             None,
+            run[6],
+            run[7],
+            run[8],
         )
         for run in payload
     ]
@@ -345,7 +351,8 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
         SELECT
             r.id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
             lcc.id, lcc.proof, lcc.leftover,
-            ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
+            rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes
         FROM runs_with_flags r
         JOIN listcomp_players ply
             ON ply.run = r.id
@@ -364,7 +371,10 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
             row[3],
             row[4],
             row[5],
-            LCC(row[6], row[7], row[8]) if row[6] else None
+            LCC(row[6], row[7], row[8]) if row[6] else None,
+            row[10],
+            row[11],
+            row[12],
         )
         for row in payload
     ]

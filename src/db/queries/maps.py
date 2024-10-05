@@ -202,8 +202,8 @@ def parse_runs_payload(
         full_usr_info: bool = False,
 ) -> list[ListCompletion]:
     run_idx = 0 + int(has_count)
-    lcc_idx = 6 + int(has_count)
-    agg_idx = 9 + int(has_count)
+    lcc_idx = 9 + run_idx
+    agg_idx = 3 + lcc_idx
 
     comps = []
     for run in payload:
@@ -224,6 +224,9 @@ def parse_runs_payload(
             run[run_idx + 4],
             run[run_idx + 5],
             LCC(*run[lcc_idx:agg_idx]) if run[lcc_idx] else None,
+            run[run_idx + 6],
+            run[run_idx + 7],
+            run[run_idx + 8],
         ))
     return comps
 
@@ -234,7 +237,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
         """
         SELECT
             runs.id, runs.map, runs.black_border, runs.no_geraldo, TRUE,
-            runs.format,
+            runs.format, runs.subm_proof_img, runs.subm_proof_vid, runs.subm_notes,
 
             lccs.id, lccs.proof, lccs.leftover,
 
@@ -287,7 +290,7 @@ async def get_completions_for(
         unique_runs AS (
             SELECT DISTINCT ON (rwf.id)
                 rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-                rwf.format,
+                rwf.format, rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes,
                 
                 lccs.id, lccs.proof, lccs.leftover,
                 
