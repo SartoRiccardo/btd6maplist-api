@@ -352,7 +352,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
             r.id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
             lcc.id, lcc.proof, lcc.leftover,
             ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
-            rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes
+            r.subm_proof_img, r.subm_proof_vid, r.subm_notes
         FROM runs_with_flags r
         JOIN listcomp_players ply
             ON ply.run = r.id
