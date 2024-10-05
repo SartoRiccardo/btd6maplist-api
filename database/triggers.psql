@@ -118,6 +118,8 @@ BEGIN
     FROM config c
     WHERE c.name = 'current_btd6_ver';
 
+    -- Current version verifier
+
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version=current_btd6_ver
@@ -126,6 +128,20 @@ BEGIN
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
         SELECT comp_map, user_id, current_btd6_ver
+        FROM listcomp_players
+        WHERE run = comp_id;
+    END IF;
+
+    -- First time verifier
+
+    SELECT COUNT(*) > 0 INTO is_verified
+    FROM verifications
+    WHERE version IS NULL
+        AND map=comp_map;
+
+    IF NOT is_verified THEN
+        INSERT INTO verifications (map, user_id, version)
+        SELECT comp_map, user_id, NULL
         FROM listcomp_players
         WHERE run = comp_id;
     END IF;
