@@ -3,7 +3,12 @@ import aiohttp
 import http
 from src.utils.validators import validate_completion, validate_full_map
 from src.utils.files import save_media
-from config import MEDIA_BASE_URL, MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID, MAPLIST_ADMIN_IDS
+from config import (
+    MEDIA_BASE_URL,
+    MAPLIST_LISTMOD_ID,
+    MAPLIST_EXPMOD_ID,
+    MAPLIST_ADMIN_IDS,
+)
 
 
 async def get_submission(

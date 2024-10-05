@@ -209,8 +209,10 @@ async def validate_completion_submission(body: dict) -> dict:
         return check
 
     errors = {}
+    if "video_proof_url" in body and not is_link(body["video_proof_url"]):
+        errors["video_proof_url"] = "Invalid video URL"
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
-            ("video_proof_url" not in body or not is_link(body["video_proof_url"])):
+            "video_proof_url" not in body:
         errors["video_proof_url"] = "Missing or invalid URL"
     if body["current_lcc"]:
         if "leftover" not in body or not isinstance(body["leftover"], int):

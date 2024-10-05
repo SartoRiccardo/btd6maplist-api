@@ -10,7 +10,13 @@ from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL, MAPLIST_BANNED_ID
+from config import (
+    WEBHOOK_LIST_RUN,
+    WEBHOOK_EXPLIST_RUN,
+    MEDIA_BASE_URL,
+    MAPLIST_BANNED_ID,
+    MAPLIST_NEEDSREC_ID,
+)
 from src.utils.embeds import get_runsubm_embed, send_webhook
 
 
@@ -98,7 +104,7 @@ async def post(
     reader = await request.multipart()
     while part := await reader.next():
         if part.name == "proof_completion":
-            # Max 2MB cause of the Application init
+            # Max 3MB cause of the Application init
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
             proof_fname, _fpath = await save_media(file_contents, proof_ext)
@@ -107,6 +113,12 @@ async def post(
             data = await part.json()
             if len(errors := await validate_completion_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+
+            if MAPLIST_NEEDSREC_ID in maplist_profile["roles"] and "video_proof_url" not in data:
+                return web.json_response(
+                    {"errors": {"video_proof_url": "You must submit a recording"}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
 
             embeds = get_runsubm_embed(data, discord_profile, resource)
             if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
