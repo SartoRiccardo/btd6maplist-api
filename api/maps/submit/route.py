@@ -1,4 +1,5 @@
 import asyncio
+import math
 import http
 import aiohttp.hdrs
 from aiohttp import web, FormData
@@ -12,7 +13,13 @@ from src.ninjakiwi import get_btd6_map
 from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID, MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed, propositions
 from src.utils.misc import list_to_int
-from src.db.queries.mapsubmissions import add_map_submission, add_map_submission_wh
+from src.db.queries.mapsubmissions import (
+    add_map_submission,
+    add_map_submission_wh,
+    get_map_submissions,
+)
+
+PAGE_ENTRIES = 50
 
 
 @src.utils.routedecos.bearer_auth
@@ -127,3 +134,55 @@ async def post(
     asyncio.create_task(send_submission_wh())
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
+
+async def get(request: web.Request) -> web.Response:
+    """
+    ---
+    description: Gets all map submissions.
+    tags:
+    - The List
+    - Expert List
+    parameters:
+    - in: query
+      name: page
+      required: false
+      schema:
+        type: integer
+      description: Pagination. Defaults to `1`.
+    - in: query
+      name: omit_rejected
+      required: false
+      schema:
+        type: boolean
+      description: Whether to omit rejected completions or not.
+    responses:
+      "200":
+        description: A list of map submissions.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                total:
+                  type: integer
+                  description: The total count of player entries.
+                pages:
+                  type: integer
+                  description: The total number of pages.
+                completions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/MapSubmission"
+    """
+    page = request.query.get("page", "1")
+    page = max(1, int(page if page.isnumeric() else "1"))
+
+    total, submissions = await get_map_submissions(
+        idx_start=PAGE_ENTRIES * (page - 1),
+        amount=PAGE_ENTRIES,
+    )
+    return web.json_response({
+        "total": total,
+        "pages": math.ceil(total/PAGE_ENTRIES),
+        "completions": [sub.to_dict() for sub in submissions],
+    })
