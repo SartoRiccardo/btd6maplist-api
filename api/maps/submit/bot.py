@@ -1,4 +1,5 @@
-import io
+import asyncio
+import http
 from aiohttp import web, FormData
 import json
 import src.http
@@ -6,8 +7,10 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission
 from src.ninjakiwi import get_btd6_map
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
+from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed
+from src.utils.misc import list_to_int
+from src.db.queries.mapsubmissions import add_map_submission, add_map_submission_wh
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
@@ -29,15 +32,21 @@ async def post(
 
     form_data = FormData()
     wh_data = {"embeds": embeds}
-    form_data.add_field("payload_json", json.dumps(wh_data))
-    for i, value in enumerate(files):
-        fname, fstream = value
-        form_data.add_field(
-            f"files[{i}]",
-            io.BytesIO(fstream),
-            filename=fname,
-            content_type="application/octet-stream",
-        )
-    resp = await src.http.http.post(hook_url, data=form_data)
+    wh_data_str = json.dumps(wh_data)
+    form_data.add_field("payload_json", wh_data_str)
 
-    return web.Response(status=resp.status)
+    async def send_webhook():
+        async with src.http.http.post(hook_url + "?wait=true", data=form_data) as resp:
+            msg_id = (await resp.json())["id"]
+            await add_map_submission_wh(json_data["code"], f"{msg_id};{wh_data_str}")
+
+    await add_map_submission(
+        json_data["code"],
+        json_data["submitter"]["id"],
+        json_data["notes"],
+        list_to_int.index(json_data["type"]),
+        json_data["proposed"],
+        f"{MEDIA_BASE_URL}/{files[0][0]}",
+    )
+    asyncio.create_task(send_webhook())
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
