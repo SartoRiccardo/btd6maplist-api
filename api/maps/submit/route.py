@@ -1,15 +1,18 @@
+import asyncio
 import http
-import io
 import aiohttp.hdrs
 from aiohttp import web, FormData
 import json
 import src.http
+from src.utils.files import save_media
 from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission
 from src.ninjakiwi import get_btd6_map
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID
+from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID, MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed, propositions
+from src.utils.misc import list_to_int
+from src.db.queries.mapsubmissions import add_map_submission, add_map_submission_wh
 
 
 @src.utils.routedecos.bearer_auth
@@ -75,16 +78,16 @@ async def post(
     discord_profile = maplist_profile["user"]
 
     embeds = []
+    data = None
     hook_url = ""
-    images = []
-    proof_ext = None
+    proof_fname = None
 
     reader = await request.multipart()
     while part := await reader.next():
         if part.name == "proof_completion":
-            # Max 2MB cause of the Application init
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            images.append((f"proof.{proof_ext}", io.BytesIO(await part.read(decode=False))))
+            file_contents = await part.read(decode=False)
+            proof_fname, _fpath = await save_media(file_contents, proof_ext)
         elif part.name == "data":
             data = await part.json()
             if len(errors := await validate_submission(data)):
@@ -98,22 +101,29 @@ async def post(
             embeds = get_mapsubm_embed(data, discord_profile, btd6_map)
             hook_url = WEBHOOK_LIST_SUBM if data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
 
-    if not (len(embeds) and len(images)):
+    if len(embeds) == 0 or data is None or proof_fname is None:
         return web.json_response(status=HTTPStatus.BAD_REQUEST)
 
-    embeds[0]["image"] = {"url": f"attachment://proof.{proof_ext}"}
+    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
 
     form_data = FormData()
     json_data = {"embeds": embeds}
-    form_data.add_field("payload_json", json.dumps(json_data))
-    for i, value in enumerate(images):
-        fname, fstream = value
-        form_data.add_field(
-            f"files[{i}]",
-            fstream,
-            filename=fname,
-            content_type="application/octet-stream",
-        )
-    resp = await src.http.http.post(hook_url, data=form_data)
+    json_data_str = json.dumps(json_data)
+    form_data.add_field("payload_json", json_data_str)
 
-    return web.Response(status=resp.status)
+    async def send_submission_wh():
+        async with src.http.http.post(hook_url + "?wait=true", data=form_data) as resp:
+            msg_id = (await resp.json())["id"]
+            await add_map_submission_wh(data["code"], f"{msg_id};{json_data_str}")
+
+    await add_map_submission(
+        data["code"],
+        maplist_profile["user"]["id"],
+        data["notes"],
+        list_to_int.index(data["type"]),
+        data["proposed"],
+        f"{MEDIA_BASE_URL}/{proof_fname}",
+    )
+    asyncio.create_task(send_submission_wh())
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+

@@ -147,3 +147,25 @@ ALTER TABLE listcomp_players ADD CONSTRAINT fk_list_completions_1
   FOREIGN KEY (run) REFERENCES list_completions(id) ON DELETE CASCADE;
 ALTER TABLE listcomp_players ADD CONSTRAINT fk_users_1
   FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+
+
+---------------------
+-- Map submissions --
+---------------------
+
+CREATE TABLE map_submissions (
+  code VARCHAR(10) NOT NULL,
+  submitter BIGINT NOT NULL,
+  subm_notes TEXT,
+  for_list INT NOT NULL, -- 0: Maplist, 1: Experts
+  proposed INT NOT NULL,
+  rejected_by BIGINT,
+  created_on TIMESTAMP DEFAULT NOW(),
+  completion_proof VARCHAR(256) NOT NULL,
+  wh_data TEXT,
+  PRIMARY KEY(code)
+);
+ALTER TABLE map_submissions ADD CONSTRAINT fk_users_1
+  FOREIGN KEY (submitter) REFERENCES users(discord_id) ON DELETE CASCADE;
+ALTER TABLE map_submissions ADD CONSTRAINT fk_users_2
+  FOREIGN KEY (rejected_by) REFERENCES users(discord_id) ON DELETE CASCADE;

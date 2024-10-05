@@ -5,6 +5,7 @@ from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .User import User, PartialUser, MaplistProfile, MaplistMedals
 from .LeaderboardEntry import LeaderboardEntry
+from .MapSubmission import MapSubmission
 
 
 swagger_definitions_str = """
@@ -68,6 +69,7 @@ entities = [
     MaplistProfile,
     LeaderboardEntry,
     MaplistMedals,
+    MapSubmission,
 ]
 for entity in entities:
     if not entity.__doc__:

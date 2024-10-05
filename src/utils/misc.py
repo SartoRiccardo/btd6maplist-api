@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+list_to_int = ["list", "experts"]
+
 
 @lru_cache()
 def point_formula(idx, points_btm, points_top, map_count, slope) -> float:
