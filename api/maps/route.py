@@ -1,12 +1,20 @@
 import asyncio
+import json
 import src.utils.routedecos
 import http
 import src.http
 import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
-from config import MAPLIST_LISTMOD_ID, MAPLIST_EXPMOD_ID
+from config import (
+    MAPLIST_LISTMOD_ID,
+    MAPLIST_EXPMOD_ID,
+    WEBHOOK_EXPLIST_SUBM,
+    WEBHOOK_LIST_SUBM,
+)
+from src.utils.embeds import ACCEPT_CLR
 from src.utils.forms import get_map_form
+from src.db.queries.mapsubmissions import get_map_submission, add_map_submission_wh
 
 
 async def get(request: web.Request):
@@ -112,6 +120,19 @@ async def post(
             status=http.HTTPStatus.BAD_REQUEST
         )
 
+    async def update_submission_wh():
+        subm = await get_map_submission(json_body["code"])
+        if subm is None or subm.wh_data is None:
+            return
+        hook_url = [WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM][subm.for_list]
+        msg_id, wh_data = subm.wh_data.split(";", 1)
+        wh_data = json.loads(wh_data)
+        wh_data["embeds"][0]["color"] = ACCEPT_CLR
+        async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
+            if resp.ok:
+                await add_map_submission_wh(json_body["code"], None)
+
     await add_map(json_body)
+    asyncio.create_task(update_submission_wh())
     asyncio.create_task(src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

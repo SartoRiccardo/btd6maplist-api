@@ -31,7 +31,7 @@ async def add_map_submission(
 @postgres
 async def add_map_submission_wh(
         code: str,
-        wh_data: str,
+        wh_data: str | None,
         conn=None,
 ) -> None:
     await conn.execute(
@@ -49,7 +49,7 @@ async def get_map_submission(
         code: str,
         conn=None,
 ) -> MapSubmission | None:
-    payload = await conn.fetchval(
+    payload = await conn.fetchrow(
         """
         SELECT
             submitter, subm_notes, for_list, proposed, rejected_by,

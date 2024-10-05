@@ -21,6 +21,8 @@ formats = {
 PENDING_CLR = 0x1e88e5
 LIST_CLR = 0x1e88e5
 EXPERTS_CLR = 0x1e88e5
+FAIL_CLR = 0xb71c1c
+ACCEPT_CLR = 0x43a047
 
 
 def get_avatar_url(discord_profile: dict) -> str:
@@ -114,7 +116,7 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
         return
     msg_id, payload = comp.subm_wh_payload.split(";", 1)
     content = json.loads(payload)
-    content["embeds"][0]["color"] = 0xb71c1c if fail else 0x43a047
+    content["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
     hook_url = WEBHOOK_LIST_RUN if 0 < comp.format <= 50 else WEBHOOK_EXPLIST_RUN
     await src.http.http.patch(hook_url + f"/messages/{msg_id}", json=content)
     await add_completion_wh_payload(comp.id, None)
