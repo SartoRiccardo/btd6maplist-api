@@ -35,5 +35,6 @@ six==1.16.0
 typing_extensions==4.12.2
 url-normalize==1.4.3
 urllib3==2.2.2
+validators==0.34.0
 wrapt==1.16.0
 yarl==1.9.4

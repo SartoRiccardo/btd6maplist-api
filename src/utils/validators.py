@@ -1,4 +1,5 @@
 import asyncio
+import validators
 from typing import Type, Any
 import re
 import src.utils.routedecos
@@ -107,9 +108,9 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
             if isdup:
                 errors[f"aliases[{i}].alias"] = "Already assigned to another map"
 
-    if body["r6_start"] and not is_link(body["r6_start"]):
+    if body["r6_start"] and not validators.url(body["r6_start"]):
         errors["r6_start"] = "Must be a URL"
-    if body["map_preview_url"] and not is_link(body["map_preview_url"]):
+    if body["map_preview_url"] and not validators.url(body["map_preview_url"]):
         errors["map_preview_url"] = "Must be a URL"
 
     if len(body["creators"]) == 0:
@@ -192,10 +193,6 @@ async def validate_submission(body: dict) -> dict:
     return errors
 
 
-def is_link(text: str) -> bool:
-    return re.match(link_re, text) is not None
-
-
 async def validate_completion_submission(body: dict) -> dict:
     check_fields_exists = {
         "format": int,
@@ -209,7 +206,7 @@ async def validate_completion_submission(body: dict) -> dict:
         return check
 
     errors = {}
-    if "video_proof_url" in body and not is_link(body["video_proof_url"]):
+    if body.get("video_proof_url", None) and not validators.url(body["video_proof_url"]):
         errors["video_proof_url"] = "Invalid video URL"
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
             "video_proof_url" not in body:
@@ -245,7 +242,7 @@ async def validate_completion(body: dict) -> dict[str, str]:
         if len(check := check_fields(body["lcc"], check_lcc_exists)):
             return check
 
-        if "proof_completion" in body["lcc"] and not is_link(body["lcc"]["proof_completion"]):
+        if "proof_completion" in body["lcc"] and not validators.url(body["lcc"]["proof_completion"]):
             errors["lcc.proof_url"] = "Must be a valid URL"
         elif 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
