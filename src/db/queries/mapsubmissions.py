@@ -78,7 +78,7 @@ async def get_map_submissions(
         idx_start: int = 0,
         amount: int = 50,
         conn=None,
-) -> list[MapSubmission]:
+) -> tuple[int, list[MapSubmission]]:
     payload = await conn.fetch(
         f"""
         SELECT
