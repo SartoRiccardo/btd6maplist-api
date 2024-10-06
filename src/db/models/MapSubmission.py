@@ -47,11 +47,11 @@ class MapSubmission:
     def to_dict(self) -> dict:
         return {
             "code": self.code,
-            "submitter": self.submitter,
+            "submitter": str(self.submitter),
             "subm_notes": self.subm_notes,
             "type": list_to_int[self.for_list],
             "proposed_diff": self.proposed_diff,
-            "rejected_by": self.rejected_by,
+            "rejected_by": str(self.rejected_by) if self.rejected_by else None,
             "completion_proof": self.completion_proof,
             "created_on": int(self.created_on.timestamp()),
         }
