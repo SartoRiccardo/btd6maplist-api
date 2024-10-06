@@ -177,12 +177,17 @@ async def get(request: web.Request) -> web.Response:
     page = request.query.get("page", "1")
     page = max(1, int(page if page.isnumeric() else "1"))
 
+    show = request.query.get("pending", "pending").lower()
+    if show not in ["pending", "all"]:
+        show = "pending"
+
     total, submissions = await get_map_submissions(
+        omit_rejected=(show == "pending"),
         idx_start=PAGE_ENTRIES * (page - 1),
         amount=PAGE_ENTRIES,
     )
     return web.json_response({
         "total": total,
         "pages": math.ceil(total/PAGE_ENTRIES),
-        "completions": [sub.to_dict() for sub in submissions],
+        "submissions": [sub.to_dict() for sub in submissions],
     })
