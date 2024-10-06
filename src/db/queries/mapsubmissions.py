@@ -110,3 +110,22 @@ async def get_map_submissions(
     ]
 
     return 0 if not len(payload) else payload[0]["total_count"], submissions
+
+
+@postgres
+async def reject_submission(
+        code: str,
+        rejector: str | int,
+        conn=None,
+) -> None:
+    if isinstance(rejector, str):
+        rejector = int(rejector)
+
+    await conn.execute(
+        """
+        UPDATE map_submissions
+        SET rejected_by=$2
+        WHERE code=$1
+        """,
+        code, rejector,
+    )
