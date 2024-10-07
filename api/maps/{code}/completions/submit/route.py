@@ -8,6 +8,7 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
+from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import (
@@ -90,7 +91,16 @@ async def post(
     if MAPLIST_BANNED_ID in maplist_profile["roles"]:
         return web.json_response(
             {"errors": {"": "You are banned from submitting..."}},
-            status=http.HTTPStatus.UNAUTHORIZED,
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
+    maplist_cfg = await get_config()
+    map_count = next(cfg for cfg in maplist_cfg if cfg.name == "map_count")
+    if resource.difficulty == -1 and \
+            resource.placement_cur not in range(1, map_count.value + 1):
+        return web.json_response(
+            {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
+            status=http.HTTPStatus.BAD_REQUEST,
         )
 
     discord_profile = maplist_profile["user"]

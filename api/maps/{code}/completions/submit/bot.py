@@ -1,5 +1,4 @@
 import http
-
 from aiohttp import web, FormData
 import asyncio
 import json
@@ -9,6 +8,7 @@ import src.utils.routedecos
 from src.utils.files import save_media
 from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
+from src.db.queries.misc import get_config
 from src.db.queries.completions import submit_run
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
 from src.utils.embeds import get_runsubm_embed, send_webhook
@@ -35,6 +35,15 @@ async def post(
     #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
     #         status=HTTPStatus.BAD_REQUEST,
     #     )
+
+    maplist_cfg = await get_config()
+    map_count = next(cfg for cfg in maplist_cfg if cfg.name == "map_count")
+    if resource.difficulty == -1 and \
+            resource.placement_cur not in range(1, map_count.value + 1):
+        return web.json_response(
+            {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
 
     discord_profile = json_data["submitter"]
     proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
