@@ -133,3 +133,18 @@ async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail:
     async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
         if resp.ok:
             await add_map_submission_wh(mapsubm.code, None)
+
+
+async def send_map_submission_webhook(hook_url: str, code: str, wh_data: dict) -> None:
+    form_data = aiohttp.FormData()
+    wh_data_str = json.dumps(wh_data)
+    form_data.add_field("payload_json", wh_data_str)
+
+    async with src.http.http.post(hook_url + "?wait=true", data=form_data) as resp:
+        msg_id = (await resp.json())["id"]
+        await add_map_submission_wh(code, f"{msg_id};{wh_data_str}")
+
+
+async def delete_map_submission_webhook(hook_url: str, msg_id: str) -> None:
+    async with src.http.http.delete(hook_url + f"/messages/{msg_id}") as _r:
+        pass

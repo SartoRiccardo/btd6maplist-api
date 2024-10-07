@@ -14,18 +14,35 @@ async def add_map_submission(
         for_list: int,
         proposed: int,
         completion_proof: str,
+        edit: bool = False,
         conn=None,
 ) -> None:
     if isinstance(submitter, str):
         submitter = int(submitter)
-    await conn.execute(
-        """
-        INSERT INTO map_submissions
-            (code, submitter, subm_notes, for_list, proposed, completion_proof)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        """,
-        code, submitter, subm_notes, for_list, proposed, completion_proof,
-    )
+
+    if edit:
+        await conn.execute(
+            """
+            UPDATE map_submissions
+            SET
+                subm_notes=$2,
+                for_list=$3,
+                proposed=$4,
+                completion_proof=$5,
+                created_on=CURRENT_TIMESTAMP
+            WHERE code=$1
+            """,
+            code, subm_notes, for_list, proposed, completion_proof,
+        )
+    else:
+        await conn.execute(
+            """
+            INSERT INTO map_submissions
+                (code, submitter, subm_notes, for_list, proposed, completion_proof)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            """,
+            code, submitter, subm_notes, for_list, proposed, completion_proof,
+        )
 
 
 @postgres

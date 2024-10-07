@@ -1,16 +1,14 @@
 import asyncio
 import http
-from aiohttp import web, FormData
-import json
-import src.http
+from aiohttp import web
 from http import HTTPStatus
 import src.utils.routedecos
-from src.utils.validators import validate_submission
+from src.utils.validators import validate_submission, check_prev_map_submission
 from src.ninjakiwi import get_btd6_map
 from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
-from src.utils.embeds import get_mapsubm_embed
+from src.utils.embeds import get_mapsubm_embed, send_map_submission_webhook, delete_map_submission_webhook
 from src.utils.misc import list_to_int
-from src.db.queries.mapsubmissions import add_map_submission, add_map_submission_wh
+from src.db.queries.mapsubmissions import add_map_submission
 from src.utils.files import save_media
 
 
@@ -31,16 +29,11 @@ async def post(
     embeds = get_mapsubm_embed(json_data, json_data["submitter"], btd6_map)
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
-
-    form_data = FormData()
     wh_data = {"embeds": embeds}
-    wh_data_str = json.dumps(wh_data)
-    form_data.add_field("payload_json", wh_data_str)
 
-    async def send_webhook():
-        async with src.http.http.post(hook_url + "?wait=true", data=form_data) as resp:
-            msg_id = (await resp.json())["id"]
-            await add_map_submission_wh(json_data["code"], f"{msg_id};{wh_data_str}")
+    prev_submission = await check_prev_map_submission(json_data["code"], json_data["submitter"]["id"])
+    if isinstance(prev_submission, web.Response):
+        return prev_submission
 
     await add_map_submission(
         json_data["code"],
@@ -49,6 +42,14 @@ async def post(
         list_to_int.index(json_data["type"]),
         json_data["proposed"],
         f"{MEDIA_BASE_URL}/{proof_fname}",
+        edit=(prev_submission is not None),
     )
-    asyncio.create_task(send_webhook())
+
+    async def update_wh():
+        if prev_submission and prev_submission.wh_data:
+            old_hook_url = WEBHOOK_LIST_SUBM if prev_submission.for_list == 0 else WEBHOOK_EXPLIST_SUBM
+            await delete_map_submission_webhook(old_hook_url, prev_submission.wh_data.split(";")[0])
+        await send_map_submission_webhook(hook_url, json_data["code"], wh_data)
+
+    asyncio.create_task(update_wh())
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
