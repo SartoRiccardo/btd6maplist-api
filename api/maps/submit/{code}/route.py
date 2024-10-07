@@ -1,14 +1,12 @@
 import asyncio
-import json
 from aiohttp import web
 import http
 import src.log
 import src.http
-from src.db.queries.mapsubmissions import reject_submission, get_map_submission, add_map_submission_wh
+from src.db.queries.mapsubmissions import reject_submission, get_map_submission
 from src.utils.forms import get_map_form
-from src.utils.embeds import FAIL_CLR
+from src.utils.embeds import update_map_submission_wh
 import src.utils.routedecos
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
 
 
 @src.utils.routedecos.bearer_auth
@@ -47,17 +45,6 @@ async def delete(
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
     code = request.match_info["code"]
 
-    async def update_submission_wh():
-        if resource.wh_data is None:
-            return
-        hook_url = [WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM][resource.for_list]
-        msg_id, wh_data = resource.wh_data.split(";", 1)
-        wh_data = json.loads(wh_data)
-        wh_data["embeds"][0]["color"] = FAIL_CLR
-        async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
-            if resp.ok:
-                await add_map_submission_wh(code, None)
-
     await reject_submission(code, maplist_profile["user"]["id"])
-    asyncio.create_task(update_submission_wh())
+    asyncio.create_task(update_map_submission_wh(resource, fail=True))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

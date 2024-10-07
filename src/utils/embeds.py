@@ -1,10 +1,11 @@
 import json
 import aiohttp
 from src.db.queries.completions import add_completion_wh_payload
+from src.db.queries.mapsubmissions import add_map_submission_wh
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
 import src.http
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN
+from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
 
 propositions = {
     "list": ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
@@ -120,3 +121,15 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
     hook_url = WEBHOOK_LIST_RUN if 0 < comp.format <= 50 else WEBHOOK_EXPLIST_RUN
     await src.http.http.patch(hook_url + f"/messages/{msg_id}", json=content)
     await add_completion_wh_payload(comp.id, None)
+
+
+async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail: bool = False):
+    if mapsubm.wh_data is None:
+        return
+    hook_url = [WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM][mapsubm.for_list]
+    msg_id, wh_data = mapsubm.wh_data.split(";", 1)
+    wh_data = json.loads(wh_data)
+    wh_data["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
+    async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
+        if resp.ok:
+            await add_map_submission_wh(mapsubm.code, None)
