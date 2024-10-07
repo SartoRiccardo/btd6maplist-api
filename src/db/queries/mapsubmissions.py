@@ -64,15 +64,18 @@ async def add_map_submission_wh(
 @postgres
 async def get_map_submission(
         code: str,
+        not_deleted: bool = True,
         conn=None,
 ) -> MapSubmission | None:
     payload = await conn.fetchrow(
-        """
+        f"""
         SELECT
             submitter, subm_notes, for_list, proposed, rejected_by,
             created_on, completion_proof, wh_data 
         FROM map_submissions
         WHERE code=$1
+            {"AND rejected_by IS NULL" if not_deleted else ""}
+        ORDER BY created_on DESC
         """,
         code,
     )

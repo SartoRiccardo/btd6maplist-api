@@ -162,9 +162,11 @@ CREATE TABLE map_submissions (
   rejected_by BIGINT,
   created_on TIMESTAMP DEFAULT NOW(),
   completion_proof VARCHAR(256) NOT NULL,
-  wh_data TEXT,
-  PRIMARY KEY(code)
+  wh_data TEXT
 );
+CREATE UNIQUE INDEX map_submissions_uq_code
+  ON map_submissions (code)
+  WHERE rejected_by IS NULL;
 ALTER TABLE map_submissions ADD CONSTRAINT fk_users_1
   FOREIGN KEY (submitter) REFERENCES users(discord_id) ON DELETE CASCADE;
 ALTER TABLE map_submissions ADD CONSTRAINT fk_users_2
