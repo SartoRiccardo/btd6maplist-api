@@ -90,6 +90,7 @@ async def get_map_submissions(
             on ms.code = m.code
         WHERE m.code IS NULL
             {"AND ms.rejected_by IS NULL" if omit_rejected else ""}
+        ORDER BY ms.created_on DESC
         LIMIT $1
         OFFSET $2
         """,
