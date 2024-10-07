@@ -11,6 +11,7 @@ from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed
 from src.utils.misc import list_to_int
 from src.db.queries.mapsubmissions import add_map_submission, add_map_submission_wh
+from src.utils.files import save_media
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
@@ -25,10 +26,11 @@ async def post(
     if not (btd6_map := await get_btd6_map(json_data["code"])):
         return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
+    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
     hook_url = WEBHOOK_LIST_SUBM if json_data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
     embeds = get_mapsubm_embed(json_data, json_data["submitter"], btd6_map)
 
-    embeds[0]["image"] = {"url": f"attachment://{files[0][0]}"}
+    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
 
     form_data = FormData()
     wh_data = {"embeds": embeds}
@@ -46,7 +48,7 @@ async def post(
         json_data["notes"],
         list_to_int.index(json_data["type"]),
         json_data["proposed"],
-        f"{MEDIA_BASE_URL}/{files[0][0]}",
+        f"{MEDIA_BASE_URL}/{proof_fname}",
     )
     asyncio.create_task(send_webhook())
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
