@@ -25,14 +25,19 @@ async def get_submission(
 
     proof_ext = None
     file_contents = None
+    subm_proof = None
     data = None
 
     reader = await request.multipart()
     while part := await reader.next():
         if part.name == "proof_completion":
-            # Max 2MB cause of the Application init
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
+
+        if part.name == "submission_proof":
+            ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+            proof_fname, _fp = await save_media(await part.read(decode=False), ext)
+            subm_proof = f"{MEDIA_BASE_URL}/{proof_fname}"
 
         elif part.name == "data":
             data = await part.json()
@@ -70,10 +75,12 @@ async def get_submission(
             }, status=http.HTTPStatus.BAD_REQUEST)
 
         if "proof_completion" not in data["lcc"]:
-            proof_fname, fpath = await save_media(file_contents, proof_ext, prefix="proof_")
+            proof_fname, fpath = await save_media(file_contents, proof_ext)
             data["lcc"]["proof"] = f"{MEDIA_BASE_URL}/{proof_fname}"
         else:
             data["lcc"]["proof"] = data["lcc"]["proof_completion"]
+
+    data["subm_proof"] = subm_proof
 
     return data
 
