@@ -452,3 +452,33 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         )
         for row in payload
     ]
+
+
+@postgres
+async def transfer_all_completions(
+        from_code: str,
+        to_code: str,
+        transfer_list_comps: bool = False,
+        transfer_explist_comps: bool = False,
+        conn=None
+) -> None:
+    if not transfer_list_comps and not transfer_explist_comps:
+        return
+
+    transfer_range = ""
+    if transfer_explist_comps and not transfer_list_comps:
+        transfer_range = "AND format BETWEEN 51 AND 100"
+    elif not transfer_explist_comps and transfer_list_comps:
+        transfer_range = "AND format BETWEEN 1 AND 50"
+
+    await conn.execute(
+        f"""
+        UPDATE list_completions
+        SET map=$2
+        WHERE map=$1
+            AND deleted_on IS NULL
+            AND new_version IS NULL
+            {transfer_range}
+        """,
+        from_code, to_code
+    )
