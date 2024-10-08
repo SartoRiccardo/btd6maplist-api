@@ -70,13 +70,13 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
     if code.isnumeric():  # Current version index
         placement_union = """
             UNION
-            SELECT m.* FROM maps m WHERE m.placement_curver = $1::int
+            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_curver = $1::int
         """
     elif code.startswith("@") and code[1:].isnumeric():  # All versions idx
         code = code[1:]
         placement_union = """
             UNION
-            SELECT m.* FROM maps m WHERE m.placement_allver = $1::int
+            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_allver = $1::int
         """
 
     payload = await conn.fetch(
@@ -95,17 +95,43 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         possible_map AS (
             SELECT *
             FROM (
-                SELECT m.* FROM maps m WHERE m.code = $1
+                SELECT 1 AS ord, m.*
+                FROM maps m
+                WHERE m.code = $1
+                
                 UNION
-                SELECT m.* FROM maps m WHERE LOWER(m.name) = LOWER($1)
+                
+                SELECT 2 AS ord, m.*
+                FROM maps m
+                WHERE LOWER(m.name) = LOWER($1)
+                    AND m.deleted_on IS NULL
+                    AND m.new_version IS NULL
+                
                 UNION
-                SELECT m.*
+                
+                SELECT 3 AS ord, m.*
                 FROM maps m
                 JOIN map_aliases a
                     ON m.id = a.map
                 WHERE LOWER(a.alias) = LOWER($1)
+                    OR LOWER(a.alias) = LOWER($2)
+                
                 {placement_union}
+                
+                UNION
+
+                (
+                    SELECT 6 AS ord, m.*
+                    FROM maps m
+                    WHERE LOWER(m.name) = LOWER($1)
+                        AND (
+                            m.deleted_on IS NOT NULL
+                            OR m.new_version IS NOT NULL
+                        )
+                    ORDER BY m.created_on DESC
+                )
             ) possible
+            ORDER BY ord
             LIMIT 1
         )
         SELECT
@@ -116,7 +142,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         LEFT JOIN verified_maps v
             ON v.map = m.id
         """,
-        code,
+        code, code.replace(" ", "_")
     )
     if len(payload) == 0:
         return None
@@ -328,7 +354,18 @@ async def map_exists(code, conn=None) -> bool:
 
 @postgres
 async def alias_exists(alias, conn=None) -> bool:
-    result = await conn.execute("SELECT alias FROM map_aliases WHERE alias=$1", alias)
+    result = await conn.execute(
+        """
+        SELECT al.alias
+        FROM map_aliases al
+        JOIN maps m
+            ON m.id = al.map
+        WHERE al.alias=$1
+            AND m.deleted_on IS NULL
+            AND m.new_version IS NULL
+        """,
+        alias,
+    )
     return int(result[len("SELECT "):]) > 0
 
 
@@ -369,6 +406,15 @@ async def insert_map_relations(map_id: int, map_data: dict, conn=None) -> None:
             (map_id, obj["version"], obj["status"])
             for obj in map_data["version_compatibilities"]
         ]
+    )
+
+    await conn.execute(
+        """
+        DELETE FROM map_aliases al
+        USING maps m
+        WHERE al.alias = ANY($1::VARCHAR(20)[])
+        """,
+        map_data["aliases"],
     )
     await conn.executemany(
         "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",

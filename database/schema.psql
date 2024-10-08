@@ -55,7 +55,7 @@ ALTER TABLE maps ADD CONSTRAINT fk_maps_1
 
 CREATE TABLE map_aliases (
   map INT NOT NULL,
-  alias VARCHAR(20) NOT NULL,
+  alias VARCHAR(255) NOT NULL,
   PRIMARY KEY(alias)
 );
 ALTER TABLE map_aliases ADD CONSTRAINT fk_maps_1
