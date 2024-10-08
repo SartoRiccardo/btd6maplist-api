@@ -1,5 +1,6 @@
 import src.db.connection
 from src.db.models import LeaderboardEntry, PartialUser
+from typing import Literal
 postgres = src.db.connection.postgres
 
 
@@ -19,12 +20,17 @@ def get_lb_list(payload) -> tuple[list[LeaderboardEntry], int]:
 
 @postgres
 async def get_maplist_leaderboard(
-        idx_start=0,
-        amount=50,
-        curver=True,
-        conn=None
+        idx_start: int = 0,
+        amount: int = 50,
+        format: Literal["current", "all", "experts"] = True,
+        conn=None,
 ) -> tuple[list[LeaderboardEntry], int]:
-    lb_view = "list_curver_leaderboard" if curver else "list_allver_leaderboard"
+    lb_view = "list_curver_leaderboard"
+    if format == "all":
+        lb_view = "list_allver_leaderboard"
+    elif format == "experts":
+        lb_view = "experts_leaderboard"
+
     payload = await conn.fetch(
         f"""
         SELECT
@@ -45,10 +51,15 @@ async def get_maplist_leaderboard(
 
 @postgres
 async def get_maplist_lcc_leaderboard(
-        curver=True,
+        format: Literal["current", "all", "experts"] = True,
         conn=None
 ) -> tuple[list[LeaderboardEntry], int]:
-    lb_view = "list_curver_lcclb" if curver else "list_allver_lcclb"
+    lb_view = "list_curver_lcclb"
+    if format == "all":
+        lb_view = "list_allver_lcclb"
+    elif format == "experts":
+        lb_view = "experts_lcc_leaderboard"
+
     payload = await conn.fetch(
         f"""
         SELECT

@@ -218,3 +218,74 @@ leaderboard AS (
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
 FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
+
+
+---------------------
+-- Expert List LBs --
+---------------------
+
+CREATE OR REPLACE VIEW experts_leaderboard AS
+WITH diff_points AS (
+    SELECT *
+    FROM (
+        VALUES
+            (0, (SELECT value::int FROM config WHERE name='exp_points_casual')),
+            (1, (SELECT value::int FROM config WHERE name='exp_points_medium')),
+            (2, (SELECT value::int FROM config WHERE name='exp_points_high')),
+            (3, (SELECT value::int FROM config WHERE name='exp_points_true')),
+            (4, (SELECT value::int FROM config WHERE name='exp_points_extreme'))
+    ) AS points_values (difficulty, points)
+),
+expert_maps AS (
+    SELECT m.code, p.points
+    FROM maps m
+    JOIN diff_points p
+        ON m.difficulty = p.difficulty
+        AND m.deleted_on IS NULL
+        AND m.new_version IS NULL
+),
+completion_points AS (
+    SELECT DISTINCT lc.map, ply.user_id
+    FROM list_completions lc
+    JOIN listcomp_players ply
+        ON lc.id = ply.run
+    WHERE lc.format BETWEEN 51 AND 100
+        OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+        AND lc.accepted_by IS NOT NULL
+        AND lc.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT cp.user_id, SUM(m.points) AS score
+    FROM completion_points cp
+    JOIN expert_maps m
+        ON m.code = cp.map
+    GROUP BY (cp.user_id)
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+
+CREATE OR REPLACE VIEW experts_lcc_leaderboard AS
+WITH leaderboard AS (
+    SELECT lcp.user_id, COUNT(lcp.user_id) AS score
+    FROM lccs_by_map lccs
+    JOIN list_completions r
+        ON r.lcc = lccs.id
+    JOIN maps m
+        ON r.map = m.code
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE m.difficulty >= 0
+        AND (
+            lccs.format BETWEEN 51 AND 100
+            OR lccs.format = 1
+        )
+        AND m.deleted_on IS NULL
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+    GROUP BY lcp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;

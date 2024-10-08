@@ -15,8 +15,11 @@ ALTER TABLE config ADD CONSTRAINT fk_config_1
 INSERT INTO config (name, value, type) VALUES
 ('points_top_map', '100', 'float'), ('points_bottom_map', '5', 'float'), ('formula_slope', '0.88', 'float'),
 ('points_extra_lcc', '20', 'float'), ('points_multi_gerry', '2', 'float'), ('points_multi_bb', '3', 'float'),
-('decimal_digits', '0', 'int'), ('map_count', '50', 'int'), ('current_btd6_ver', '441', 'int');
-ALTER SEQUENCE config_id_seq RESTART WITH 10;
+('decimal_digits', '0', 'int'), ('map_count', '50', 'int'), ('current_btd6_ver', '441', 'int'),
+
+('exp_points_casual', '1', 'int'), ('exp_points_medium', '2', 'int'), ('exp_points_high', '3', 'int'),
+('exp_points_true', '4', 'int'), ('exp_points_extreme', '5', 'int');
+ALTER SEQUENCE config_id_seq RESTART WITH 15;
 
 CREATE TABLE users (
   discord_id BIGINT NOT NULL,  -- IDs below 1000 are manual, non-Discord IDs.
