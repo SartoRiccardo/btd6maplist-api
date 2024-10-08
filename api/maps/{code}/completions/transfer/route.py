@@ -34,7 +34,7 @@ async def put(
         resource: "src.db.models.PartialMap" = None,
         maplist_profile: dict = None,
         is_explist_mod: bool = False,
-        is_maplist_mod: bool = False,
+        is_list_mod: bool = False,
         json_body: dict = None,
         **_kwargs,
 ) -> web.Response:
@@ -84,7 +84,7 @@ async def put(
     await transfer_all_completions(
         resource.code,
         json_body["code"],
-        transfer_list_comps=is_maplist_mod,
+        transfer_list_comps=is_list_mod,
         transfer_explist_comps=is_explist_mod,
     )
     asyncio.create_task(
