@@ -141,8 +141,8 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
         else:
             body["verifiers"][i]["id"] = str(usr.id)
 
-    if not (-1 <= body["difficulty"] <= 3):
-        errors["difficulty"] = "Must be between -1 and 3, included"
+    if not (-1 <= body["difficulty"] <= 4):
+        errors["difficulty"] = "Must be between -1 and 4, included"
     elif body["difficulty"] <= body["placement_curver"] <= body["placement_allver"] < 0:
         errors["placement_allver"] = "At least one of these should be set"
         errors["placement_curver"] = "At least one of these should be set"

@@ -24,13 +24,14 @@ MaplistFormat:
 
 ExpertDifficulty:
   type: int
-  enum: [-1, 0, 1, 2, 3]
+  enum: [-1, 0, 1, 2, 3, 4]
   description: >
     The Expert difficulty. If none, it's set to `-1`.\\n
     * `0` - Casual Expert.\\n
     * `1` - Medium Expert.\\n
     * `2` - High Expert.\\n
-    * `3` - True Expert.
+    * `3` - True Expert.\\n
+    * `4` - Extreme Expert.
 
 MapVersionCompatibility:
   type: int
