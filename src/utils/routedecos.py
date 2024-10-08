@@ -142,7 +142,7 @@ def require_perms(
 
             is_admin = any([role in MAPLIST_ADMIN_IDS for role in mp["roles"]])
             is_explist_mod = is_admin or MAPLIST_EXPMOD_ID in mp["roles"]
-            is_list_mod = is_admin or MAPLIST_LISTMOD_ID not in mp["roles"]
+            is_list_mod = is_admin or MAPLIST_LISTMOD_ID in mp["roles"]
 
             if not (is_admin or is_explist_mod or is_list_mod):
                 return web.json_response(
