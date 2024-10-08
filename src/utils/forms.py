@@ -45,15 +45,20 @@ async def get_submission(
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
             is_admin = any([role in MAPLIST_ADMIN_IDS for role in maplist_profile["roles"]])
-            if resource is not None and not is_admin:
-                if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and \
-                        (1 <= resource.format <= 50 or 1 <= data["format"] <= 50):
+            is_expmod = MAPLIST_EXPMOD_ID in maplist_profile["roles"]
+            is_listmod = MAPLIST_LISTMOD_ID in maplist_profile["roles"]
+            if not is_admin:
+                if not is_listmod and (
+                        1 <= data["format"] <= 50 or
+                        resource and 1 <= resource.format <= 50):
                     return web.json_response(
                         {"errors": {"format": "You must be a Maplist Moderator"}},
                         status=http.HTTPStatus.UNAUTHORIZED,
                     )
-                if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and \
-                        (51 <= resource.format <= 100 or 51 <= data["format"] <= 100):
+
+                if not is_expmod and (
+                        50 <= data["format"] <= 100 or
+                        resource and 51 <= resource.format <= 100):
                     return web.json_response(
                         {"errors": {"format": "You must be an Expert List Moderator"}},
                         status=http.HTTPStatus.UNAUTHORIZED,
