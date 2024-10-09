@@ -61,7 +61,7 @@ async def update_schema(conn=None):
     updates = sorted(os.listdir(patches_path))
     for upd in updates:
         upd_day, _ = upd.split("-", 1)
-        upd_day = int(upd_day)
+        upd_day = int(upd_day.replace("_", ""))
         if upd_day <= last_update:
             continue
         patch_path = os.path.join(patches_path, upd)
