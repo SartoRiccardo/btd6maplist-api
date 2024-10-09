@@ -25,7 +25,7 @@ async def init_client_session(_app):
         expire_after=0,
         urls_expire_after={
             "data.ninjakiwi.com": 3600*24,
-            "discord.com": 60*3,
+            "discord.com": 60*60,
         },
         include_headers=True,
     )
