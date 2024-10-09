@@ -223,7 +223,7 @@ def check_bot_signature(
     Otherwise, checks also the body and adds `files: list[tuple[str, bytes]]` and
     `json_data: dict` to kwargs.
 
-    Returns 401 if the signature doesn't match.
+    Returns 403 if the signature doesn't match.
 
     Bot usually routes assume most data is already validated by the bot.
     :param files: List of valid filenames, in order.
@@ -251,7 +251,7 @@ def check_bot_signature(
                 try:
                     _check_signature(signature, message)
                 except cryptography.exceptions.InvalidSignature:
-                    return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+                    return web.Response(status=http.HTTPStatus.FORBIDDEN)
                 return await handler(request, *args, **kwargs)
 
             req_files: list[tuple[str, bytes] | None] = [None for _ in range(len(files))]
@@ -282,7 +282,7 @@ def check_bot_signature(
                 _check_signature(signature, message)
                 json_data = json.loads(req_data["data"])
             except cryptography.exceptions.InvalidSignature:
-                return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
+                return web.Response(status=http.HTTPStatus.FORBIDDEN)
             except json.JSONDecodeError:
                 return web.Response(status=http.HTTPStatus.BAD_REQUEST)
 
