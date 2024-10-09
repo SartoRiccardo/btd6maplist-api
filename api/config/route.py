@@ -5,6 +5,23 @@ from src.db.queries.misc import get_config, update_config
 import src.utils.routedecos
 import src.log
 
+var_perms = {
+    "points_top_map": (True, False),
+    "points_bottom_map": (True, False),
+    "formula_slope": (True, False),
+    "points_extra_lcc": (True, False),
+    "points_multi_gerry": (True, False),
+    "points_multi_bb": (True, False),
+    "decimal_digits": (True, False),
+    "map_count": (True, False),
+    "current_btd6_ver": (True, True),
+    "exp_points_casual": (False, True),
+    "exp_points_medium": (False, True),
+    "exp_points_high": (False, True),
+    "exp_points_true": (False, True),
+    "exp_points_extreme": (False, True),
+}
+
 
 async def get(_r: web.Request):
     """
@@ -29,12 +46,8 @@ async def put_validate(body: dict) -> dict:
     if "config" not in body:
         return {"": "Missing config"}
 
-    allowed_keys = [
-        "points_top_map", "points_bottom_map", "formula_slope", "points_extra_lcc", "points_multi_gerry",
-        "points_multi_bb", "decimal_digits", "map_count", "current_btd6_ver"
-    ]
     for key in body["config"]:
-        if key not in allowed_keys:
+        if key not in var_perms:
             return {"": f"Found wrong key \"{key}\""}
 
     errors = {}
@@ -52,11 +65,21 @@ async def put_validate(body: dict) -> dict:
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_json_body(put_validate)
 @src.utils.routedecos.with_maplist_profile
-@src.utils.routedecos.require_perms(explist_admin=False)
-async def put(_r: web.Request, json_body: dict = None, maplist_profile: dict = None, **_kwargs):
+@src.utils.routedecos.require_perms()
+async def put(
+        _r: web.Request,
+        json_body: dict = None,
+        maplist_profile: dict = None,
+        is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
+        **_kwargs
+):
     """
     ---
-    description: Change any number of the config variables. Must be a Maplist Moderator.
+    description: |
+      Change any number of the config variables. Certain roles have access to change different variables.
+      Must be a Maplist or Expert List Moderator. Changes to variables you don't have access to will be ignored.
     tags:
     - Misc
     requestBody:
@@ -103,6 +126,14 @@ async def put(_r: web.Request, json_body: dict = None, maplist_profile: dict = N
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
+    if not is_admin:
+        cvar_keys = list(json_body["config"].keys())
+        for key in cvar_keys:
+            check_ml_mod, check_exp_mod = var_perms[key]
+            if not (check_ml_mod and is_maplist_mod) and \
+                    not (check_exp_mod and is_explist_mod):
+                del json_body["config"][key]
+
     await update_config(json_body["config"])
     asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], maplist_profile["user"]["id"]))
     return web.json_response({"errors": {}, "data": json_body["config"]})
