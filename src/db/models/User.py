@@ -29,10 +29,18 @@ class PartialUser:
               Whether the user has already been notified there are rules
               to submissions.
     """
-    id: id
+    id: int
     name: str
     oak: str | None
     has_seen_popup: bool
+
+    def __eq__(self, other):
+        if isinstance(other, PartialUser):
+            return self.id == other.id and self.name == other.name
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(f"{self.id}//{self.name}")
 
     def to_dict(self, profile: bool = False) -> dict:
         extra_fields = {}

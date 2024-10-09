@@ -75,7 +75,6 @@ def get_runsubm_embed(
     embeds = [
         {
             "title": f"{resource.name}",
-            #  "url": f"https://join.btd6.com/Map/{resource.code}",  URL to run acceptance
             "author": {
                 "name": discord_profile["username"],
                 "icon_url": get_avatar_url(discord_profile),

@@ -10,11 +10,14 @@ from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.misc import get_config
 from src.db.queries.completions import submit_run
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL
+from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL, WEB_BASE_URL
 from src.utils.embeds import get_runsubm_embed, send_webhook
 
+MAX_FILES = 4
+compl_files = [f"proof_completion[{n}]" for n in range(MAX_FILES)]
 
-@src.utils.routedecos.check_bot_signature(files=["proof_completion"], path_params=["code"])
+
+@src.utils.routedecos.check_bot_signature(files=compl_files, path_params=["code"])
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         _r: web.Request,
@@ -46,14 +49,20 @@ async def post(
         )
 
     discord_profile = json_data["submitter"]
-    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
+    proofs_finfo = await asyncio.gather(*[
+        save_media(file[1], file[0].split(".")[-1])
+        for file in files
+        if file is not None
+    ])
 
     lcc_data = None
     if json_data["current_lcc"]:
         lcc_data = {
-            "proof": f"{MEDIA_BASE_URL}/{proof_fname}",
+            "proof": f"{MEDIA_BASE_URL}/{proofs_finfo[0]}",
             "leftover": json_data["leftover"],
         }
+
+    proof_urls = [f"{MEDIA_BASE_URL}/{fname}" for fname, _fp in proofs_finfo]
     run_id = await submit_run(
         resource.code,
         json_data["black_border"],
@@ -61,18 +70,34 @@ async def post(
         json_data["format"],
         lcc_data,  # leftover, proof
         int(discord_profile["id"]),
-        f"{MEDIA_BASE_URL}/{proof_fname}",
+        proof_urls,
         json_data["video_proof_url"],
         json_data["notes"],
     )
 
     embeds = get_runsubm_embed(json_data, discord_profile, resource)
-    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
+    embeds[0]["url"] = f"{WEB_BASE_URL}/completions/{run_id}"
+    embeds[0]["image"] = {"url": proof_urls[0]}
     embeds[0]["footer"] = {"text": f"Run No.{run_id}"}
+    for i in range(1, len(proof_urls)):
+        embeds.append({
+            "url": embeds[0]["url"],
+            "image": {"url": proof_urls[i]},
+        })
+
+    if len(json_data["video_proof_url"]):
+        embeds[0]["fields"].append({
+            "name": "Video Proof URL" + ("" if len(json_data["video_proof_url"]) == 1 else "s"),
+            "value": json_data['video_proof_url'][0] if len(json_data["video_proof_url"]) == 1 else \
+                ("- " + "\n- ".join(json_data["video_proof_url"])),
+            "inline": False,
+        })
+    if len(json_data["video_proof_url"]) == 1:
+        embeds[0]["content"] = f"__Video Proof: {json_data['video_proof_url'][0]}__".replace("@", "")
+    elif len(json_data["video_proof_url"]) > 1:
+        embeds[0]["content"] = f"Video Proofs: {json_data['video_proof_url'][0]}__".replace("@", "")
 
     msg_data = {"embeds": embeds}
-    if json_data.get("video_proof_url", None):
-        msg_data["content"] = f"__Video Proof: {json_data['video_proof_url']}__".replace("@", "")
 
     form_data = FormData()
     payload_json = json.dumps(msg_data)

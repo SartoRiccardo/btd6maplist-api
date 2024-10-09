@@ -17,6 +17,20 @@ def list_eq(l1, l2) -> bool:
     return True
 
 
+def list_rm_dupe(lst: list | None, preserve_order: bool = True) -> list:
+    if lst is None:
+        return []
+
+    if not preserve_order:
+        return list(set(lst))
+
+    unique = []
+    for item in lst:
+        if item not in unique:
+            unique.append(item)
+    return unique
+
+
 def index_where(l: list, cond) -> int:
     for i in range(len(l)):
         if cond(l[i]):

@@ -1,3 +1,4 @@
+import re
 import asyncio
 import http
 import aiohttp.hdrs
@@ -17,8 +18,11 @@ from config import (
     MEDIA_BASE_URL,
     MAPLIST_BANNED_ID,
     MAPLIST_NEEDSREC_ID,
+    WEB_BASE_URL,
 )
 from src.utils.embeds import get_runsubm_embed, send_webhook
+
+MAX_FILES = 4
 
 
 @src.utils.routedecos.bearer_auth
@@ -60,11 +64,12 @@ async def post(
                 type: boolean
                 description: Whether the run is a LCC attempt.
               video_proof_url:
-                type: string
+                type: array
+                items:
+                  type: string
                 description: |
                   URL to video proof of you beating some hard rounds.
                   Can be omitted if not needed.
-                nullable: true
               leftover:
                 type: integer
                 description: |
@@ -109,15 +114,27 @@ async def post(
     hook_url = ""
     description = None
     data = None
-    proof_fname = None
+    proof_fnames: list[str | None] = [None for _ in range(MAX_FILES)]
 
     reader = await request.multipart()
     while part := await reader.next():
-        if part.name == "proof_completion":
-            # Max 3MB cause of the Application init
+        if match := re.match(r"proof_completion\[(\d+)]", part.name):
+            findex = int(match.group(1))
+            if findex >= MAX_FILES:
+                return web.json_response(
+                    {"errors": {[part.name]: f"Can upload max {MAX_FILES} files, Found index {findex}"}},
+                    status=HTTPStatus.BAD_REQUEST
+                )
+            if proof_fnames[findex] is not None:
+                return web.json_response(
+                    {"errors": {[part.name]: "Duplicate index"}},
+                    status=HTTPStatus.BAD_REQUEST
+                )
+
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
-            proof_fname, _fpath = await save_media(file_contents, proof_ext)
+            fname, _fpath = await save_media(file_contents, proof_ext)
+            proof_fnames[findex] = f"{MEDIA_BASE_URL}/{fname}"
 
         elif part.name == "data":
             data = await part.json()
@@ -145,19 +162,17 @@ async def post(
             #     )
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
 
-    if not (len(embeds) and proof_fname):
+    proof_fnames = [url for url in proof_fnames if url is not None]
+    if not (len(embeds) and len(proof_fnames)):
         return web.json_response(status=HTTPStatus.BAD_REQUEST)
-
-    form_data = FormData()
-
-    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
 
     lcc_data = None
     if data["current_lcc"]:
         lcc_data = {
-            "proof": f"{MEDIA_BASE_URL}/{proof_fname}",
+            "proof": proof_fnames[0],
             "leftover": data["leftover"],
         }
+
     run_id = await submit_run(
         resource.code,
         data["black_border"],
@@ -165,11 +180,21 @@ async def post(
         data["format"],
         lcc_data,  # leftover, proof
         int(discord_profile['id']),
-        f"{MEDIA_BASE_URL}/{proof_fname}",
-        data.get("video_proof_url", None),
+        proof_fnames,
+        data["video_proof_url"],
         data["notes"],
     )
+
+    embeds[0]["url"] = f"{WEB_BASE_URL}/completions/{run_id}"
+    embeds[0]["image"] = {"url": proof_fnames[0]}
     embeds[0]["footer"] = {"text": f"Run No.{run_id}"}
+    for i in range(1, len(proof_fnames)):
+        embeds.append({
+            "url": embeds[0]["url"],
+            "image": {"url": proof_fnames[i]},
+        })
+
+    form_data = FormData()
 
     json_data = {"embeds": embeds}
     if description:

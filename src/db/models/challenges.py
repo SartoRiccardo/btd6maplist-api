@@ -62,6 +62,20 @@ class ListCompletion:
         description: "`true` if the run is the current LCC for the map."
       format:
         $ref: "#/components/schemas/MaplistFormat"
+      subm_proof_img:
+        type: array
+        items:
+          type: string
+        description: URL to the proof images used when submitting.
+      subm_proof_vid:
+        type: array
+        items:
+          type: string
+        description: URL to the proof images used when submitting.
+      subm_notes:
+        type: string
+        nullable: true
+        description: Notes the user put when submitting.
     ---
     ListCompletionWithMap:
       allOf:
@@ -79,8 +93,8 @@ class ListCompletion:
     current_lcc: bool
     format: int
     lcc: LCC | None
-    subm_proof_img: str | None
-    subm_proof_vid: str | None
+    subm_proof_img: list[str]
+    subm_proof_vid: list[str]
     subm_notes: str | None
 
     def to_dict(self) -> dict:
@@ -96,8 +110,8 @@ class ListCompletion:
             "current_lcc": self.current_lcc,
             "lcc": self.lcc.to_dict() if self.lcc else None,
             "format": self.format,
-            "subm_proof_img": self.subm_proof_img,
-            "subm_proof_vid": self.subm_proof_vid,
+            "subm_proof_img": self.subm_proof_img if self.subm_proof_img else [],
+            "subm_proof_vid": self.subm_proof_vid if self.subm_proof_vid else [],
         }
 
 
@@ -121,18 +135,6 @@ class ListCompletionWithMeta(ListCompletion):
           nullable: true
           description: |
             Timestamp of the completion's deletion. Always `null` if not `accepted_by`.
-        subm_proof_img:
-          type: string
-          nullable: true
-          description: URL to the proof image used when submitting.
-        subm_proof_vid:
-          type: string
-          nullable: true
-          description: URL to the proof vid used when submitting.
-        subm_notes:
-          type: string
-          nullable: true
-          description: Notes the user put when submitting.
     """
     accepted_by: int | None
     created_on: datetime.datetime | None

@@ -15,6 +15,7 @@ from src.db.queries.mapsubmissions import get_map_submission
 MAX_TEXT_LEN = 100
 MAX_LONG_TEXT_LEN = 500
 MAX_ADD_CODES = 5
+MAX_PROOF_URL = 5
 
 
 async def validate_map_code(code: str) -> str | None:
@@ -201,17 +202,22 @@ async def validate_completion_submission(body: dict) -> dict:
         "black_border": bool,
         "no_geraldo": bool,
         "current_lcc": bool,
+        "video_proof_url": [str],
     }
     check = check_fields(body, check_fields_exists)
     if len(check):
         return check
 
     errors = {}
-    if body.get("video_proof_url", None) and not validators.url(body["video_proof_url"]):
-        errors["video_proof_url"] = "Invalid video URL"
+    if len(body["video_proof_url"]) > MAX_PROOF_URL:
+        errors[f"video_proof_url"] = f"Can submit up to {MAX_PROOF_URL} URLs"
+    else:
+        for i, url in enumerate(body["video_proof_url"]):
+            if not validators.url(url):
+                errors[f"video_proof_url[{i}]"] = "Invalid video URL"
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
-            "video_proof_url" not in body:
-        errors["video_proof_url"] = "Missing or invalid URL"
+            len(body["video_proof_url"]) == 0:
+        errors["video_proof_url"] = "Missing proof URL"
     if body["current_lcc"]:
         if "leftover" not in body or not isinstance(body["leftover"], int):
             errors["leftover"] = "Missing or non-integer saveup"

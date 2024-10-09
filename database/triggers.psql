@@ -46,6 +46,9 @@ BEGIN
         dupe_lcc_id := NULL;  -- No lcc to duplicate
     END IF;
 
+
+    -- # FIXME <proof>
+
     -- Duplicate the list_completions row with format set to 2
     INSERT INTO list_completions (map, black_border, no_geraldo, lcc, created_on, accepted_by, format)
     VALUES (

@@ -10,6 +10,7 @@ from src.db.models import (
     PartialUser,
 )
 from src.db.queries.subqueries import get_int_config
+from src.utils.misc import list_rm_dupe
 postgres = src.db.connection.postgres
 
 
@@ -224,35 +225,30 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
 
 def parse_runs_payload(
         payload,
-        has_count: bool = True,
         full_usr_info: bool = False,
 ) -> list[ListCompletion]:
-    run_idx = 0 + int(has_count)
-    lcc_idx = 9 + run_idx
-    agg_idx = 3 + lcc_idx
-
     comps = []
     for run in payload:
-        usr_list = list(set(run[agg_idx]))
+        usr_list = run["user_ids"]
         if full_usr_info:
-            usrname_list = list(set(run[agg_idx+1]))
             usr_list = [
-                PartialUser(usr_list[i], usrname_list[i], None, False)
+                PartialUser(run["user_ids"][i], run["user_names"][i], None, False)
                 for i in range(len(usr_list))
             ]
+        usr_list = list_rm_dupe(usr_list, preserve_order=False)
 
         comps.append(ListCompletion(
-            run[run_idx],
-            run[run_idx + 1],
+            run["run_id"],
+            run["map"],
             usr_list,
-            run[run_idx + 2],
-            run[run_idx + 3],
-            run[run_idx + 4],
-            run[run_idx + 5],
-            LCC(*run[lcc_idx:agg_idx]) if run[lcc_idx] else None,
-            run[run_idx + 6],
-            run[run_idx + 7],
-            run[run_idx + 8],
+            run["black_border"],
+            run["no_geraldo"],
+            run["current_lcc"],
+            run["format"],
+            LCC(run["lcc_id"], run["proof"], run["leftover"]) if run["lcc_id"] else None,
+            list_rm_dupe(run["subm_proof_img"]),
+            list_rm_dupe(run["subm_proof_vid"]),
+            run["subm_notes"],
         ))
     return comps
 
@@ -262,10 +258,12 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         """
         SELECT
-            runs.id, runs.map, runs.black_border, runs.no_geraldo, TRUE,
-            runs.format, runs.subm_proof_img, runs.subm_proof_vid, runs.subm_notes,
+            runs.id AS run_id, runs.map, runs.black_border, runs.no_geraldo, TRUE AS current_lcc, runs.format,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY runs.id) AS subm_proof_img,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY runs.id) AS subm_proof_vid,
+            runs.subm_notes,
 
-            lccs.id, lccs.proof, lccs.leftover,
+            lccs.id AS lcc_id, lccs.proof, lccs.leftover,
 
             ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids,
             ARRAY_AGG(u.name) OVER (PARTITION by runs.id) AS user_names
@@ -278,6 +276,8 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
             ON ply.run = runs.id
         JOIN users u
             ON ply.user_id = u.discord_id
+        LEFT JOIN completion_proofs cp
+            ON cp.run = runs.id
         WHERE runs.map = $1
             AND runs.accepted_by IS NOT NULL
             AND runs.deleted_on IS NULL
@@ -287,7 +287,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     if not len(payload):
         return []
 
-    return parse_runs_payload(payload, has_count=False, full_usr_info=True)
+    return parse_runs_payload(payload, full_usr_info=True)
 
 
 @postgres
@@ -315,16 +315,20 @@ async def get_completions_for(
         ),
         unique_runs AS (
             SELECT DISTINCT ON (rwf.id)
-                rwf.id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-                rwf.format, rwf.subm_proof_img, rwf.subm_proof_vid, rwf.subm_notes,
+                rwf.id AS run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc, rwf.format,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.id) AS subm_proof_vid,
+                rwf.subm_notes,
                 
-                lccs.id, lccs.proof, lccs.leftover,
+                lccs.id AS lcc_id, lccs.proof, lccs.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids,
                 ARRAY_AGG(u.name) OVER (PARTITION by rwf.id) AS user_names
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
+            LEFT JOIN completion_proofs cp
+                ON cp.run = rwf.id
             LEFT JOIN leastcostchimps lccs
                 ON rwf.lcc = lccs.id
             JOIN users u

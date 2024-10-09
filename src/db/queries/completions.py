@@ -1,6 +1,7 @@
 import asyncpg.pool
 import src.db.connection
 from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap
+from src.utils.misc import list_rm_dupe
 postgres = src.db.connection.postgres
 
 
@@ -12,8 +13,8 @@ async def submit_run(
         format_id: int,
         lcc_info: dict | None,  # leftover, proof
         player_id: int,
-        proof_url: str | None,
-        proof_vid_url: str | None,
+        proof_img_url: list[str],
+        proof_vid_url: list[str],
         notes: str | None,
         conn=None,
 ) -> int | None:
@@ -28,17 +29,29 @@ async def submit_run(
                 """,
                 lcc_info["proof"], lcc_info["leftover"]
             )
+
         run_id = await conn.fetchval(
             """
             INSERT INTO list_completions
-                (map, black_border, no_geraldo, lcc, format, subm_proof_img, subm_proof_vid,
-                subm_notes)
+                (map, black_border, no_geraldo, lcc, format, subm_notes)
             VALUES
-                ($1, $2, $3, $4, $5, $6, $7, $8)
+                ($1, $2, $3, $4, $5, $6)
             RETURNING id
             """,
-            map_code, black_border, no_geraldo, lcc_id, format_id, proof_url, proof_vid_url, notes,
+            map_code, black_border, no_geraldo, lcc_id, format_id, notes,
         )
+
+        proofs = [(run_id, url, 0) for url in proof_img_url] + \
+            [(run_id, url, 1) for url in proof_vid_url]
+        await conn.executemany(
+            """
+            INSERT INTO completion_proofs
+                (run, proof_url, proof_type)
+            VALUES ($1, $2, $3)
+            """,
+            proofs,
+        )
+
         await conn.execute(
             """
             INSERT INTO listcomp_players(run, user_id)
@@ -46,15 +59,16 @@ async def submit_run(
             """,
             run_id, player_id
         )
+
         return run_id
 
 
 @postgres
-async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta:
+async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta | None:
     if isinstance(run_id, str):
         run_id = int(run_id)
 
-    payload = await conn.fetch(
+    run = await conn.fetchrow(
         """
         WITH the_run AS (SELECT * FROM list_completions WHERE id=$1),
         runs_with_flags AS (
@@ -65,12 +79,17 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         )
         SELECT
             run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-            run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
-            run.subm_wh_payload,
+            run.created_on, run.deleted_on,
+            ARRAY_AGG(cp.proof_url) FILTER (WHERE cp.proof_type = 0) OVER() AS subm_proof_img,
+            ARRAY_AGG(cp.proof_url) FILTER (WHERE cp.proof_type = 1) OVER() AS subm_proof_vid,
+            run.subm_notes, run.subm_wh_payload,
             
-            lcc.id, lcc.proof, lcc.leftover,
-            ply.user_id, u.name
+            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+            ARRAY_AGG(ply.user_id) OVER() AS user_ids,
+            ARRAY_AGG(u.name) OVER() AS user_names
         FROM runs_with_flags run
+        LEFT JOIN completion_proofs cp
+            ON cp.run = run.id
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
         LEFT JOIN listcomp_players ply
@@ -80,29 +99,29 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         """,
         run_id
     )
-    if len(payload):
-        run_sidx = 0
-        lcc_sidx = 12 + run_sidx
-        ply_sidx = 3 + lcc_sidx
+    if run is None:
+        return None
 
-        run = payload[0]
-        return ListCompletionWithMeta(
-            run_id,
-            run[run_sidx],
-            [PartialUser(row[ply_sidx], row[ply_sidx+1], None, False) for row in payload],
-            run[run_sidx+1],
-            run[run_sidx+2],
-            run[run_sidx+3],
-            run[run_sidx+4],
-            LCC(run[lcc_sidx], run[lcc_sidx+1], run[lcc_sidx+2]) if run[lcc_sidx] else None,
-            run[run_sidx+8],
-            run[run_sidx+9],
-            run[run_sidx+10],
-            run[run_sidx+5],
-            run[run_sidx+6],
-            run[run_sidx+7],
-            run[run_sidx+11],
-        )
+    return ListCompletionWithMeta(
+        run_id,
+        run["map"],
+        list_rm_dupe([
+            PartialUser(run["user_ids"][i], run["user_names"][i], None, False)
+            for i in range(len(run["user_ids"]))
+        ], preserve_order=False),
+        run["black_border"],
+        run["no_geraldo"],
+        run["current_lcc"],
+        run["format"],
+        LCC(run["lcc_id"], run["proof"], run["leftover"]) if run["lcc_id"] else None,
+        list_rm_dupe(run["subm_proof_img"]),
+        list_rm_dupe(run["subm_proof_vid"]),
+        run["subm_notes"],
+        run["accepted_by"],
+        run["created_on"],
+        run["deleted_on"],
+        run["subm_wh_payload"],
+    )
 
 
 @postgres
@@ -207,8 +226,8 @@ async def add_completion(
         comp_id = await conn.fetchval(
             f"""
             INSERT INTO list_completions
-                (accepted_by, black_border, no_geraldo, format, lcc, map, subm_proof_img)
-            VALUES ($6, $1, $2, $3, $4, $5, $7)
+                (accepted_by, black_border, no_geraldo, format, lcc, map)
+            VALUES ($6, $1, $2, $3, $4, $5)
             RETURNING id
             """,
             black_border,
@@ -217,8 +236,17 @@ async def add_completion(
             lcc_id,
             map_code,
             mod_id,
-            subm_proof,
         )
+
+        if subm_proof:
+            await conn.execute(
+                """
+                INSERT INTO completion_proofs
+                    (run, proof_url, proof_type)
+                VALUES ($1, $2, 0)
+                """,
+                comp_id, subm_proof,
+            )
 
         await conn.executemany(
             """
@@ -270,19 +298,24 @@ async def get_unapproved_completions(
             SELECT DISTINCT ON (run.id)
 
                 run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-                run.created_on, run.deleted_on, run.subm_proof_img, run.subm_proof_vid, run.subm_notes,
-                run.id, run.subm_wh_payload,
+                run.created_on, run.deleted_on,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                run.subm_notes,
+                run.id AS run_id, run.subm_wh_payload,
                 
-                lcc.id, lcc.proof, lcc.leftover,
-                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_id,
+                lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
                 
-                m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
+                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
                 m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
             FROM unapproved_runs run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
             LEFT JOIN listcomp_players ply
                 ON ply.run = run.id
+            LEFT JOIN completion_proofs cp
+                ON cp.run = run.id
             JOIN maps m
                 ON m.code = run.map
             WHERE m.deleted_on IS NULL
@@ -299,46 +332,41 @@ async def get_unapproved_completions(
         amount
     )
 
-    run_sidx = 1
-    lcc_sidx = 13 + run_sidx
-    ply_sidx = 3 + lcc_sidx
-    map_sidx = 1 + ply_sidx
-
     completions = [
         ListCompletionWithMeta(
-            run[run_sidx + 11],
+            run["run_id"],
             PartialMap(
-                run[map_sidx],
-                run[run_sidx],
-                run[map_sidx + 1],
-                run[map_sidx + 2],
-                run[map_sidx + 3],
-                run[map_sidx + 4],
-                run[map_sidx + 5],
-                run[map_sidx + 6],
-                run[map_sidx + 10],
-                run[map_sidx + 7].split(","),
-                run[map_sidx + 8],
-                run[map_sidx + 11],
-                run[map_sidx + 9],
+                run["map_id"],
+                run["map"],
+                run["name"],
+                run["placement_curver"],
+                run["placement_allver"],
+                run["difficulty"],
+                run["r6_start"],
+                "",
+                run["deleted_on"],
+                run["optimal_heros"].split(","),
+                run["map_preview_url"],
+                run["new_version"],
+                run["created_on"],
             ),
-            run[ply_sidx],
-            run[run_sidx + 1],
-            run[run_sidx + 2],
-            run[run_sidx + 3],
-            run[run_sidx + 4],
+            list_rm_dupe(run["user_ids"], preserve_order=False),
+            run["black_border"],
+            run["no_geraldo"],
+            run["current_lcc"],
+            run["format"],
             LCC(
-                run[lcc_sidx],
-                run[lcc_sidx + 1],
-                run[lcc_sidx + 2]
-            ) if run[lcc_sidx] else None,
-            run[run_sidx + 8],
-            run[run_sidx + 9],
-            run[run_sidx + 10],
-            run[run_sidx + 5],
-            run[run_sidx + 6],
-            run[run_sidx + 7],
-            run[run_sidx + 12],
+                run["lcc_id"],
+                run["proof"],
+                run["leftover"],
+            ) if run["lcc_id"] else None,
+            list_rm_dupe(run["subm_proof_img"]),
+            list_rm_dupe(run["subm_proof_vid"]),
+            run["subm_notes"],
+            run["accepted_by"],
+            run["created_on"],
+            run["deleted_on"],
+            run["subm_wh_payload"],
         )
         for run in payload
     ]
@@ -388,20 +416,24 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 ON lccs.id = r.lcc
         )
         SELECT
-            run.id, run.map, ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+            run.id AS run_id, run.map,
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
             run.black_border, run.no_geraldo, run.current_lcc, run.format,
-            run.subm_proof_img, run.subm_proof_vid, run.subm_notes, run.accepted_by,
-            run.created_on, run.deleted_on,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+            run.subm_notes, run.accepted_by, run.created_on, run.deleted_on,
             
-            lcc.id, lcc.proof, lcc.leftover,
+            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
             
-            m.id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
+            m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
             m.optimal_heros, m.map_preview_url, m.created_on
         FROM runs_with_flags run
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
         LEFT JOIN listcomp_players ply
             ON ply.run = run.id
+        LEFT JOIN completion_proofs cp
+            ON cp.run = run.id
         JOIN maps m
             ON m.code = run.map
             AND m.deleted_on IS NULL
@@ -416,38 +448,36 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         *additional_args,
     )
 
-    lcc_is = 13
-    map_is = 3 + lcc_is
     return [
         ListCompletionWithMeta(
-            row[0],
+            row["run_id"],
             PartialMap(
-                row[map_is],
-                row[1],
-                row[map_is+1],
-                row[map_is+2],
-                row[map_is+3],
-                row[map_is+4],
-                row[map_is+5],
+                row["map_id"],
+                row["map"],
+                row["name"],
+                row["placement_curver"],
+                row["placement_allver"],
+                row["difficulty"],
+                row["r6_start"],
                 "",
                 None,
-                row[map_is+6].split(","),
-                row[map_is+7],
+                row["optimal_heros"].split(","),
+                row["map_preview_url"],
                 None,
-                row[map_is+8],
+                row["created_on"],
             ),
-            row[2],
-            row[3],
-            row[4],
-            row[5],
-            row[6],
-            None if row[lcc_is] is None else LCC(row[lcc_is], row[lcc_is+1], row[lcc_is+2]),
-            row[7],
-            row[8],
-            row[9],
-            row[10],
-            row[11],
-            row[12],
+            list_rm_dupe(row["user_ids"], preserve_order=False),
+            row["black_border"],
+            row["no_geraldo"],
+            row["current_lcc"],
+            row["format"],
+            None if row["lcc_id"] is None else LCC(row["lcc_id"], row["proof"], row["leftover"]),
+            list_rm_dupe(row["subm_proof_img"]),
+            list_rm_dupe(row["subm_proof_vid"]),
+            row["subm_notes"],
+            row["accepted_by"],
+            row["created_on"],
+            row["deleted_on"],
             None,
         )
         for row in payload
