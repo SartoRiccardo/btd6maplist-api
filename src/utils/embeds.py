@@ -100,6 +100,14 @@ def get_runsubm_embed(
                          "current_lcc"] else ""),
             "inline": True,
         })
+    if len(data["video_proof_url"]):
+        embeds[0]["fields"].append({
+            "name": "Video Proof URL" + ("" if len(data["video_proof_url"]) == 1 else "s"),
+            "value": data['video_proof_url'][0]
+                if len(data["video_proof_url"]) == 1 else
+                ("- " + "\n- ".join(data["video_proof_url"])),
+            "inline": False,
+        })
     return embeds
 
 

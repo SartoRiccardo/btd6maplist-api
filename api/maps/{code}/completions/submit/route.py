@@ -148,8 +148,6 @@ async def post(
                 )
 
             embeds = get_runsubm_embed(data, discord_profile, resource)
-            if data["no_geraldo"] or data["current_lcc"] or data["black_border"]:
-                description = f"__Video Proof: {data['video_proof_url']}__"
             if resource.difficulty == -1 and data["format"] in range(50, 100):
                 return web.json_response(
                     {"errors": {"format": "Submitted experts run for non-experts map"}},
@@ -197,8 +195,6 @@ async def post(
     form_data = FormData()
 
     json_data = {"embeds": embeds}
-    if description:
-        json_data["content"] = description.replace("@", "")
     payload_json = json.dumps(json_data)
     form_data.add_field("payload_json", payload_json)
 

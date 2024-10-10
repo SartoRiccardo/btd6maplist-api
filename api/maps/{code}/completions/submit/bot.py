@@ -85,18 +85,6 @@ async def post(
             "image": {"url": proof_urls[i]},
         })
 
-    if len(json_data["video_proof_url"]):
-        embeds[0]["fields"].append({
-            "name": "Video Proof URL" + ("" if len(json_data["video_proof_url"]) == 1 else "s"),
-            "value": json_data['video_proof_url'][0] if len(json_data["video_proof_url"]) == 1 else \
-                ("- " + "\n- ".join(json_data["video_proof_url"])),
-            "inline": False,
-        })
-    if len(json_data["video_proof_url"]) == 1:
-        embeds[0]["content"] = f"__Video Proof: {json_data['video_proof_url'][0]}__".replace("@", "")
-    elif len(json_data["video_proof_url"]) > 1:
-        embeds[0]["content"] = f"Video Proofs: {json_data['video_proof_url'][0]}__".replace("@", "")
-
     msg_data = {"embeds": embeds}
 
     form_data = FormData()
