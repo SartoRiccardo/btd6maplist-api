@@ -1,11 +1,11 @@
-import os.path
-
+import os
 import asyncpg
 import config
 from src.utils.colors import red, purple
 from functools import wraps
 
 pool: asyncpg.Pool | None
+os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
 
 
 async def start():
@@ -48,7 +48,7 @@ async def init_database(conn=None):
 
 @postgres
 async def update_schema(conn=None):
-    dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "dbinfo.txt")
+    dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
     patches_path = os.path.join("database", "patches")
     if not os.path.exists(dbinfo_path):
         with open(dbinfo_path, "w") as fdb:
