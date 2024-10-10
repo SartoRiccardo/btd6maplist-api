@@ -112,7 +112,6 @@ async def post(
 
     embeds = []
     hook_url = ""
-    description = None
     data = None
     proof_fnames: list[str | None] = [None for _ in range(MAX_FILES)]
 
