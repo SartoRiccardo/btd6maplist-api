@@ -412,36 +412,40 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         WITH runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
             FROM list_completions r
-            LEFT JOIN list_completions lccs
+            LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
+        ),
+        accepted_runs AS (
+            SELECT DISTINCT ON (run.id)
+                run.id AS run_id, run.map,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+                run.black_border, run.no_geraldo, run.current_lcc, run.format,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                run.subm_notes, run.accepted_by, run.created_on AS run_created_on, run.deleted_on AS run_deleted_on,
+                
+                lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+                
+                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
+                m.optimal_heros, m.map_preview_url, m.created_on AS map_created_on
+            FROM runs_with_flags run
+            LEFT JOIN leastcostchimps lcc
+                ON lcc.id = run.lcc
+            LEFT JOIN listcomp_players ply
+                ON ply.run = run.id
+            LEFT JOIN completion_proofs cp
+                ON cp.run = run.id
+            JOIN maps m
+                ON m.code = run.map
+                AND m.deleted_on IS NULL
+                AND m.new_version IS NULL
+            WHERE run.deleted_on IS NULL
+                AND run.accepted_by IS NOT NULL
+                {format_filter}
         )
-        SELECT
-            run.id AS run_id, run.map,
-            ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
-            run.black_border, run.no_geraldo, run.current_lcc, run.format,
-            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
-            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
-            run.subm_notes, run.accepted_by, run.created_on, run.deleted_on,
-            
-            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
-            
-            m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
-            m.optimal_heros, m.map_preview_url, m.created_on
-        FROM runs_with_flags run
-        LEFT JOIN leastcostchimps lcc
-            ON lcc.id = run.lcc
-        LEFT JOIN listcomp_players ply
-            ON ply.run = run.id
-        LEFT JOIN completion_proofs cp
-            ON cp.run = run.id
-        JOIN maps m
-            ON m.code = run.map
-            AND m.deleted_on IS NULL
-            AND m.new_version IS NULL
-        WHERE run.deleted_on IS NULL
-            AND run.accepted_by IS NOT NULL
-            {format_filter}
-        ORDER BY run.created_on DESC
+        SELECT *
+        FROM accepted_runs
+        ORDER BY run_created_on DESC
         LIMIT $1
         """,
         limit,
@@ -464,7 +468,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 row["optimal_heros"].split(","),
                 row["map_preview_url"],
                 None,
-                row["created_on"],
+                row["map_created_on"],
             ),
             list_rm_dupe(row["user_ids"], preserve_order=False),
             row["black_border"],
@@ -476,8 +480,8 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],
             row["accepted_by"],
-            row["created_on"],
-            row["deleted_on"],
+            row["run_created_on"],
+            row["run_deleted_on"],
             None,
         )
         for row in payload
