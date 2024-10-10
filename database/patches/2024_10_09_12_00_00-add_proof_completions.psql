@@ -4,7 +4,7 @@ CREATE TABLE completion_proofs (
   proof_url TEXT NOT NULL,
   proof_type INT -- 0: image, 1: video
 );
-ALTER TABLE completion_proof ADD CONSTRAINT fk_list_completions_1
+ALTER TABLE completion_proofs ADD CONSTRAINT fk_list_completions_1
   FOREIGN KEY (run) REFERENCES list_completions(id) ON DELETE CASCADE;
 
 INSERT INTO completion_proofs (run, proof_url, proof_type)
