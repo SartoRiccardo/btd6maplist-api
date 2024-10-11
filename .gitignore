@@ -2,6 +2,7 @@ api.btd6maplist.key*
 api.btd6maplist.crt*
 *.pem
 config.py
+config.test.py
 compose.yaml
 
 # Python
@@ -13,3 +14,4 @@ __pycache__
 # Misc
 .DS_Store
 tmp
+tmp-test

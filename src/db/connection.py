@@ -5,18 +5,17 @@ from src.utils.colors import red, purple
 from functools import wraps
 
 pool: asyncpg.Pool | None
-os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
 
 
 async def start():
     global pool
     try:
+        os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
         pool = await asyncpg.create_pool(
             user=config.DB_USER, password=config.DB_PSWD,
-            database=config.DB_NAME, host=config.DB_HOST
+            database=config.DB_NAME, host=config.DB_HOST,
         )
         print(f"{purple('[PSQL]')} Connected")
-        await update_schema()
         await init_database()
     except:
         print(f"{purple('[PSQL]')} {red('Error connecting to Postgres database')}")
@@ -37,7 +36,9 @@ def postgres(wrapped):
 
 
 @postgres
-async def init_database(conn=None):
+async def init_database(test: bool = False, conn=None):
+    await update_schema(test=test, conn=conn)
+
     with open(os.path.join("database", "views.psql")) as fviews:
         await conn.execute(fviews.read())
         print(f"{purple('[PSQL/Init]')} Created views")
@@ -47,7 +48,7 @@ async def init_database(conn=None):
 
 
 @postgres
-async def update_schema(conn=None):
+async def update_schema(test: bool = False, conn=None):
     dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
     patches_path = os.path.join("database", "patches")
     if not os.path.exists(dbinfo_path):
@@ -60,6 +61,9 @@ async def update_schema(conn=None):
     print(f"{purple('[PSQL/Schema]')} Last update: {last_update}")
     updates = sorted(os.listdir(patches_path))
     for upd in updates:
+        if upd.startswith("9999") and not test:
+            continue
+
         upd_day, _ = upd.split("-", 1)
         upd_day = int(upd_day.replace("_", ""))
         if upd_day <= last_update:

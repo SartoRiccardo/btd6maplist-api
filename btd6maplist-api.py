@@ -187,17 +187,26 @@ async def redirect_to_swagger(r):
     return web.Response(status=301, headers={"Location": "/doc"})
 
 
-if __name__ == '__main__':
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+def get_application(
+        with_swagger: bool = True,
+) -> web.Application:
     app = web.Application(
         client_max_size=1024**2 * 3,
     )
     app.add_routes(get_routes())
-    swagger(app)
-    app.router.add_get("/", redirect_to_swagger)
+
+    if with_swagger:
+        swagger(app)
+        app.router.add_get("/", redirect_to_swagger)
 
     app.on_startup.append(start_db_connection)
     app.cleanup_ctx.append(init_client_session)
+    return app
+
+
+if __name__ == '__main__':
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    app = get_application()
 
     ssl_context = None
     if os.path.exists("api.btd6maplist.crt") and os.path.exists("api.btd6maplist.key"):
