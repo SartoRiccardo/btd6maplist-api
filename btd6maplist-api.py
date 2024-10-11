@@ -50,8 +50,10 @@ async def init_client_session(_app):
         [await t for t in tasks]
 
 
-async def start_db_connection(_app):
-    await src.db.connection.start()
+def start_db_connection(init_database: bool = True):
+    async def start(_app):
+        await src.db.connection.start(init_database)
+    return start
 
 
 def get_cors_regex(cors_options):
@@ -189,6 +191,7 @@ async def redirect_to_swagger(r):
 
 def get_application(
         with_swagger: bool = True,
+        init_database: bool = True,
 ) -> web.Application:
     app = web.Application(
         client_max_size=1024**2 * 3,
@@ -199,7 +202,7 @@ def get_application(
         swagger(app)
         app.router.add_get("/", redirect_to_swagger)
 
-    app.on_startup.append(start_db_connection)
+    app.on_startup.append(start_db_connection(init_database))
     app.cleanup_ctx.append(init_client_session)
     return app
 

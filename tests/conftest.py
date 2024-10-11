@@ -1,10 +1,9 @@
-import os
 import pytest
 import pytest_asyncio
-import importlib.util
+import importlib
 import src.db.connection
 from aiohttp.test_utils import TestServer, TestClient
-import config
+from .testutils import clear_db_patch_data, override_config
 btd6maplist_api = importlib.import_module("btd6maplist-api")
 
 
@@ -16,45 +15,14 @@ def pytest_collection_modifyitems(items):
 
 
 def pytest_configure():
-    def override_config():
-        spec = importlib.util.spec_from_file_location(
-            name="config_test",
-            location=os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "config.test.py"),
-        )
-        config_test = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(config_test)
-
-        forced_override = [
-            "PERSISTENT_DATA_PATH",
-            "DB_NAME",
-        ]
-
-        for vname in vars(config_test):
-            if not vname.isupper():
-                continue
-            if vname in forced_override:
-                if getattr(config, vname) == getattr(config_test, vname):
-                    raise ValueError(f"Must override config.{forced_override[0]} in config.test.py "
-                                     "with a different value than config.py")
-                forced_override.remove(vname)
-            setattr(config, vname, getattr(config_test, vname))
-
-        if len(forced_override):
-            raise ValueError(f"Must override config.{forced_override[0]} in config.test.py")
-
-    def clear_previous_data():
-        dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
-        os.remove(dbinfo_path)
-
     override_config()
-    clear_previous_data()
+    clear_db_patch_data()
 
 
 @pytest_asyncio.fixture(autouse=True, scope="module")
 async def reset_database():
     """Resets the database before every test module"""
-    dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
-    os.remove(dbinfo_path)
+    clear_db_patch_data()
 
     @src.db.connection.postgres
     async def restore(conn=None):
@@ -76,6 +44,7 @@ def btd6ml_app():
     """The main Application"""
     app = btd6maplist_api.get_application(
         with_swagger=False,
+        init_database=False,
     )
     return app
 

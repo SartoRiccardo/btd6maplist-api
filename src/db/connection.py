@@ -7,7 +7,7 @@ from functools import wraps
 pool: asyncpg.Pool | None
 
 
-async def start():
+async def start(should_init_database: bool = True):
     global pool
     try:
         os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
@@ -16,7 +16,8 @@ async def start():
             database=config.DB_NAME, host=config.DB_HOST,
         )
         print(f"{purple('[PSQL]')} Connected")
-        await init_database()
+        if should_init_database:
+            await init_database()
     except:
         print(f"{purple('[PSQL]')} {red('Error connecting to Postgres database')}")
         exit(1)
