@@ -115,7 +115,7 @@ async def get_map_form(
                 data["map_preview_url"] = None
 
     for fname in files:
-        if data[fname] is None:
+        if data.get(fname, None) is None:
             data[fname] = files[fname]
 
     return data

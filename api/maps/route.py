@@ -78,9 +78,19 @@ async def post(
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            $ref: "#/components/schemas/Map"
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/MapPayload"
+              r6_start:
+                type: string
+                format: binary
+              map_preview_url:
+                type: string
+                format: binary
     responses:
       "204":
         description: The resource was created correctly

@@ -108,24 +108,7 @@ class PartialMap:
       optimal_heros:
         type: array
         items:
-          type: string
-          enum:
-          - quincy
-          - gwen
-          - obyn
-          - striker
-          - churchill
-          - ben
-          - ezili
-          - pat
-          - adora
-          - brickell
-          - etienne
-          - sauda
-          - psi
-          - geraldo
-          - corvus
-          - rosalia
+          $ref: "#/components/schemas/Btd6Hero"
       created_on:
         type: integer
         description: Timestamp of the map's creation date (in seconds).
@@ -208,7 +191,7 @@ class Map(PartialMap):
               verifier:
                 $ref: "#/components/schemas/DiscordID"
               name:
-                type: str
+                type: string
                 description: The username of the verifier
               version:
                 type: number
@@ -234,14 +217,107 @@ class Map(PartialMap):
               version:
                 type: number
                 description: The version since this compatibility status came into effect.
-          description: >
+          description: |
             Changelog of compatibilities with previous versions.
-            It always implicitely starts at v39.0 with it being unavailable.
+            It always implicitly starts at v39.0 with it being unavailable.
         aliases:
           type: array
           items:
             type: string
           description: A list of aliases for the map
+    ---
+    MapPayload:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The map's name.
+        code:
+          type: string
+          description: The map's code.
+        placement_cur:
+          type: integer
+          description: The map's placement in the list ~ current version (starts from 1). If none, set to `-1`.
+        placement_all:
+          type: integer
+          description: The map's placement in the list ~ all versions (starts from 1). If none, set to `-1`.
+        difficulty:
+          $ref: "#/components/schemas/ExpertDifficulty"
+        r6_start:
+          type: string
+          nullable: true
+          description: |
+            URL to how to start Round 6. Can be an image or a YouTube URL. Takes priority
+            over the one provided in the form data.
+        map_data:
+          type: string
+          nullable: true
+          description: URL to the map data. #DEPRECATED
+        creators:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: "#/components/schemas/RequestUserID"
+              role:
+                type: string
+                nullable: true
+                description: The contributions the user had in the map's creation
+          description: The map's creators
+        additional_codes:
+          description: Additional codes for the map, if any.
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                description: The map's code.
+              description:
+                type: string
+                nullable: true
+                description: What this map has different from the original.
+        verifiers:
+          description: The users who verified the map
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: "#/components/schemas/RequestUserID"
+              version:
+                type: number
+                nullable: true
+                description: >
+                  The version the map was verified in.
+                  If it's the first verification, it's set to `null`.
+        aliases:
+          description: A list of aliases for the map
+          type: array
+          items:
+            type: string
+        map_data_compatibility:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                $ref: "#/components/schemas/MapVersionCompatibility"
+              version:
+                type: number
+                description: The version since this compatibility status came into effect.
+          description: |
+            Changelog of compatibilities with previous versions.
+            It always implicitly starts at v39.0 with it being unavailable.
+        map_preview_url:
+          type: string
+          nullable: true
+          description: URL to the map preview. Takes priority over the one provided in the form data.
+        optimal_heros:
+          type: array
+          items:
+            $ref: "#/components/schemas/Btd6Hero"
     """
     creators: list[tuple[int, str | None, str]]  # TODO tuple role, PartialUser
     additional_codes: list[tuple[str, str | None]]
