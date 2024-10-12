@@ -2,6 +2,8 @@ import pytest
 import pytest_asyncio
 import importlib
 import src.db.connection
+import src.requests
+from .mocks.DiscordRequestMock import DiscordRequestMock
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
 btd6maplist_api = importlib.import_module("btd6maplist-api")
@@ -19,7 +21,7 @@ def pytest_configure():
     clear_db_patch_data()
 
 
-@pytest_asyncio.fixture(autouse=True, scope="module")
+@pytest_asyncio.fixture(autouse=True, scope="class")
 async def reset_database():
     """Resets the database before every test module"""
     clear_db_patch_data()
@@ -33,10 +35,20 @@ async def reset_database():
             WHERE schemaname = 'public';
             """
         )
-        await conn.execute("\n".join(d[0] for d in drops))
+        if len(drops):
+            await conn.execute("\n".join(d[0] for d in drops))
         await src.db.connection.init_database(test=True, conn=conn)
 
     await restore()
+
+
+@pytest.fixture(autouse=True)
+def mock_discord_api():
+    src.requests.set_discord_api(src.requests.DiscordRequests)
+
+    def set_mock(**kwargs):
+        src.requests.set_discord_api(DiscordRequestMock(**kwargs))
+    return set_mock
 
 
 @pytest.fixture(scope="session")
