@@ -92,7 +92,7 @@ async def dump_test_data(conn=None):
             table_name=table,
             source=os.path.join(test_data_path, fname),
             delimiter="\t",
-            header=True,
+            header=False,
             format="csv",
             null="\\N",
         )
