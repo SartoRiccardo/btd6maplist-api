@@ -329,8 +329,8 @@ class Map(PartialMap):
 
     def to_dict(self) -> dict:
         compatibility = [*self.map_data_compatibility]
-        if len(compatibility) and compatibility[0][1] > 39:
-            compatibility.insert(0, (3, 39))
+        if len(compatibility) and compatibility[0][1] > 390:
+            compatibility.insert(0, (3, 390))
 
         return {
             **super().to_dict(),
@@ -347,7 +347,7 @@ class Map(PartialMap):
                 {"verifier": str(verif), "version": version, "name": verif_name}
                 for verif, version, verif_name in self.verifications
             ],
-            "verified": self.verified,
+            "verified": bool(self.verified),
             "map_data_compatibility": [
                 {"status": status, "version": version}
                 for status, version in compatibility
