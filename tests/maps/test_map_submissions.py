@@ -2,7 +2,7 @@ import pytest
 
 
 @pytest.mark.post
-@pytest.mark.submission
+@pytest.mark.submissions
 class TestSubmitMap:
     async def test_submit_map(self, btd6ml_test_client, mock_discord_api):
         """Test a valid map submission"""
@@ -18,7 +18,7 @@ class TestSubmitMap:
 
 
 @pytest.mark.put
-@pytest.mark.submission
+@pytest.mark.submissions
 class TestHandleSubmissions:
     async def test_reject_submission(self, btd6ml_test_client, mock_discord_api):
         """Test rejecting a map submission"""
