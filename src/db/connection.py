@@ -82,13 +82,22 @@ async def update_schema(conn=None):
 @postgres
 async def dump_test_data(conn=None):
     test_data_path = os.path.join("database", "data")
+    sequences = await conn.fetch(
+        """
+        SELECT sequence_name
+        FROM information_schema.sequences
+        WHERE sequence_schema = 'public'
+        """
+    )
+    sequences = [s["sequence_name"] for s in sequences]
+
     tables = sorted(os.listdir(test_data_path))
     for fname in tables:
         if not fname.endswith(".csv"):
             continue
 
         table = fname.split("_")[-1][:-4]
-        await conn.copy_to_table(
+        result = await conn.copy_to_table(
             table_name=table,
             source=os.path.join(test_data_path, fname),
             delimiter="\t",
@@ -96,3 +105,11 @@ async def dump_test_data(conn=None):
             format="csv",
             null="\\N",
         )
+        if f"{table}_id_seq" in sequences:
+            added_rows = int(result[len("COPY "):])
+            await conn.execute(
+                f"""
+                ALTER SEQUENCE {table}_id_seq
+                RESTART WITH {added_rows+1}
+                """
+            )
