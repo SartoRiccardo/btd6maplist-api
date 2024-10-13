@@ -7,7 +7,7 @@ async def get(_r: web.Request) -> web.Response:
     ---
     description: Returns a list of deleted/pushed off maps.
     tags:
-    - The List
+    - Map Lists
     responses:
       "200":
         description: Returns an array of `PartialListMap`.

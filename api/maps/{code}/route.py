@@ -14,8 +14,7 @@ async def get(_r: web.Request, resource: "src.db.models.Map" = None):
     ---
     description: Returns an map's data.
     tags:
-    - Expert List
-    - The List
+    - Maps
     parameters:
     - in: path
       name: code
@@ -50,8 +49,7 @@ async def put(
     ---
     description: Edit a map. Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Maps
     parameters:
     - in: path
       name: code
@@ -124,8 +122,7 @@ async def delete(
       Soft deletes a map. Must be a Maplist or Expert List Moderator.
       Deleted maps and all their data are kept in the database, but ignored.
     tags:
-    - The List
-    - Expert List
+    - Maps
     parameters:
     - in: path
       name: code

@@ -17,7 +17,7 @@ async def get(request: web.Request):
     ---
     description: Returns a user's data.
     tags:
-    - Users
+    - Completions
     parameters:
     - in: path
       name: uid

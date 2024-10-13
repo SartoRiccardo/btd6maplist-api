@@ -28,7 +28,7 @@ async def get(_r: web.Request):
     ---
     description: Returns a list of config variables for the project.
     tags:
-    - Misc
+    - Config
     responses:
       "200":
         description: Returns an array of `ConfigVar`.
@@ -81,7 +81,7 @@ async def put(
       Change any number of the config variables. Certain roles have access to change different variables.
       Must be a Maplist or Expert List Moderator. Changes to variables you don't have access to will be ignored.
     tags:
-    - Misc
+    - Config
     requestBody:
       required: true
       content:

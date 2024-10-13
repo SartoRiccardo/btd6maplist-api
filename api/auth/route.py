@@ -12,7 +12,7 @@ async def post(request: web.Request):
       Creates an user based on a Discord profile if it's not in the database, and
       returns its discord profile alongside its Maplist profile.
     tags:
-    - Users
+    - Authentication
     parameters:
     - in: query
       name: discord_token

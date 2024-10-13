@@ -18,8 +18,7 @@ async def get(request: web.Request):
     ---
     description: Returns a list of up to 50 maplist completions of this map.
     tags:
-    - Expert List
-    - The List
+    - Completions
     parameters:
     - in: path
       name: code

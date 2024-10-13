@@ -12,9 +12,7 @@ async def get(request: web.Request, discord_profile: dict, **_kw) -> web.Respons
     ---
     description: Returns a list of up to 50 maplist completions of this map.
     tags:
-    - Expert List
-    - The List
-    - Users
+    - Completions
     parameters:
     - in: path
       name: code

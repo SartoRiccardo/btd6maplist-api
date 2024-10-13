@@ -25,7 +25,7 @@ async def post(
       Accept a completion. Must be a Maplist and/or Expert List Moderator,
       depending on the completion's old and new `format`s.
     tags:
-    - Completions
+    - Submissions
     parameters:
     - in: path
       name: cid

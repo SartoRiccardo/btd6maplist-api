@@ -9,8 +9,6 @@ async def get(request: web.Request) -> web.Response:
     ---
     description: Gets the most recent completions.
     tags:
-    - Expert List
-    - The List
     - Completions
     parameters:
     - in: query

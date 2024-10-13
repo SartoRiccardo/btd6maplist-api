@@ -37,10 +37,9 @@ async def post(
 ) -> web.Response:
     """
     ---
-    description: Submits a run to the maplist. Currently all this does its be a proxy for a Discord webhook.
+    description: Submits a run to the maplist.
     tags:
-    - The List
-    - Expert List
+    - Submissions
     requestBody:
       required: true
       content:

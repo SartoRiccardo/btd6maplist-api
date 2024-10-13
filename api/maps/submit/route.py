@@ -37,8 +37,7 @@ async def post(
     ---
     description: Submits a map to the maplist. Currently all this does its be a proxy for a Discord webhook.
     tags:
-    - The List
-    - Expert List
+    - Submissions
     requestBody:
       required: true
       content:
@@ -146,8 +145,7 @@ async def get(request: web.Request) -> web.Response:
     ---
     description: Gets all map submissions.
     tags:
-    - The List
-    - Expert List
+    - Submissions
     parameters:
     - in: query
       name: page

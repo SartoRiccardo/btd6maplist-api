@@ -22,7 +22,7 @@ async def get(request: web.Request):
     ---
     description: Returns a list of maps in The List.
     tags:
-    - The List
+    - Map Lists
     parameters:
     - in: query
       name: version
@@ -73,8 +73,7 @@ async def post(
     ---
     description: Add a map. Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Maps
     requestBody:
       required: true
       content:

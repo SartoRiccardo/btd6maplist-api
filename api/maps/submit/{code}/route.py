@@ -24,8 +24,7 @@ async def delete(
     description: |
       Soft deletes a map submission. Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Submissions
     parameters:
     - in: path
       name: code

@@ -44,8 +44,7 @@ async def put(
       Transfer all completions of this map to another. Only works if the current map is deleted.
       Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Completions
     parameters:
     - in: path
       name: code

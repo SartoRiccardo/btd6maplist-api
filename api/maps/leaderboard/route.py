@@ -15,7 +15,7 @@ async def get(request: web.Request):
     ---
     description: Returns the Maplist leaderboard. People with 0 points are omitted.
     tags:
-    - The List
+    - Completions
     parameters:
     - in: query
       name: page
