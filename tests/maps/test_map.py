@@ -20,16 +20,24 @@ def map_form_data(json_data: dict) -> FormData:
 @pytest.mark.maps
 @pytest.mark.get
 class TestGetMaps:
-    async def test_not_exists(self, btd6ml_test_client, mock_discord_api):
+    async def get_map(self, btd6ml_test_client):
+        """Test getting a map by code"""
         pytest.skip("Not Implemented")
 
-    async def test_get_by_name(self, btd6ml_test_client, mock_discord_api):
+    async def test_not_exists(self, btd6ml_test_client):
+        """Test getting a map that doesn't exist"""
         pytest.skip("Not Implemented")
 
-    async def test_get_by_alias(self, btd6ml_test_client, mock_discord_api):
+    async def test_get_by_name(self, btd6ml_test_client):
+        """Test getting a map by name"""
         pytest.skip("Not Implemented")
 
-    async def test_get_by_placement(self, btd6ml_test_client, mock_discord_api):
+    async def test_get_by_alias(self, btd6ml_test_client):
+        """Test getting a map by an alias"""
+        pytest.skip("Not Implemented")
+
+    async def test_get_by_placement(self, btd6ml_test_client):
+        """Test getting a map by its placement"""
         pytest.skip("Not Implemented")
 
 
