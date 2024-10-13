@@ -17,7 +17,7 @@ async def get(request: web.Request):
     ---
     description: Returns a user's data.
     tags:
-    - Completions
+    - Users
     parameters:
     - in: path
       name: uid
@@ -74,7 +74,7 @@ async def put_validate(body: dict) -> dict:
 async def put(request: web.Request, json_body: dict = None, discord_profile: dict = None, **_kwargs):
     """
     ---
-    description: Modify an user's data.
+    description: Modify a user's data.
     tags:
     - Users
     parameters:

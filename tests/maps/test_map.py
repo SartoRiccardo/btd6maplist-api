@@ -201,15 +201,21 @@ async def test_add_aggr_fields(btd6ml_test_client, mock_discord_api, map_payload
 class TestValidateMaps:
     @pytest.mark.post
     @pytest.mark.put
+    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, map_payload):
+        """Test adding and editing map with invalid fields in the payload"""
+        pytest.skip("Not Implemented")
+
+    @pytest.mark.post
+    @pytest.mark.put
     async def test_req_with_images(self, btd6ml_test_client, mock_discord_api, map_payload):
-        """Test that adding and editing map with images in the payload works"""
+        """Test adding and editing map with images in the payload works"""
         pytest.skip("Not Implemented")
 
     @pytest.mark.post
     @pytest.mark.put
     @pytest.mark.delete
     async def test_forbidden(self, btd6ml_test_client, mock_discord_api):
-        """Test that a user can't add, edit or delete maps if unauthorized"""
+        """Test a user adding, editing or deleting maps if unauthorized"""
         async def make_admin_requests(test_label: str, expected_status: int) -> None:
             TEST_CODE = "MLXXX01"
 
@@ -237,7 +243,7 @@ class TestEditMaps:
     @pytest.mark.put
     async def test_edit(self, btd6ml_test_client, mock_discord_api, map_payload):
         """
-        Test that editing a map with a correct payload works, rearranges maps on
+        Test editing a map with a correct payload works, and rearranging maps on
         the list correctly.
         """
         pytest.skip("Not Implemented")
@@ -245,11 +251,12 @@ class TestEditMaps:
     @pytest.mark.put
     async def test_admin_edit_perms(self, btd6ml_test_client, mock_discord_api, map_payload):
         """
-        Test that Maplist Mods can't edit Expert List attributes, and vice versa.
+        Test Maplist Mods editing Expert List attributes, and vice versa.
         """
         pytest.skip("Not Implemented")
 
     @pytest.mark.post
     @pytest.mark.put
     async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, map_payload):
+        """Test a request with some missing fields"""
         pytest.skip("Not Implemented")
