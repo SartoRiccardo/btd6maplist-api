@@ -11,7 +11,6 @@ async def get(request: web.Request):
     ---
     description: Returns a list of up to 50 maplist completions by the user.
     tags:
-    - Users
     - Completions
     parameters:
     - in: path

@@ -26,6 +26,11 @@ class TestSubmitCompletion:
         """
         pytest.skip("Not Implemented")
 
+    @pytest.mark.users
+    async def test_new_user(self, btd6ml_test_client, mock_discord_api):
+        """Test a submitting as a new user"""
+        pytest.skip("Not Implemented")
+
 
 @pytest.mark.submissions
 class TestHandleSubmissions:
