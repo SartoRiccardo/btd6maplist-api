@@ -28,7 +28,12 @@ class TestSubmitCompletion:
 
     @pytest.mark.users
     async def test_new_user(self, btd6ml_test_client, mock_discord_api):
-        """Test a submitting as a new user"""
+        """Test submitting as a new user"""
+        pytest.skip("Not Implemented")
+
+    @pytest.mark.users
+    async def test_submit_invalid_map(self, btd6ml_test_client, mock_discord_api):
+        """Test submitting to a deleted or pushed off the list map"""
         pytest.skip("Not Implemented")
 
 
