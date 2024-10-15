@@ -193,6 +193,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             ON u.discord_id=v.user_id
         WHERE map=$1
             AND (version=cv.current_btd6_ver OR version IS NULL)
+        ORDER BY version ASC NULLS FIRST
         """,
         map_id
     )
