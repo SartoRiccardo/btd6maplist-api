@@ -90,6 +90,7 @@ async def put(
     if isinstance(json_body, web.Response):
         return json_body
 
+    json_body["code"] = resource.code
     if not is_admin:
         if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
             if "difficulty" in json_body:
