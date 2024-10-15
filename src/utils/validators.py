@@ -18,10 +18,13 @@ MAX_ADD_CODES = 5
 MAX_PROOF_URL = 5
 
 
-async def validate_map_code(code: str) -> str | None:
+async def validate_map_code(
+        code: str,
+        validate_code_exists: bool = True,
+) -> str | None:
     if not isinstance(code, str) or not re.match("^[A-Z]{7}$", code):
         return "Must be a 7 uppercase letter code"
-    else:
+    elif validate_code_exists:
         nk_response = await src.http.http.get(f"https://data.ninjakiwi.com/btd6/maps/map/{code}")
         if not nk_response.ok or not (await nk_response.json())["success"]:
             return f"There is no map with code {code}"
@@ -76,17 +79,21 @@ def typecheck_full_map(body: dict) -> dict:
         return check
 
 
-async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
+async def validate_full_map(
+        body: dict,
+        check_dup_code: bool = True,
+        validate_code_exists: bool = True,
+) -> dict:
     errors = {}
     if check_fail := typecheck_full_map(body):
         return check_fail
 
     if check_dup_code and await map_exists(body["code"]):
         return {"code": "Map already exists"}
-    if code_err := await validate_map_code(body["code"]):
+    if code_err := await validate_map_code(body["code"], validate_code_exists=validate_code_exists):
         errors["code"] = code_err
     for i, addcode in enumerate(body["additional_codes"][:MAX_ADD_CODES]):
-        if code_err := await validate_map_code(addcode["code"]):
+        if code_err := await validate_map_code(addcode["code"], validate_code_exists=validate_code_exists):
             errors[f"additional_codes[{i}].code"] = code_err
         if addcode["description"] is not None and len(addcode["description"]) > MAX_TEXT_LEN:
             errors[f"additional_codes[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"

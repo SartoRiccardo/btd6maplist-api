@@ -92,6 +92,7 @@ async def get_submission(
 
 async def get_map_form(
         request: web.Request,
+        editing: bool = False,
         check_dup_code: bool = False,
 ) -> dict | web.Response:
     data = None
@@ -109,7 +110,12 @@ async def get_map_form(
 
         elif part.name == "data":
             data = await part.json()
-            if len(errors := await validate_full_map(data, check_dup_code=check_dup_code)):
+            errors = await validate_full_map(
+                data,
+                check_dup_code=check_dup_code,
+                validate_code_exists=not editing,
+            )
+            if len(errors):
                 return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
             if data["map_preview_url"] and data["map_preview_url"].startswith("https://data.ninjakiwi.com"):
                 data["map_preview_url"] = None

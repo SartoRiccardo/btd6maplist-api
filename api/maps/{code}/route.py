@@ -86,7 +86,7 @@ async def put(
       "404":
         description: No map with that ID was found.
     """
-    json_body = await get_map_form(request, check_dup_code=False)
+    json_body = await get_map_form(request, check_dup_code=False, editing=True)
     if isinstance(json_body, web.Response):
         return json_body
 
