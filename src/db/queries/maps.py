@@ -71,13 +71,13 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
     if code.isnumeric():  # Current version index
         placement_union = """
             UNION
-            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_curver = $1::int
+            SELECT 3 AS ord, m.* FROM maps m WHERE m.placement_curver = $1::int
         """
     elif code.startswith("@") and code[1:].isnumeric():  # All versions idx
         code = code[1:]
         placement_union = """
             UNION
-            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_allver = $1::int
+            SELECT 3 AS ord, m.* FROM maps m WHERE m.placement_allver = $1::int
         """
 
     payload = await conn.fetch(
@@ -110,7 +110,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
                 
                 UNION
                 
-                SELECT 3 AS ord, m.*
+                SELECT 4 AS ord, m.*
                 FROM maps m
                 JOIN map_aliases a
                     ON m.id = a.map
