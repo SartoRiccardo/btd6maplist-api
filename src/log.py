@@ -5,20 +5,17 @@ import json
 import aiofiles
 import asyncio
 from typing import Literal
-from config import PERSISTENT_DATA_PATH
+import config
 from src.utils.colors import purple
 from datetime import datetime
-
-
-log_path = os.path.join(PERSISTENT_DATA_PATH, "logs")
-os.makedirs(log_path, exist_ok=True)
-
 
 file: aiofiles.threadpool.text.AsyncTextIOWrapper | None = None
 
 
 async def init_log():
     global file
+    log_path = os.path.join(config.PERSISTENT_DATA_PATH, "logs")
+    os.makedirs(log_path, exist_ok=True)
     async with aiofiles.open(os.path.join(log_path, "changes.log"), "a") as logfile:
         file = logfile
         print(f"{purple('[Log]')} Logfile open")
