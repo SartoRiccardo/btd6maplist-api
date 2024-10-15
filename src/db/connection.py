@@ -96,7 +96,7 @@ async def dump_test_data(conn=None):
         if not fname.endswith(".csv"):
             continue
 
-        table = fname.split("_")[-1][:-4]
+        table = fname.split("_", 1)[-1][:-4]
         result = await conn.copy_to_table(
             table_name=table,
             source=os.path.join(test_data_path, fname),
