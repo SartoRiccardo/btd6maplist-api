@@ -20,25 +20,71 @@ def map_form_data(json_data: dict) -> FormData:
 @pytest.mark.maps
 @pytest.mark.get
 class TestGetMaps:
-    async def get_map(self, btd6ml_test_client):
+    @staticmethod
+    async def assert_get_correct(btd6ml_test_client, query, expected_code):
+        async with btd6ml_test_client.get(f"/maps/{query}") as resp:
+            assert resp.ok, \
+                f"GET /maps/:code by name returned {resp.status}"
+            resp_map_data = await resp.json()
+            assert resp_map_data["code"] == expected_code, \
+                f"GET /maps/{query} did not return {expected_code}"
+
+    async def test_get_map(self, btd6ml_test_client):
         """Test getting a map by code"""
-        pytest.skip("Not Implemented")
+        MAP_PLC = 44
+        async with btd6ml_test_client.get(f"/maps/MLXXX{MAP_PLC}") as resp:
+            assert resp.ok, f"GET /maps/MLXXX50 returned {resp.status}"
+            resp_map_data = await resp.json()
+
+            value_eq_check = {
+                "name": f"Maplist Map {MAP_PLC}",
+                "code": f"MLXXX{MAP_PLC}",
+                "placement_cur": MAP_PLC,
+                "placement_all": MAP_PLC-5,
+                "difficulty": -1,
+                "r6_start": "https://drive.google.com/file/d/qWpmWHvTUJMEhyxBNiZTsMJjOHJfLFdY/view",
+                "map_data": None,
+                "optimal_heros": ["rosalia", "geraldo"],
+                "map_preview_url": "https://dummyimage.com/250x150/9966cc/fff",
+                "verified": True,
+                "deleted_on": None,
+                "creators": [
+                    {"id": "12", "name": "usr12", "role": "Decoration"},
+                    {"id": "30", "name": "usr30", "role": "Gameplay"},
+                ],
+                "additional_codes": [{"code": "MLA1X44", "description": "Additional Code 1"}],
+                "verifications": [
+                    {"verifier": "10", "name": "usr10", "version": None},
+                    {"verifier": "12", "name": "usr12", "version": None},
+                    {"verifier": "10", "name": "usr10", "version": 44.1},
+                    {"verifier": "12", "name": "usr12", "version": 44.1},
+                ],
+            }
+            for key in value_eq_check:
+                exp_value = value_eq_check[key]
+                assert resp_map_data[key] == exp_value, \
+                    f"Map.{key} differs from expected"
 
     async def test_not_exists(self, btd6ml_test_client):
         """Test getting a map that doesn't exist"""
-        pytest.skip("Not Implemented")
+        async with btd6ml_test_client.get(f"/maps/AAAAAAA") as resp:
+            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+                f"GET /maps/:code on a nonexistent map returned {resp.status}"
 
     async def test_get_by_name(self, btd6ml_test_client):
         """Test getting a map by name"""
-        pytest.skip("Not Implemented")
+        await self.assert_get_correct(btd6ml_test_client, "Maplist Map 45", "MLXXX45")
+        await self.assert_get_correct(btd6ml_test_client, "Deleted Maplist Map 9", "DELXX09")
 
     async def test_get_by_alias(self, btd6ml_test_client):
-        """Test getting a map by an alias"""
-        pytest.skip("Not Implemented")
+        """Test getting a map by an alias, checking priority over deleted map's names"""
+        await self.assert_get_correct(btd6ml_test_client, "ml45", "MLXXX45")
+        await self.assert_get_correct(btd6ml_test_client, "deleted maplist map 0", "MLXXX45")
 
     async def test_get_by_placement(self, btd6ml_test_client):
         """Test getting a map by its placement"""
-        pytest.skip("Not Implemented")
+        await self.assert_get_correct(btd6ml_test_client, "45", "MLXXX45")
+        await self.assert_get_correct(btd6ml_test_client, "@5", "MLXXX10")
 
 
 @pytest.mark.maps
@@ -71,37 +117,26 @@ async def test_add(btd6ml_test_client, mock_discord_api, map_payload, valid_code
             f"GET /maps/{cur_code} returned {resp.status}"
         resp_map_data = await resp.json()
 
-        value_eq_check = [
-            "name",
-            "code",
-            ("placement_curver", "placement_cur"),
-            ("placement_allver", "placement_all"),
-            "difficulty",
-            "r6_start",
-            "aliases",
-            "additional_codes",
-            "optimal_heros",
-        ]
-        for key_req in value_eq_check:
-            key_resp = key_req
-            if isinstance(key_req, tuple):
-                key_req, key_resp = key_req
-            assert req_map_data[key_req] == resp_map_data[key_resp], \
-                f"Map.{key_req} differs from expected"
-
-        value_eq_check = [
-            ("map_preview_url", f"https://data.ninjakiwi.com/btd6/maps/map/{cur_code}/preview"),
-            ("verified", False),
-            ("deleted_on", None),
-            (
-                "creators",
-                [
-                    {"id": "1", "name": "usr1", "role": None},
-                    {"id": "2", "name": "usr2", "role": "Suggested the idea"},
-                ]
-            ),
-        ]
-        for key, exp_value in value_eq_check:
+        value_eq_check = {
+            "name": req_map_data["name"],
+            "code": req_map_data["code"],
+            "placement_cur": req_map_data["placement_curver"],
+            "placement_all": req_map_data["placement_allver"],
+            "difficulty": req_map_data["difficulty"],
+            "r6_start": req_map_data["r6_start"],
+            "aliases": req_map_data["aliases"],
+            "additional_codes": req_map_data["additional_codes"],
+            "optimal_heros": req_map_data["optimal_heros"],
+            "map_preview_url": f"https://data.ninjakiwi.com/btd6/maps/map/{cur_code}/preview",
+            "verified": False,
+            "deleted_on": None,
+            "creators": [
+                {"id": "1", "name": "usr1", "role": None},
+                {"id": "2", "name": "usr2", "role": "Suggested the idea"},
+            ],
+        }
+        for key in value_eq_check:
+            exp_value = value_eq_check[key]
             assert resp_map_data[key] == exp_value, \
                 f"Map.{key} differs from expected"
 
