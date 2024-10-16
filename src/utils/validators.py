@@ -41,6 +41,10 @@ def get_repeated_indexes(l: list) -> list[int]:
 
 def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str = "") -> dict:
     if isinstance(body, dict):
+        if schema == dict:
+            return {}
+        if not isinstance(schema, dict):
+            return {f"{path}"[1:]: "Item cannot be an object"}
         for key in schema:
             if key not in body:
                 return {f"{path}.{key}"[1:]: "Missing"}
@@ -52,7 +56,9 @@ def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str 
         for i, item in enumerate(body):
             if error := check_fields(item, schema[0], path=f"{path}[{i}]"):
                 return error
-    elif not isinstance(body, schema):
+    elif isinstance(schema, list) or \
+            isinstance(schema, dict) or \
+            not isinstance(body, schema):
         return {path[1:]: f"Wrong typing (must be `{schema}`)"}
     return {}
 
@@ -66,7 +72,7 @@ def typecheck_full_map(body: dict) -> dict:
         "difficulty": int,
         "r6_start": str | None,
         "map_data": str | None,
-        "additional_codes": [{"code": str, "description": str | None}],
+        "additional_codes": [{"code": str, "description": str}],
         "creators": [{"id": str, "role": str | None}],
         "verifiers": [{"id": str, "version": int | None}],
         "aliases": [str],
