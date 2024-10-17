@@ -16,11 +16,11 @@ class DiscordRequestMock:
             self,
             perms: int = 0,
             unauthorized: bool = False,
-            not_in_maplist: bool = False,
+            in_maplist: bool = True,
     ):
         self.perms = perms
         self.unauthorized = unauthorized
-        self.not_in_maplist = not_in_maplist
+        self.in_maplist = in_maplist
 
     async def get_user_profile(self, *args) -> dict:
         if self.unauthorized:
@@ -47,7 +47,7 @@ class DiscordRequestMock:
     async def get_maplist_profile(self, *args) -> dict:
         if self.unauthorized:
             raise aiohttp.ClientResponseError(None, (), status=http.HTTPStatus.UNAUTHORIZED)
-        elif self.not_in_maplist:
+        elif not self.in_maplist:
             raise aiohttp.ClientResponseError(None, (), status=http.HTTPStatus.NOT_FOUND)
 
         roles = []
