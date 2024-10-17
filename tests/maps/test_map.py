@@ -729,6 +729,16 @@ class TestEditMaps:
                 resp_map_data = await resp_get.json()
                 assert resp_map_data["deleted_on"] is not None, \
                     f"Map.deleted_on is not None after being deleted"
+
+                current_deleted_on = resp_map_data["deleted_on"]
+                async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp_delete_again:
+                    assert resp_delete_again.status == http.HTTPStatus.NO_CONTENT, \
+                        f"Deleting a map again returns {resp_delete_again.status}"
+                async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get_again:
+                    resp_del_data = await resp_get_again.json()
+                    assert current_deleted_on == resp_del_data["deleted_on"], \
+                        "Map.deleted_on changed upon double deletion"
+
             async with btd6ml_test_client.get(f"/maps/50") as resp_get:
                 resp_map_data = await resp_get.json()
                 assert resp_map_data["code"] == "MLXXXFA", "Last map is not the expected one"
