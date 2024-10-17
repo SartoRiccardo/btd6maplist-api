@@ -94,6 +94,12 @@ async def post(
             status=http.HTTPStatus.UNAUTHORIZED,
         )
 
+    if not request.content_type.startswith("multipart"):
+        return web.json_response(
+            {"errors": {"": "multipart/* Content-Type expected"}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
+
     discord_profile = maplist_profile["user"]
 
     embeds = []
