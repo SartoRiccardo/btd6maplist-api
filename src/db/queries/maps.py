@@ -619,7 +619,9 @@ async def get_legacy_maps(conn=None) -> list[PartialListMap]:
                 placement_curver > cvar.map_count
                 OR placement_curver = -1 AND difficulty = -1
             )
-        ORDER BY placement_curver ASC
+        ORDER BY
+            (placement_curver = -1),
+            placement_curver ASC
         """,
     )
     return [
