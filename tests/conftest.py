@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import pytest_asyncio
 import importlib
@@ -85,4 +87,14 @@ async def aiohttp_client():
 @pytest_asyncio.fixture(scope="session")
 async def btd6ml_test_client(btd6ml_app, aiohttp_client):
     """A TestClient for the BTD6 Maplist API"""
-    return await aiohttp_client(btd6ml_app)
+    yield await aiohttp_client(btd6ml_app)
+
+    # https://github.com/pytest-dev/pytest-asyncio/issues/435
+    event_loop = asyncio.get_running_loop()
+    tasks = [t for t in asyncio.all_tasks(event_loop) if not t.done()]
+    for t in tasks:
+        t.cancel()
+    try:
+        await asyncio.wait(tasks)
+    except asyncio.CancelledError:
+        pass

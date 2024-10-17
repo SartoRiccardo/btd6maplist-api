@@ -5,19 +5,9 @@ import pytest
 import requests
 from aiohttp import FormData
 from ..mocks import DiscordPermRoles
-from ..testutils import stringify_path
+from ..testutils import stringify_path, to_formdata
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
-
-
-def map_form_data(json_data: dict) -> FormData:
-    form_data = FormData()
-    form_data.add_field(
-        "data",
-        json.dumps(json_data),
-        content_type="application/json",
-    )
-    return form_data
 
 
 @pytest.mark.maps
@@ -107,7 +97,7 @@ async def test_add(btd6ml_test_client, mock_discord_api, map_payload, valid_code
             {"id": "usr2", "role": "Suggested the idea"},
         ],
     }
-    form_data = map_form_data(req_map_data)
+    form_data = to_formdata(req_map_data)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
             f"POST /maps (unauthorized) returned {resp.status} " \
@@ -191,7 +181,7 @@ async def test_add_aggr_fields(btd6ml_test_client, mock_discord_api, map_payload
         ],
         "optimal_heros": ["geraldo", "brickell"],
     }
-    form_data = map_form_data(req_map_data)
+    form_data = to_formdata(req_map_data)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
             f"POST /maps returned {resp.status} " \
@@ -277,7 +267,7 @@ class TestValidateMaps:
                         dtype.__class__ == original_type:
                     continue
                 current_data[key_path[-1]] = dtype
-                form_data = map_form_data(request_data)
+                form_data = to_formdata(request_data)
                 async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=form_data) as resp:
                     error_path = stringify_path(key_path)
                     assert resp.status == http.HTTPStatus.BAD_REQUEST, \
@@ -367,13 +357,13 @@ class TestValidateMaps:
             for test_val, error_msg in validations:
                 edit[key] = test_val
                 if test_add:
-                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(full_data)) as resp:
+                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(full_data)) as resp:
                         assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
                         resp_data = await resp.json()
                         assert "errors" in resp_data and error_path in resp_data["errors"], \
                             f"\"{error_path}\" was not in response.errors"
                 if test_edit:
-                    async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=map_form_data(full_data)) as resp:
+                    async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=to_formdata(full_data)) as resp:
                         assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned %d" % resp.status
                         resp_data = await resp.json()
                         assert "errors" in resp_data and error_path in resp_data["errors"], \
@@ -463,7 +453,7 @@ class TestValidateMaps:
             "difficulty": 0,
             "creators": [{"id": "1", "role": None}],
         }
-        form_data = map_form_data(req_map_data)
+        form_data = to_formdata(req_map_data)
         form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
         form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
         async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
@@ -475,7 +465,7 @@ class TestValidateMaps:
                 )
             )
 
-        form_data = map_form_data(req_map_data)
+        form_data = to_formdata(req_map_data)
         form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
         form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
         async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
@@ -487,7 +477,7 @@ class TestValidateMaps:
                 )
             )
 
-        form_data = map_form_data({
+        form_data = to_formdata({
             **req_map_data,
             "r6_start": "https://example.com/img1.png",
             "map_preview_url": "https://example.com/img2.png",
@@ -500,7 +490,7 @@ class TestValidateMaps:
                 valid_codes[0], ("https://example.com/img1.png", "https://example.com/img2.png"), full=True
             )
 
-        form_data = map_form_data({
+        form_data = to_formdata({
             **req_map_data,
             "code": valid_codes[1],
             "r6_start": "https://example.com/img1.png",
@@ -529,7 +519,7 @@ class TestValidateMaps:
         for key in correct_map_data:
             req_map_data = {**correct_map_data}
             del req_map_data[key]
-            async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+            async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Removing Map.{key} from editing a map resulted in code {resp.status}"
                 resp_data = await resp.json()
@@ -541,7 +531,7 @@ class TestValidateMaps:
                 "code": valid_codes[0],
             }
             del req_map_data[key]
-            async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+            async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Removing Map.{key} from adding a map resulted in code {resp.status}"
                 resp_data = await resp.json()
@@ -556,7 +546,7 @@ class TestValidateMaps:
                         key: [{**obj} for obj in correct_map_data[key]],
                     }
                     del req_map_data[key][0][inner_key]
-                    async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+                    async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
                         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                             f"Removing Map.{key}[0].{inner_key} from editing a map resulted in code {resp.status}"
                         resp_data = await resp.json()
@@ -569,7 +559,7 @@ class TestValidateMaps:
                         "code": valid_codes[0],
                     }
                     del req_map_data[key][0][inner_key]
-                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
                         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                             f"Removing Map.{key}[0].{inner_key} from adding a map resulted in code {resp.status}"
                         resp_data = await resp.json()
@@ -601,21 +591,21 @@ class TestValidateMaps:
 
         # Maplist Mods
         mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                 f"POST /maps/{test_code} returned {resp.status}"
 
-        async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+        async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.ok, f"PUT /maps/MLXXXAA returned {resp.status}"
             await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
 
         # Expert Mods
         mock_discord_api(perms=DiscordPermRoles.EXPLIST_MOD)
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                 f"POST /maps/{test_code} returned {resp.status}"
 
-        async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+        async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.ok, f"PUT /maps/MLXXXAB returned {resp.status}"
             await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
 
@@ -641,7 +631,7 @@ class TestValidateMaps:
         await make_admin_requests("unauthorized", http.HTTPStatus.UNAUTHORIZED)
 
         mock_discord_api()
-        await make_admin_requests("missing permissions", http.HTTPStatus.UNAUTHORIZED)
+        await make_admin_requests("missing permissions", http.HTTPStatus.FORBIDDEN)
 
 
 @pytest.mark.maps
@@ -681,7 +671,7 @@ class TestEditMaps:
             "optimal_heros": ["geraldo", "brickell"],
         }
 
-        async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+        async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.ok, f"PUT /maps/MLXXXCJ returned {resp.status}"
 
         async with btd6ml_test_client.get("/maps/MLXXXCJ") as resp:
@@ -795,7 +785,7 @@ class TestEditMaps:
             "placement_curver": 55,
             "creators": [{"id": "1", "role": "Legacy Role"}],
         }
-        form_data = map_form_data(req_map_data)
+        form_data = to_formdata(req_map_data)
         async with btd6ml_test_client.put(f"/maps/{code}", headers=HEADERS, data=form_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Editing legacy map with same placement returned {resp.status}"
@@ -806,7 +796,7 @@ class TestEditMaps:
             "placement_curver": 51,
             "creators": [{"id": "2", "role": "Legacy Role"}],
         }
-        form_data = map_form_data(req_map_data)
+        form_data = to_formdata(req_map_data)
         async with btd6ml_test_client.put(f"/maps/{code}", headers=HEADERS, data=form_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Editing legacy map with different placement returned {resp.status}"
@@ -824,7 +814,7 @@ class TestEditMaps:
             "creators": [{"id": "1", "role": None}],
             "aliases": ["deleted_map_alias1"],
         }
-        form_data = map_form_data(req_map_data)
+        form_data = to_formdata(req_map_data)
         async with btd6ml_test_client.put("/maps/MLXXXDF", headers=HEADERS, data=form_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Editing map with deleted map's alias returned {resp.status}"
@@ -851,7 +841,7 @@ async def test_large_placements(btd6ml_test_client, mock_discord_api, map_payloa
         "placement_allver": 99999,
         "creators": [{"id": "1", "role": None}],
     }
-    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/{valid_codes[0]}") as resp_get:
@@ -863,7 +853,7 @@ async def test_large_placements(btd6ml_test_client, mock_discord_api, map_payloa
 
     async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
         prev_map_data = await resp_get.json()
-    async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+    async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.NO_CONTENT, \
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
@@ -874,6 +864,6 @@ async def test_large_placements(btd6ml_test_client, mock_discord_api, map_payloa
                 "Map.placement_all != -1 when added with a large payload"
 
     mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
-    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=map_form_data(req_map_data)) as resp:
+    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
             f"Adding map with large placements as a list moderator returns {resp.status}"

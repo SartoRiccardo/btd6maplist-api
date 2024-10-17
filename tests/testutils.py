@@ -1,6 +1,8 @@
 import os
+import json
 import config
 import importlib.util
+import aiohttp
 
 
 def override_config():
@@ -44,3 +46,13 @@ def stringify_path(key_path: list):
     if path_str.startswith("."):
         path_str = path_str[1:]
     return path_str
+
+
+def to_formdata(json_data: dict) -> aiohttp.FormData:
+    form_data = aiohttp.FormData()
+    form_data.add_field(
+        "data",
+        json.dumps(json_data),
+        content_type="application/json",
+    )
+    return form_data

@@ -1,30 +1,37 @@
 import pytest
 import requests
-import copy
 
 
 @pytest.fixture
 def map_payload():
-    sample_data = {
-        "name": "Test Map Data",
-        "placement_allver": -1,
-        "placement_curver": -1,
-        "difficulty": -1,
-        "r6_start": None,
-        "map_data": None,
-        "map_preview_url": None,
-        "additional_codes": [],
-        "creators": [],
-        "verifiers": [],
-        "aliases":  [],
-        "version_compatibilities": [],
-        "optimal_heros": [],
-    }
-
-    def generate(code: str):
+    def generate(code: str, creators: dict = None):
         return {
             "code": code,
-            **copy.deepcopy(sample_data),
+            "name": "Test Map Data",
+            "placement_allver": -1,
+            "placement_curver": -1,
+            "difficulty": -1,
+            "r6_start": None,
+            "map_data": None,
+            "map_preview_url": None,
+            "additional_codes": [],
+            "creators": creators if creators is not None else [{"id": "1", "role": None}],
+            "verifiers": [],
+            "aliases": [],
+            "version_compatibilities": [],
+            "optimal_heros": [],
+        }
+    return generate
+
+
+@pytest.fixture
+def map_submission_payload():
+    def generate(code: str, notes: str = None, for_list: int = 0, proposed: int = 0) -> dict:
+        return {
+            "code": code,
+            "notes": notes,
+            "type": "list" if for_list == 0 else "experts",
+            "proposed": proposed,
         }
     return generate
 
