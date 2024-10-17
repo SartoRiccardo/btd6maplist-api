@@ -126,7 +126,7 @@ def require_perms(
 ):
     """
     Must be used with `with_maplist_profile` beforehand.
-    Returns 401 if doesn't have the required perms.
+    Returns 403 if doesn't have the required perms.
     Adds `is_admin`, `is_maplist_mod` and `is_explist_mod` to kwargs.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
@@ -143,7 +143,7 @@ def require_perms(
             if not (is_admin or is_explist_mod or is_list_mod):
                 return web.json_response(
                     {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
+                    status=http.HTTPStatus.FORBIDDEN,
                 )
 
             return await handler(
@@ -153,6 +153,7 @@ def require_perms(
                 is_admin=is_admin,
                 is_explist_mod=is_explist_mod,
                 is_list_mod=is_list_mod,
+                is_maplist_mod=is_list_mod,  # Alias cause I keep mixing them up
             )
         return wrapper
     return deco

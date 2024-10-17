@@ -17,6 +17,8 @@ async def delete(
         request: web.Request,
         resource: "src.db.model.MapSubmission" = None,
         maplist_profile: dict = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ):
     """
@@ -36,13 +38,26 @@ async def delete(
       "204":
         description: The resource was deleted correctly
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing or invalid.
+      "403":
+        description: You don't have the privileges for this.
       "404":
-        description: No map with that ID was found.
+        description: No map submission with that code was found.
     """
     if resource.rejected_by:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
     code = request.match_info["code"]
+
+    err_str = None
+    if resource.for_list == 0 and not is_maplist_mod:
+        err_str = "Maplist"
+    elif resource.for_list == 1 and not is_explist_mod:
+        err_str = "Expert List"
+    if err_str:
+        return web.json_response(
+            {"errors": {"": f"Can't delete a submission to the {err_str} if you're not an {err_str} Mod"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
 
     await reject_submission(code, maplist_profile["user"]["id"])
     asyncio.create_task(update_map_submission_wh(resource, fail=True))
