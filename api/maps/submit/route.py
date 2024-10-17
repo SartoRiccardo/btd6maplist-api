@@ -35,32 +35,42 @@ async def post(
 ) -> web.Response:
     """
     ---
-    description: Submits a map to the maplist. Currently all this does its be a proxy for a Discord webhook.
+    description: Submits a map to the maplist.
     tags:
     - Submissions
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
             type: object
+            required: [data, proof_completion]
             properties:
-              code:
+              data:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: The code of the map.
+                  notes:
+                    type: string
+                    description: Additional notes about the map.
+                    nullable: true
+                  type:
+                    type: string
+                    enum:
+                    - list
+                    - experts
+                    description: Which list the map will be submitted on
+                  proposed:
+                    type: integer
+                    description: The proposed difficulty/index of the list. 0-6 for list and 0-6 for experts.
+                  r6_start:
+                    type: string
+                    format: binary
+              proof_completion:
                 type: string
-                description: The code of the map.
-              notes:
-                type: string
-                description: Additional notes about the map.
-                nullable: true
-              type:
-                type: string
-                enum:
-                - list
-                - experts
-                description: Which list the map will be submitted on
-              proposed:
-                type: integer
-                description: The proposed difficulty/index of the list. 0-6 for list and 0-6 for experts.
+                format: binary
     responses:
       "204":
         description: The map was submitted
@@ -111,7 +121,10 @@ async def post(
             hook_url = WEBHOOK_LIST_SUBM if data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
 
     if len(embeds) == 0 or data is None or proof_fname is None:
-        return web.json_response(status=HTTPStatus.BAD_REQUEST)
+        return web.json_response(
+            {"errors": "Missing either data or proof_completion"},
+            status=HTTPStatus.BAD_REQUEST,
+        )
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
@@ -137,7 +150,7 @@ async def post(
         await send_map_submission_webhook(hook_url, data["code"], wh_data)
 
     asyncio.create_task(update_wh())
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(status=http.HTTPStatus.NO_CONTENT if prev_submission is not None else http.HTTPStatus.CREATED)
 
 
 async def get(request: web.Request) -> web.Response:
