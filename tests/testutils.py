@@ -32,3 +32,15 @@ def clear_db_patch_data():
     dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
     if os.path.exists(dbinfo_path):
         os.remove(dbinfo_path)
+
+
+def stringify_path(key_path: list):
+    path_str = ""
+    for i, key in enumerate(key_path):
+        if isinstance(key, int):
+            path_str += f"[{key}]"
+        else:
+            path_str += f".{key}"
+    if path_str.startswith("."):
+        path_str = path_str[1:]
+    return path_str
