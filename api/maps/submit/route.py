@@ -154,10 +154,13 @@ async def get(request: web.Request) -> web.Response:
         type: integer
       description: Pagination. Defaults to `1`.
     - in: query
-      name: omit_rejected
+      name: pending
       required: false
       schema:
-        type: boolean
+        type: string
+        enum:
+          - pending
+          - all
       description: Whether to omit rejected completions or not.
     responses:
       "200":
@@ -173,7 +176,7 @@ async def get(request: web.Request) -> web.Response:
                 pages:
                   type: integer
                   description: The total number of pages.
-                completions:
+                submissions:
                   type: array
                   items:
                     $ref: "#/components/schemas/MapSubmission"
