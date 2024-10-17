@@ -91,7 +91,7 @@ async def post(
                 type: string
                 format: binary
     responses:
-      "204":
+      "201":
         description: The resource was created correctly
       "400":
         description: |
@@ -144,4 +144,4 @@ async def post(
     await add_map(json_body)
     asyncio.create_task(update_submission_wh())
     asyncio.create_task(src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"]))
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(status=http.HTTPStatus.CREATED)

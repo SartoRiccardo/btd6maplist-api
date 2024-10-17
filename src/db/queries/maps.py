@@ -448,6 +448,8 @@ async def delete_map_relations(map_id: int, conn=None) -> None:
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
         for field in ["placement_allver", "placement_curver"]:
+            if field not in map_data:
+                continue
             await update_list_placements(field, -1, map_data[field])
 
         map_id = await conn.fetchval(
@@ -459,8 +461,8 @@ async def add_map(map_data: dict, conn=None) -> None:
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
             """,
-            map_data["code"], map_data["name"], map_data["placement_allver"],
-            map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
+            map_data["code"], map_data["name"], map_data.get("placement_allver", -1),
+            map_data.get("placement_curver", -1), map_data["difficulty"], map_data["map_data"],
             map_data["r6_start"], ";".join(map_data["optimal_heros"]), map_data["map_preview_url"],
         )
 

@@ -99,13 +99,18 @@ async def validate_full_map(
     if code_err := await validate_map_code(body["code"], validate_code_exists=validate_code_exists):
         errors["code"] = code_err
     for i, addcode in enumerate(body["additional_codes"][:MAX_ADD_CODES]):
-        if code_err := await validate_map_code(addcode["code"], validate_code_exists=validate_code_exists):
+        if code_err := await validate_map_code(addcode["code"]):
             errors[f"additional_codes[{i}].code"] = code_err
-        if addcode["description"] is not None and len(addcode["description"]) > MAX_TEXT_LEN:
-            errors[f"additional_codes[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+        if addcode["description"] is not None:
+            if len(addcode["description"]) > MAX_TEXT_LEN:
+                errors[f"additional_codes[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+            elif len(addcode["description"]) == 0:
+                errors[f"additional_codes[{i}].description"] = f"Cannot be an empty string"
 
     if len(body["name"]) > MAX_TEXT_LEN:
         errors["name"] = f"Must be under {MAX_TEXT_LEN} characters"
+    elif len(body["name"]) == 0:
+        errors["name"] = f"Must have a name"
 
     rep_alias_idx = get_repeated_indexes(body["aliases"])
     if len(rep_alias_idx):
@@ -123,9 +128,11 @@ async def validate_full_map(
             if isdup:
                 errors[f"aliases[{i}].alias"] = "Already assigned to another map"
 
-    if body["r6_start"] and not validators.url(body["r6_start"]):
+    if body["r6_start"] is not None and \
+            (len(body["r6_start"]) == 0 or not validators.url(body["r6_start"])):
         errors["r6_start"] = "Must be a URL"
-    if body["map_preview_url"] and not validators.url(body["map_preview_url"]):
+    if body["map_preview_url"] is not None and \
+            (len(body["map_preview_url"]) == 0 or not validators.url(body["map_preview_url"])):
         errors["map_preview_url"] = "Must be a URL"
 
     if len(body["creators"]) == 0:
@@ -143,8 +150,11 @@ async def validate_full_map(
             else:
                 body["creators"][i]["id"] = str(usr.id)
         for i, crt in enumerate(body["creators"]):
-            if crt["role"] is not None and len(crt["role"]) > MAX_TEXT_LEN:
-                errors[f"creators[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+            if crt["role"] is not None:
+                if len(crt["role"]) > MAX_TEXT_LEN:
+                    errors[f"creators[{i}].role"] = f"Must be under {MAX_TEXT_LEN} characters"
+                elif len(crt["role"]) == 0:
+                    errors[f"creators[{i}].role"] = "Cannot be an empty string"
 
     users = await asyncio.gather(*[
         get_user_min(verif["id"]) for verif in body["verifiers"]
@@ -164,8 +174,12 @@ async def validate_full_map(
     # FIMXE: Should take 50 from config
     if body["placement_curver"] > 50:
         del body["placement_curver"]
+    elif body["placement_curver"] < -1:
+        errors["placement_curver"] = "Must either be -1 or a between 1 and 50"
     if body["placement_allver"] > 50:
         del body["placement_allver"]
+    elif body["placement_allver"] < -1:
+        errors["placement_allver"] = "Must either be -1 or a between 1 and 50"
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
