@@ -1,5 +1,4 @@
 import asyncio
-
 import pytest
 import pytest_asyncio
 import importlib
@@ -91,10 +90,12 @@ async def btd6ml_test_client(btd6ml_app, aiohttp_client):
 
     # https://github.com/pytest-dev/pytest-asyncio/issues/435
     event_loop = asyncio.get_running_loop()
-    tasks = [t for t in asyncio.all_tasks(event_loop) if not t.done()]
-    for t in tasks:
-        t.cancel()
-    try:
-        await asyncio.wait(tasks)
-    except asyncio.CancelledError:
-        pass
+    self = asyncio.current_task(event_loop)
+    for task in asyncio.all_tasks(event_loop):
+        if task.done() or task == self:
+            continue
+        try:
+            task.cancel()
+            await task
+        except asyncio.CancelledError:
+            pass
