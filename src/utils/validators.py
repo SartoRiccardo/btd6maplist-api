@@ -215,8 +215,11 @@ async def validate_submission(body: dict) -> dict:
     errors = {}
     if await map_exists(body["code"]):
         return {"code": "Map already exists"}
-    if body["notes"] and len(body["notes"]) > MAX_LONG_TEXT_LEN:
-        errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
+    if body["notes"]:
+        if len(body["notes"]) > MAX_LONG_TEXT_LEN:
+            errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
+        if len(body["notes"]) == 0:
+            body["notes"] = None
     if body["type"] not in ["list", "experts"]:
         errors["type"] = f"Must be either `list` or `experts`"
     return errors

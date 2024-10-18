@@ -59,15 +59,14 @@ async def post(
                   type:
                     type: string
                     enum:
-                    - list
-                    - experts
-                    description: Which list the map will be submitted on
+                      - 0
+                      - 1
+                    description: |
+                      Which list the map will be submitted on.
+                      `0` for the Maplist and `1` for the Expert List.
                   proposed:
                     type: integer
                     description: The proposed difficulty/index of the list. 0-6 for list and 0-6 for experts.
-                  r6_start:
-                    type: string
-                    format: binary
               proof_completion:
                 type: string
                 format: binary
@@ -118,7 +117,7 @@ async def post(
             if len(errors := await validate_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
             if not data["proposed"] in range(len(propositions[data["type"]])):
-                return web.json_response({"errors": {"proposition": "Out of range"}}, status=HTTPStatus.BAD_REQUEST)
+                return web.json_response({"errors": {"proposed": "Out of range"}}, status=HTTPStatus.BAD_REQUEST)
 
             if not (btd6_map := await get_btd6_map(data["code"])):
                 return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)

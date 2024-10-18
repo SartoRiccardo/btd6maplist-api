@@ -5,7 +5,7 @@ import pathlib
 import pytest
 import requests
 from ..mocks import DiscordPermRoles
-from ..testutils import to_formdata, formdata_field_tester, fuzz_data
+from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
@@ -112,10 +112,11 @@ class TestSubmitMap:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Submitting map with missing formdata field {field} returns {resp.status}"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes):
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes, save_image):
         """Sets every field to another datatype, one by one"""
         mock_discord_api()
 
+        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
         valid_data = map_submission_payload(
             valid_codes[0],
             notes="Test Submission Notes",
@@ -123,27 +124,64 @@ class TestSubmitMap:
         extra_allowed = {"notes": [None]}
 
         for req_data, path, sub_value in fuzz_data(valid_data, extra_allowed):
-            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=to_formdata(req_data)) as resp:
+            form_data = to_formdata(req_data)
+            form_data.add_field("proof_completion", proof_completion.open("rb"))
+            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Setting Map.{path} to {sub_value} while editing a map returns {resp.status}"
                 resp_data = await resp.json()
                 assert "errors" in resp_data and path in resp_data["errors"], \
                     f"\"{path}\" was not in response.errors when set to {sub_value}"
 
-    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes):
+    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes,
+                                  save_image):
         """Test submitting a map with invalid fields in the payload"""
         mock_discord_api()
 
+        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
         valid_data = map_submission_payload(
             valid_codes[0],
             notes="Test Submission Notes",
         )
 
-        pytest.skip("Not Implemented")
+        async def call_endpoints(data: dict, edited_path: str, error_msg: str) -> None:
+            form_data = to_formdata(data)
+            form_data.add_field("proof_completion", proof_completion.open("rb"))
+            error_msg = error_msg.replace("[keypath]", edited_path)
+            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Submitting {error_msg} returned %d" % resp.status
+                resp_data = await resp.json()
+                assert "errors" in resp_data and edited_path in resp_data["errors"], \
+                    f"\"{edited_path}\" was not in response.errors"
 
-    # async def test_invalid_map(self, btd6ml_test_client, mock_discord_api):
-    #     """Test a submission of a map that doesn't exist or is already in the database"""
-    #     pytest.skip("Not Implemented")
+        # Code fields
+        validations = [
+            ("AAAAAA1", "a map with an invalid code"),
+            ("AAAAAAAA", "a map with an invalid code"),
+            ("MLXXXEJ", "a code of an already inserted map"),
+            ("AAAAAAA", "a map with a nonexistent code"),
+        ]
+        invalid_schema = {None: ["code"]}
+        for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # String fields
+        validations = [
+            # ("", f"a map with an empty [keypath]"),
+            ("a"*3000, f"a map with a [keypath] too long"),
+        ]
+        invalid_schema = {None: ["notes"]}
+        for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # List & Proposed
+        validations = [
+            (-1, "a map with a negative [keypath]"),
+            (30, "a map with a [keypath] too large"),
+        ]
+        invalid_schema = {None: ["proposed", "type"]}
+        for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
 
     async def test_unauthorized(self, btd6ml_test_client, mock_discord_api):
         """Test a submission from an unauthorized user or one not in the Maplist Discord"""
@@ -176,6 +214,18 @@ class TestHandleSubmissions:
                 resp_data = await resp_get.json()
                 assert any([subm["code"] == "SUBXBBJ" for subm in resp_data["submissions"]]), \
                     "Rejected submission doesn't appear among rejected"
+
+    @pytest.mark.delete
+    @pytest.mark.post
+    async def test_resubmit_rejected_map(self, btd6ml_test_client, mock_discord_api, valid_codes):
+        """Test resubmitting a map that was previously rejected"""
+        mock_discord_api()
+
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+        mock_discord_api()
+
+        pytest.skip("Not Implemented")
 
     @pytest.mark.delete
     async def test_reject_forbidden(self, btd6ml_test_client, mock_discord_api):

@@ -1,9 +1,8 @@
 import http
-import copy
 import pytest
 import requests
 from ..mocks import DiscordPermRoles
-from ..testutils import stringify_path, to_formdata, fuzz_data, invalidate_field
+from ..testutils import to_formdata, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
@@ -282,7 +281,7 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
             test_edit: bool = True,
             test_add: bool = True,
     ):
-        error_msg = error_msg.replace("[keypath]", edited_path)
+        error_msg = error_msg.replace("[keypath]", error_path)
         if test_add:
             async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_data)) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
