@@ -3,7 +3,7 @@ import copy
 import pytest
 import requests
 from ..mocks import DiscordPermRoles
-from ..testutils import stringify_path, to_formdata
+from ..testutils import stringify_path, to_formdata, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
@@ -246,53 +246,14 @@ async def test_fuzz(btd6ml_test_client, mock_discord_api, map_payload, valid_cod
         "creators": {"role": [str]},
         "verifiers": {"version": [float]},
     }
-    test_values = [[], {}, 1.7, "a", None]
 
-    async def send_request(key_path: list):
-        request_data = copy.deepcopy(req_map_data)
-        current_data = request_data
-        extra_types = extra_expected
-        for i, key in enumerate(key_path):
-            if isinstance(key, str) and isinstance(extra_types, dict) and key in extra_types:
-                extra_types = extra_types[key]
-            if i < len(key_path)-1:
-                current_data = current_data[key]
-
-        original_type = current_data[key_path[-1]].__class__
-        for dtype in test_values:
-            if isinstance(extra_types, list) and dtype.__class__ in extra_types or \
-                    dtype.__class__ == original_type:
-                continue
-            current_data[key_path[-1]] = dtype
-            form_data = to_formdata(request_data)
-            async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=form_data) as resp:
-                error_path = stringify_path(key_path)
-                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                    f"Setting Map.{error_path} to {dtype} while editing a map returns {resp.status}"
-                resp_data = await resp.json()
-                assert "errors" in resp_data and error_path in resp_data["errors"], \
-                    f"\"{error_path}\" was not in response.errors"
-
-    async def fuzz_request(current_path: list = None):
-        if current_path is None:
-            current_path = []
-        current_data = req_map_data
-        for key in current_path:
-            current_data = current_data[key]
-
-        if len(current_path) > 0:
-            await send_request(current_path)
-        if isinstance(current_data, dict):
-            for key in current_data:
-                current_path.append(key)
-                await fuzz_request(current_path)
-                current_path.pop()
-        elif isinstance(current_data, list):
-            current_path.append(0)
-            await fuzz_request(current_path)
-            current_path.pop()
-
-    await fuzz_request()
+    for req_data, path, sub_value in fuzz_data(req_map_data, extra_expected):
+        async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_data)) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Setting Map.{path} to {sub_value} while editing a map returns {resp.status}"
+            resp_data = await resp.json()
+            assert "errors" in resp_data and path in resp_data["errors"], \
+                f"\"{path}\" was not in response.errors"
 
 
 @pytest.mark.maps
@@ -314,120 +275,71 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
         "optimal_heros": ["geraldo", "brickell"],
     }
 
-    async def invalidate_field(schema: dict | list, test_func, current_path: list = None):
-        if current_path is None:
-            current_path = []
-
-        if isinstance(schema, dict):
-            for key in schema:
-                if key is not None:
-                    current_path.append(key)
-                await invalidate_field(schema[key], test_func, current_path)
-                if key is not None:
-                    current_path.pop()
-        elif isinstance(schema, list):
-            for key in schema:
-                appended = 1
-                request_data = copy.deepcopy(req_map_data)
-                current_data = request_data
-                for i, path_key in enumerate(current_path):
-                    while isinstance(current_data, list):
-                        appended += 1
-                        current_path.append(0)
-                        current_data = current_data[0]
-                    current_data = current_data[path_key]
-                while isinstance(current_data, list):
-                    appended += 1
-                    current_path.append(0)
-                    current_data = current_data[0]
-                current_path.append(key)
-                await test_func(request_data, current_data, key, current_path)
-                for _ in range(appended):
-                    current_path.pop()
-
     async def call_endpoints(
-            validations: list[tuple],
-            full_data: dict,
-            edit: dict,
-            key: str,
-            key_path: list,
+            req_data: dict,
+            error_path: str,
+            error_msg: str = "",
             test_edit: bool = True,
             test_add: bool = True,
     ):
-        error_path = stringify_path(key_path)
-        for test_val, error_msg in validations:
-            edit[key] = test_val
-            if test_add:
-                async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(full_data)) as resp:
-                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
-                    resp_data = await resp.json()
-                    assert "errors" in resp_data and error_path in resp_data["errors"], \
-                        f"\"{error_path}\" was not in response.errors"
-            if test_edit:
-                async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=to_formdata(full_data)) as resp:
-                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned %d" % resp.status
-                    resp_data = await resp.json()
-                    assert "errors" in resp_data and error_path in resp_data["errors"], \
-                        f"\"{error_path}\" was not in response.errors"
+        error_msg = error_msg.replace("[keypath]", edited_path)
+        if test_add:
+            async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_data)) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
+                resp_data = await resp.json()
+                assert "errors" in resp_data and error_path in resp_data["errors"], \
+                    f"\"{error_path}\" was not in response.errors"
+        if test_edit:
+            async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=to_formdata(req_data)) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned %d" % resp.status
+                resp_data = await resp.json()
+                assert "errors" in resp_data and error_path in resp_data["errors"], \
+                    f"\"{error_path}\" was not in response.errors"
 
-    async def assert_codes(full_data: dict, edit: dict, key: str, key_path: list):
-        validations = [
-            ("AAAAAA1", "a map with an invalid code"),
-            ("AAAAAAAA", "a map with an invalid code"),
-            ("MLXXXEJ", "a map with an already inserted map"),
-            ("AAAAAAA", "a map with a nonexistent code"),
-        ]
-        await call_endpoints(validations, full_data, edit, key, key_path, test_edit=stringify_path(key_path) != "code")
-    await invalidate_field(
-        {None: ["code"], "additional_codes": ["code"]},
-        assert_codes,
-    )
+    # Code fields
+    validations = [
+        ("AAAAAA1", "a map with an invalid code"),
+        ("AAAAAAAA", "a map with an invalid code"),
+        ("MLXXXEJ", "a map with an already inserted map"),
+        ("AAAAAAA", "a map with a nonexistent code"),
+    ]
+    invalid_schema = {None: ["code"], "additional_codes": ["code"]}
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg, test_edit=edited_path != "code")
 
-    async def assert_users(*args):
-        validations = [
-            ("999999999", "a map with a nonexistent user"),
-            ("a", "a map with a non-numeric user"),
-        ]
-        await call_endpoints(validations, *args)
-    await invalidate_field(
-        {"creators": ["id"], "verifiers": ["id"]},
-        assert_users,
-    )
+    # User fields
+    validations = [
+        ("999999999", "a map with a nonexistent user"),
+        ("a", "a map with a non-numeric user"),
+    ]
+    invalid_schema = {"creators": ["id"], "verifiers": ["id"]}
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg)
 
-    async def assert_string_fields(full_data: dict, edit: dict, key: str, key_path: list):
-        error_path = stringify_path(key_path)
-        validations = [
-            ("", f"a map with an empty {error_path}"),
-            ("a"*1000, f"a map with a {error_path} too long"),
-        ]
-        await call_endpoints(validations, full_data, edit, key, key_path)
-    await invalidate_field(
-        {
-            None: ["name", "r6_start", "map_preview_url"],
-            "additional_codes": ["description"],
-            "creators": ["role"],
-        },
-        assert_string_fields,
-    )
+    # String fields
+    validations = [
+        ("", f"a map with an empty [keypath]"),
+        ("a"*1000, f"a map with a [keypath] too long"),
+    ]
+    invalid_schema = {
+        None: ["name", "r6_start", "map_preview_url"],
+        "additional_codes": ["description"],
+        "creators": ["role"],
+    }
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg)
 
-    async def assert_non_neg_fields(full_data: dict, edit: dict, key: str, key_path: list):
-        # -1 is a special value so that would be valid
-        error_path = stringify_path(key_path)
-        validations = [(-2, f"a map with a negative {error_path}")]
-        await call_endpoints(validations, full_data, edit, key, key_path)
-    await invalidate_field(
-        {None: ["placement_curver", "placement_allver", "difficulty"]},
-        assert_non_neg_fields,
-    )
+    # Non-negative fields. -1 is a special value so that would be valid
+    validations = [(-2, f"a map with a negative [keypath]")]
+    invalid_schema = {None: ["placement_curver", "placement_allver", "difficulty"]}
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg)
 
-    async def assert_int_too_big(full_data: dict, edit: dict, key: str, key_path: list):
-        error_path = stringify_path(key_path)
-        validations = [(999999, f"a map with a {error_path} too large")]
-        await call_endpoints(validations, full_data, edit, key, key_path)
-    await invalidate_field(
-        {None: ["difficulty"]},
-        assert_int_too_big,
-    )
+    # Integer too large
+    validations = [(999999, f"a map with a [keypath] too large")]
+    invalid_schema = {None: ["difficulty"]}
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg)
 
 
 @pytest.mark.maps

@@ -5,7 +5,7 @@ import pathlib
 import pytest
 import requests
 from ..mocks import DiscordPermRoles
-from ..testutils import to_formdata, formdata_field_tester
+from ..testutils import to_formdata, formdata_field_tester, fuzz_data
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
@@ -26,7 +26,7 @@ class TestGetSubmissions:
         async with btd6ml_test_client.get("/maps/submit") as resp:
             assert resp.status == http.HTTPStatus.OK, f"GET /maps/submit returned {resp.status}"
             resp_maps = await resp.json()
-            expected_items = 120-9
+            expected_items = 120-9  # Implicitly makes sure there also aren't any duplicates
             expected_pages = math.ceil(expected_items/50)
             assert resp_maps["total"] == expected_items, "Total submission count differs from expected"
             assert resp_maps["pages"] == expected_pages, "Total page count differs from expected"
@@ -112,11 +112,33 @@ class TestSubmitMap:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Submitting map with missing formdata field {field} returns {resp.status}"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes):
         """Sets every field to another datatype, one by one"""
-        pytest.skip("Not Implemented")
+        mock_discord_api()
 
-    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api):
+        valid_data = map_submission_payload(
+            valid_codes[0],
+            notes="Test Submission Notes",
+        )
+        extra_allowed = {"notes": [None]}
+
+        for req_data, path, sub_value in fuzz_data(valid_data, extra_allowed):
+            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=to_formdata(req_data)) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Setting Map.{path} to {sub_value} while editing a map returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and path in resp_data["errors"], \
+                    f"\"{path}\" was not in response.errors when set to {sub_value}"
+
+    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes):
+        """Test submitting a map with invalid fields in the payload"""
+        mock_discord_api()
+
+        valid_data = map_submission_payload(
+            valid_codes[0],
+            notes="Test Submission Notes",
+        )
+
         pytest.skip("Not Implemented")
 
     # async def test_invalid_map(self, btd6ml_test_client, mock_discord_api):
