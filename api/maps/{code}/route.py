@@ -42,7 +42,8 @@ async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         maplist_profile: dict = None,
-        is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ):
     """
@@ -91,15 +92,14 @@ async def put(
         return json_body
 
     json_body["code"] = resource.code
-    if not is_admin:
-        if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
-            if "difficulty" in json_body:
-                del json_body["difficulty"]
-        if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-            if "placement_allver" in json_body:
-                del json_body["placement_allver"]
-            if "placement_curver" in json_body:
-                del json_body["placement_curver"]
+    if not is_explist_mod:
+        if "difficulty" in json_body:
+            del json_body["difficulty"]
+    if not is_maplist_mod:
+        if "placement_allver" in json_body:
+            del json_body["placement_allver"]
+        if "placement_curver" in json_body:
+            del json_body["placement_curver"]
 
     await edit_map(json_body, resource)
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"]))
