@@ -3,6 +3,7 @@ import json
 import config
 import importlib.util
 import aiohttp
+from typing import Any
 
 
 def override_config():
@@ -56,3 +57,13 @@ def to_formdata(json_data: dict) -> aiohttp.FormData:
         content_type="application/json",
     )
     return form_data
+
+
+def formdata_field_tester(content: list[tuple[str, Any, dict[str, Any]]]):
+    for i in range(len(content)):
+        form_data = aiohttp.FormData()
+        for j, content_info in enumerate(content):
+            if i == j:
+                continue
+            form_data.add_field(content_info[0], content_info[1])
+        yield form_data, content[i][0]

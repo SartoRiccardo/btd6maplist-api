@@ -1,7 +1,10 @@
 import asyncio
+import pathlib
+
 import pytest
 import pytest_asyncio
 import importlib
+import requests
 import src.db.connection
 import src.requests
 from .mocks.DiscordRequestMock import DiscordRequestMock
@@ -99,3 +102,12 @@ async def btd6ml_test_client(btd6ml_app, aiohttp_client):
             await task
         except asyncio.CancelledError:
             pass
+
+
+@pytest.fixture
+def save_image(tmp_path: pathlib.Path):
+    def save(url: str, filename: str) -> pathlib.Path:
+        path = tmp_path / filename
+        path.write_bytes(requests.get(url).content)
+        return path
+    return save

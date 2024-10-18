@@ -227,387 +227,402 @@ async def test_add_aggr_fields(btd6ml_test_client, mock_discord_api, map_payload
 @pytest.mark.put
 @pytest.mark.post
 @pytest.mark.maps
-class TestValidateMaps:
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
-        """Sets every field to another datatype, one by one"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
-        req_map_data = {
-            **map_payload(valid_codes[0]),
-            "placement_curver": 1,
-            "placement_allver": 1,
-            "creators": [{"id": "1", "role": None}],
-            "additional_codes": [{"code": valid_codes[1], "description": "Additional Code 1"}],
-            "verifiers": [{"id": "3", "version": None}],
-            "aliases": ["alias1", "alias2"],
-            "version_compatibilities": [{"status": 2, "version": 390}],
-            "optimal_heros": ["geraldo", "brickell"],
-        }
-        extra_expected = {
-            "map_data": [str],
-            "r6_start": [str],
-            "map_preview_url": [str],
-            "creators": {"role": [str]},
-            "verifiers": {"version": [float]},
-        }
-        test_values = [[], {}, 1.7, "a", None]
+async def test_fuzz(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+    """Sets every field to another datatype, one by one"""
+    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    req_map_data = {
+        **map_payload(valid_codes[0]),
+        "placement_curver": 1,
+        "placement_allver": 1,
+        "creators": [{"id": "1", "role": None}],
+        "additional_codes": [{"code": valid_codes[1], "description": "Additional Code 1"}],
+        "verifiers": [{"id": "3", "version": None}],
+        "aliases": ["alias1", "alias2"],
+        "version_compatibilities": [{"status": 2, "version": 390}],
+        "optimal_heros": ["geraldo", "brickell"],
+    }
+    extra_expected = {
+        "map_data": [str],
+        "r6_start": [str],
+        "map_preview_url": [str],
+        "creators": {"role": [str]},
+        "verifiers": {"version": [float]},
+    }
+    test_values = [[], {}, 1.7, "a", None]
 
-        async def send_request(key_path: list):
-            request_data = copy.deepcopy(req_map_data)
-            current_data = request_data
-            extra_types = extra_expected
-            for i, key in enumerate(key_path):
-                if isinstance(key, str) and isinstance(extra_types, dict) and key in extra_types:
-                    extra_types = extra_types[key]
-                if i < len(key_path)-1:
-                    current_data = current_data[key]
-
-            original_type = current_data[key_path[-1]].__class__
-            for dtype in test_values:
-                if isinstance(extra_types, list) and dtype.__class__ in extra_types or \
-                        dtype.__class__ == original_type:
-                    continue
-                current_data[key_path[-1]] = dtype
-                form_data = to_formdata(request_data)
-                async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=form_data) as resp:
-                    error_path = stringify_path(key_path)
-                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                        f"Setting Map.{error_path} to {dtype} while editing a map returns {resp.status}"
-                    resp_data = await resp.json()
-                    assert "errors" in resp_data and error_path in resp_data["errors"], \
-                        f"\"{error_path}\" was not in response.errors"
-
-        async def fuzz_request(current_path: list = None):
-            if current_path is None:
-                current_path = []
-            current_data = req_map_data
-            for key in current_path:
+    async def send_request(key_path: list):
+        request_data = copy.deepcopy(req_map_data)
+        current_data = request_data
+        extra_types = extra_expected
+        for i, key in enumerate(key_path):
+            if isinstance(key, str) and isinstance(extra_types, dict) and key in extra_types:
+                extra_types = extra_types[key]
+            if i < len(key_path)-1:
                 current_data = current_data[key]
 
-            if len(current_path) > 0:
-                await send_request(current_path)
-            if isinstance(current_data, dict):
-                for key in current_data:
-                    current_path.append(key)
-                    await fuzz_request(current_path)
-                    current_path.pop()
-            elif isinstance(current_data, list):
-                current_path.append(0)
+        original_type = current_data[key_path[-1]].__class__
+        for dtype in test_values:
+            if isinstance(extra_types, list) and dtype.__class__ in extra_types or \
+                    dtype.__class__ == original_type:
+                continue
+            current_data[key_path[-1]] = dtype
+            form_data = to_formdata(request_data)
+            async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=form_data) as resp:
+                error_path = stringify_path(key_path)
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Setting Map.{error_path} to {dtype} while editing a map returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and error_path in resp_data["errors"], \
+                    f"\"{error_path}\" was not in response.errors"
+
+    async def fuzz_request(current_path: list = None):
+        if current_path is None:
+            current_path = []
+        current_data = req_map_data
+        for key in current_path:
+            current_data = current_data[key]
+
+        if len(current_path) > 0:
+            await send_request(current_path)
+        if isinstance(current_data, dict):
+            for key in current_data:
+                current_path.append(key)
                 await fuzz_request(current_path)
                 current_path.pop()
+        elif isinstance(current_data, list):
+            current_path.append(0)
+            await fuzz_request(current_path)
+            current_path.pop()
 
-        await fuzz_request()
+    await fuzz_request()
 
-    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
-        """Test adding and editing map with invalid fields in the payload"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
 
-        req_map_data = {
-            **map_payload(valid_codes[3]),
-            "placement_curver": 1,
-            "placement_allver": 1,
-            "creators": [{"id": "1", "role": None}],
-            "additional_codes": [{"code": valid_codes[2], "description": "Additional Code 1"}],
-            "verifiers": [{"id": "3", "version": None}],
-            "aliases": ["alias1", "alias2"],
-            "version_compatibilities": [{"status": 2, "version": 390}],
-            "optimal_heros": ["geraldo", "brickell"],
-        }
+@pytest.mark.maps
+@pytest.mark.put
+@pytest.mark.post
+async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+    """Test adding and editing map with invalid fields in the payload"""
+    mock_discord_api(perms=DiscordPermRoles.ADMIN)
 
-        async def invalidate_field(schema: dict | list, test_func, current_path: list = None):
-            if current_path is None:
-                current_path = []
+    req_map_data = {
+        **map_payload(valid_codes[3]),
+        "placement_curver": 1,
+        "placement_allver": 1,
+        "creators": [{"id": "1", "role": None}],
+        "additional_codes": [{"code": valid_codes[2], "description": "Additional Code 1"}],
+        "verifiers": [{"id": "3", "version": None}],
+        "aliases": ["alias1", "alias2"],
+        "version_compatibilities": [{"status": 2, "version": 390}],
+        "optimal_heros": ["geraldo", "brickell"],
+    }
 
-            if isinstance(schema, dict):
-                for key in schema:
-                    if key is not None:
-                        current_path.append(key)
-                    await invalidate_field(schema[key], test_func, current_path)
-                    if key is not None:
-                        current_path.pop()
-            elif isinstance(schema, list):
-                for key in schema:
-                    appended = 1
-                    request_data = copy.deepcopy(req_map_data)
-                    current_data = request_data
-                    for i, path_key in enumerate(current_path):
-                        while isinstance(current_data, list):
-                            appended += 1
-                            current_path.append(0)
-                            current_data = current_data[0]
-                        current_data = current_data[path_key]
+    async def invalidate_field(schema: dict | list, test_func, current_path: list = None):
+        if current_path is None:
+            current_path = []
+
+        if isinstance(schema, dict):
+            for key in schema:
+                if key is not None:
+                    current_path.append(key)
+                await invalidate_field(schema[key], test_func, current_path)
+                if key is not None:
+                    current_path.pop()
+        elif isinstance(schema, list):
+            for key in schema:
+                appended = 1
+                request_data = copy.deepcopy(req_map_data)
+                current_data = request_data
+                for i, path_key in enumerate(current_path):
                     while isinstance(current_data, list):
                         appended += 1
                         current_path.append(0)
                         current_data = current_data[0]
-                    current_path.append(key)
-                    await test_func(request_data, current_data, key, current_path)
-                    for _ in range(appended):
-                        current_path.pop()
+                    current_data = current_data[path_key]
+                while isinstance(current_data, list):
+                    appended += 1
+                    current_path.append(0)
+                    current_data = current_data[0]
+                current_path.append(key)
+                await test_func(request_data, current_data, key, current_path)
+                for _ in range(appended):
+                    current_path.pop()
 
-        async def call_endpoints(
-                validations: list[tuple],
-                full_data: dict,
-                edit: dict,
-                key: str,
-                key_path: list,
-                test_edit: bool = True,
-                test_add: bool = True,
-        ):
-            error_path = stringify_path(key_path)
-            for test_val, error_msg in validations:
-                edit[key] = test_val
-                if test_add:
-                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(full_data)) as resp:
-                        assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
-                        resp_data = await resp.json()
-                        assert "errors" in resp_data and error_path in resp_data["errors"], \
-                            f"\"{error_path}\" was not in response.errors"
-                if test_edit:
-                    async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=to_formdata(full_data)) as resp:
-                        assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned %d" % resp.status
-                        resp_data = await resp.json()
-                        assert "errors" in resp_data and error_path in resp_data["errors"], \
-                            f"\"{error_path}\" was not in response.errors"
+    async def call_endpoints(
+            validations: list[tuple],
+            full_data: dict,
+            edit: dict,
+            key: str,
+            key_path: list,
+            test_edit: bool = True,
+            test_add: bool = True,
+    ):
+        error_path = stringify_path(key_path)
+        for test_val, error_msg in validations:
+            edit[key] = test_val
+            if test_add:
+                async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(full_data)) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and error_path in resp_data["errors"], \
+                        f"\"{error_path}\" was not in response.errors"
+            if test_edit:
+                async with btd6ml_test_client.put("/maps/MLXXXEI", headers=HEADERS, data=to_formdata(full_data)) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned %d" % resp.status
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and error_path in resp_data["errors"], \
+                        f"\"{error_path}\" was not in response.errors"
 
-        async def assert_codes(full_data: dict, edit: dict, key: str, key_path: list):
-            validations = [
-                ("AAAAAAA", "a map with a nonexistent code does not returns %d"),
-                ("AAAAAA1", "a map with an invalid code does not returns %d"),
-                ("AAAAAAAA", "a map with an invalid code does not returns %d"),
-                ("MLXXXEJ", "a map with an already inserted map does not returns %d"),
-            ]
-            await call_endpoints(validations, full_data, edit, key, key_path, test_edit=stringify_path(key_path) != "code")
-        await invalidate_field(
-            {None: ["code"], "additional_codes": ["code"]},
-            assert_codes,
-        )
-
-        async def assert_users(*args):
-            validations = [
-                ("999999999", "a map with a nonexistent user"),
-                ("a", "a map with a non-numeric user"),
-            ]
-            await call_endpoints(validations, *args)
-        await invalidate_field(
-            {"creators": ["id"], "verifiers": ["id"]},
-            assert_users,
-        )
-
-        async def assert_string_fields(full_data: dict, edit: dict, key: str, key_path: list):
-            error_path = stringify_path(key_path)
-            validations = [
-                ("", f"a map with an empty {error_path}"),
-                ("a"*1000, f"a map with a {error_path} too long"),
-            ]
-            await call_endpoints(validations, full_data, edit, key, key_path)
-        await invalidate_field(
-            {
-                None: ["name", "r6_start", "map_preview_url"],
-                "additional_codes": ["description"],
-                "creators": ["role"],
-            },
-            assert_string_fields,
-        )
-
-        async def assert_non_neg_fields(full_data: dict, edit: dict, key: str, key_path: list):
-            # -1 is a special value so that would be valid
-            error_path = stringify_path(key_path)
-            validations = [(-2, f"a map with a negative {error_path}")]
-            await call_endpoints(validations, full_data, edit, key, key_path)
-        await invalidate_field(
-            {None: ["placement_curver", "placement_allver", "difficulty"]},
-            assert_non_neg_fields,
-        )
-
-        async def assert_int_too_big(full_data: dict, edit: dict, key: str, key_path: list):
-            error_path = stringify_path(key_path)
-            validations = [(999999, f"a map with a {error_path} too large")]
-            await call_endpoints(validations, full_data, edit, key, key_path)
-        await invalidate_field(
-            {None: ["difficulty"]},
-            assert_int_too_big,
-        )
-
-    async def test_req_with_images(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes, tmp_path):
-        """Test adding and editing map with images in the payload works"""
-        async def assert_images(code: str, expected: tuple[str, str], full: bool = False):
-            async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
-                resp_data = await resp_get.json()
-                check_url = resp_data["r6_start"] if full else resp_data["r6_start"].split("/")[-1]
-                assert check_url == expected[0], "Map.r6_start differs from expected"
-                check_url = resp_data["map_preview_url"] if full else resp_data["map_preview_url"].split("/")[-1]
-                assert check_url == expected[1], "Map.map_preview_url differs from expected"
-
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
-
-        image_urls = [
-            "https://dummyimage.com/400x300/00ff00/000",
-            "https://dummyimage.com/600x400/0000ff/fff",
+    async def assert_codes(full_data: dict, edit: dict, key: str, key_path: list):
+        validations = [
+            ("AAAAAA1", "a map with an invalid code"),
+            ("AAAAAAAA", "a map with an invalid code"),
+            ("MLXXXEJ", "a map with an already inserted map"),
+            ("AAAAAAA", "a map with a nonexistent code"),
         ]
-        for i, url in enumerate(image_urls):
-            path = tmp_path / f"image{i}.png"
-            path.write_bytes(requests.get(url).content)
+        await call_endpoints(validations, full_data, edit, key, key_path, test_edit=stringify_path(key_path) != "code")
+    await invalidate_field(
+        {None: ["code"], "additional_codes": ["code"]},
+        assert_codes,
+    )
+
+    async def assert_users(*args):
+        validations = [
+            ("999999999", "a map with a nonexistent user"),
+            ("a", "a map with a non-numeric user"),
+        ]
+        await call_endpoints(validations, *args)
+    await invalidate_field(
+        {"creators": ["id"], "verifiers": ["id"]},
+        assert_users,
+    )
+
+    async def assert_string_fields(full_data: dict, edit: dict, key: str, key_path: list):
+        error_path = stringify_path(key_path)
+        validations = [
+            ("", f"a map with an empty {error_path}"),
+            ("a"*1000, f"a map with a {error_path} too long"),
+        ]
+        await call_endpoints(validations, full_data, edit, key, key_path)
+    await invalidate_field(
+        {
+            None: ["name", "r6_start", "map_preview_url"],
+            "additional_codes": ["description"],
+            "creators": ["role"],
+        },
+        assert_string_fields,
+    )
+
+    async def assert_non_neg_fields(full_data: dict, edit: dict, key: str, key_path: list):
+        # -1 is a special value so that would be valid
+        error_path = stringify_path(key_path)
+        validations = [(-2, f"a map with a negative {error_path}")]
+        await call_endpoints(validations, full_data, edit, key, key_path)
+    await invalidate_field(
+        {None: ["placement_curver", "placement_allver", "difficulty"]},
+        assert_non_neg_fields,
+    )
+
+    async def assert_int_too_big(full_data: dict, edit: dict, key: str, key_path: list):
+        error_path = stringify_path(key_path)
+        validations = [(999999, f"a map with a {error_path} too large")]
+        await call_endpoints(validations, full_data, edit, key, key_path)
+    await invalidate_field(
+        {None: ["difficulty"]},
+        assert_int_too_big,
+    )
+
+
+@pytest.mark.maps
+@pytest.mark.put
+@pytest.mark.post
+async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload, valid_codes, tmp_path):
+    """Test adding and editing map with images in the payload works"""
+    async def assert_images(code: str, expected: tuple[str, str], full: bool = False):
+        async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
+            resp_data = await resp_get.json()
+            check_url = resp_data["r6_start"] if full else resp_data["r6_start"].split("/")[-1]
+            assert check_url == expected[0], "Map.r6_start differs from expected"
+            check_url = resp_data["map_preview_url"] if full else resp_data["map_preview_url"].split("/")[-1]
+            assert check_url == expected[1], "Map.map_preview_url differs from expected"
+
+    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+    image_urls = [
+        "https://dummyimage.com/400x300/00ff00/000",
+        "https://dummyimage.com/600x400/0000ff/fff",
+    ]
+    for i, url in enumerate(image_urls):
+        path = tmp_path / f"image{i}.png"
+        path.write_bytes(requests.get(url).content)
+
+    req_map_data = {
+        **map_payload(valid_codes[0]),
+        "difficulty": 0,
+        "creators": [{"id": "1", "role": None}],
+    }
+    form_data = to_formdata(req_map_data)
+    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
+    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
+        assert resp.ok, f"Adding a map with images in the payload return {resp.status}"
+        await assert_images(
+            valid_codes[0], (
+                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
+                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
+            )
+        )
+
+    form_data = to_formdata(req_map_data)
+    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
+    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
+        assert resp.ok, f"Editing a map with images in the payload return {resp.status}"
+        await assert_images(
+            valid_codes[0], (
+                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
+                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
+            )
+        )
+
+    form_data = to_formdata({
+        **req_map_data,
+        "r6_start": "https://example.com/img1.png",
+        "map_preview_url": "https://example.com/img2.png",
+    })
+    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
+    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data):
+        assert resp.ok, f"Editing a map with images in the payload and json body return {resp.status}"
+        await assert_images(
+            valid_codes[0], ("https://example.com/img1.png", "https://example.com/img2.png"), full=True
+        )
+
+    form_data = to_formdata({
+        **req_map_data,
+        "code": valid_codes[1],
+        "r6_start": "https://example.com/img1.png",
+        "map_preview_url": "https://example.com/img2.png",
+    })
+    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
+    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    async with btd6ml_test_client.post(f"/maps", headers=HEADERS, data=form_data):
+        assert resp.ok, f"Adding a map with images in the payload and json body return {resp.status}"
+        await assert_images(
+            valid_codes[1], ("https://example.com/img1.png", "https://example.com/img2.png"), full=True
+        )
+
+
+@pytest.mark.maps
+@pytest.mark.post
+@pytest.mark.put
+async def test_missing_fields(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+    """Test a request with some missing fields"""
+    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+    correct_map_data = {
+        **map_payload("MLXXXCJ"),
+        "difficulty": 0,
+        "creators": [{"id": "1", "role": None}],
+        "additional_codes": [{"code": valid_codes[1], "description": "Additional Code 1"}],
+        "verifiers": [{"id": "3", "version": None}],
+        "version_compatibilities": [{"status": 2, "version": 390}],
+    }
+    for key in correct_map_data:
+        req_map_data = {**correct_map_data}
+        del req_map_data[key]
+        async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Removing Map.{key} from editing a map resulted in code {resp.status}"
+            resp_data = await resp.json()
+            assert "errors" in resp_data and key in resp_data["errors"], \
+                f"{key} not in errors"
 
         req_map_data = {
-            **map_payload(valid_codes[0]),
-            "difficulty": 0,
-            "creators": [{"id": "1", "role": None}],
+            **correct_map_data,
+            "code": valid_codes[0],
         }
-        form_data = to_formdata(req_map_data)
-        form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-        form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
-            assert resp.ok, f"Adding a map with images in the payload return {resp.status}"
-            await assert_images(
-                valid_codes[0], (
-                    "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                    "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-                )
-            )
-
-        form_data = to_formdata(req_map_data)
-        form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-        form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
-        async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
-            assert resp.ok, f"Editing a map with images in the payload return {resp.status}"
-            await assert_images(
-                valid_codes[0], (
-                    "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                    "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-                )
-            )
-
-        form_data = to_formdata({
-            **req_map_data,
-            "r6_start": "https://example.com/img1.png",
-            "map_preview_url": "https://example.com/img2.png",
-        })
-        form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-        form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
-        async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data):
-            assert resp.ok, f"Editing a map with images in the payload and json body return {resp.status}"
-            await assert_images(
-                valid_codes[0], ("https://example.com/img1.png", "https://example.com/img2.png"), full=True
-            )
-
-        form_data = to_formdata({
-            **req_map_data,
-            "code": valid_codes[1],
-            "r6_start": "https://example.com/img1.png",
-            "map_preview_url": "https://example.com/img2.png",
-        })
-        form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-        form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
-        async with btd6ml_test_client.post(f"/maps", headers=HEADERS, data=form_data):
-            assert resp.ok, f"Adding a map with images in the payload and json body return {resp.status}"
-            await assert_images(
-                valid_codes[1], ("https://example.com/img1.png", "https://example.com/img2.png"), full=True
-            )
-
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
-        """Test a request with some missing fields"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
-
-        correct_map_data = {
-            **map_payload("MLXXXCJ"),
-            "difficulty": 0,
-            "creators": [{"id": "1", "role": None}],
-            "additional_codes": [{"code": valid_codes[1], "description": "Additional Code 1"}],
-            "verifiers": [{"id": "3", "version": None}],
-            "version_compatibilities": [{"status": 2, "version": 390}],
-        }
-        for key in correct_map_data:
-            req_map_data = {**correct_map_data}
-            del req_map_data[key]
-            async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                    f"Removing Map.{key} from editing a map resulted in code {resp.status}"
-                resp_data = await resp.json()
-                assert "errors" in resp_data and key in resp_data["errors"], \
-                    f"{key} not in errors"
-
-            req_map_data = {
-                **correct_map_data,
-                "code": valid_codes[0],
-            }
-            del req_map_data[key]
-            async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                    f"Removing Map.{key} from adding a map resulted in code {resp.status}"
-                resp_data = await resp.json()
-                assert "errors" in resp_data and key in resp_data["errors"], \
-                    f"{key} not in errors"
-
-            # Can do this recursively but not worth it for this
-            if isinstance(correct_map_data[key], list) and len(correct_map_data[key]):
-                for inner_key in correct_map_data[key][0]:
-                    req_map_data = {
-                        **correct_map_data,
-                        key: [{**obj} for obj in correct_map_data[key]],
-                    }
-                    del req_map_data[key][0][inner_key]
-                    async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-                        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                            f"Removing Map.{key}[0].{inner_key} from editing a map resulted in code {resp.status}"
-                        resp_data = await resp.json()
-                        assert "errors" in resp_data and f"{key}[0].{inner_key}" in resp_data["errors"], \
-                            f"{key}[0].{inner_key} not in errors"
-
-                    req_map_data = {
-                        **correct_map_data,
-                        key: [{**obj} for obj in correct_map_data[key]],
-                        "code": valid_codes[0],
-                    }
-                    del req_map_data[key][0][inner_key]
-                    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-                        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                            f"Removing Map.{key}[0].{inner_key} from adding a map resulted in code {resp.status}"
-                        resp_data = await resp.json()
-                        assert "errors" in resp_data and f"{key}[0].{inner_key}" in resp_data["errors"], \
-                            f"{key}[0].{inner_key} not in errors"
-
-    async def test_moderator_perms(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
-        """
-        Test Maplist Mods adding and editing Expert List attributes, and vice versa.
-        """
-        async def assert_map_placements(map_code: str, expected: tuple[int, int, int], mod_type: str):
-            async with btd6ml_test_client.get(f"/maps/{map_code}") as resp:
-                resp_map_data = await resp.json()
-                assert resp_map_data["placement_cur"] == expected[0], \
-                    f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
-                assert resp_map_data["placement_all"] == expected[1], \
-                    f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
-                assert resp_map_data["difficulty"] == expected[2], \
-                    f"{mod_type} Moderator {'did not change' if mod_type != 'Maplist' else 'changed'} Expert Difficulty"
-
-        test_code = valid_codes[0]
-        req_map_data = {
-            **map_payload(test_code),
-            "placement_curver": 10,
-            "placement_allver": 10,
-            "difficulty": 2,
-            "creators": [{"id": "1", "role": None}],
-        }
-
-        # Maplist Mods
-        mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+        del req_map_data[key]
         async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                f"POST /maps/{test_code} returned {resp.status}"
+                f"Removing Map.{key} from adding a map resulted in code {resp.status}"
+            resp_data = await resp.json()
+            assert "errors" in resp_data and key in resp_data["errors"], \
+                f"{key} not in errors"
 
-        async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-            assert resp.ok, f"PUT /maps/MLXXXAA returned {resp.status}"
-            await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
+        # Can do this recursively but not worth it for this
+        if isinstance(correct_map_data[key], list) and len(correct_map_data[key]):
+            for inner_key in correct_map_data[key][0]:
+                req_map_data = {
+                    **correct_map_data,
+                    key: [{**obj} for obj in correct_map_data[key]],
+                }
+                del req_map_data[key][0][inner_key]
+                async with btd6ml_test_client.put("/maps/MLXXXCJ", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Removing Map.{key}[0].{inner_key} from editing a map resulted in code {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and f"{key}[0].{inner_key}" in resp_data["errors"], \
+                        f"{key}[0].{inner_key} not in errors"
 
-        # Expert Mods
-        mock_discord_api(perms=DiscordPermRoles.EXPLIST_MOD)
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                f"POST /maps/{test_code} returned {resp.status}"
+                req_map_data = {
+                    **correct_map_data,
+                    key: [{**obj} for obj in correct_map_data[key]],
+                    "code": valid_codes[0],
+                }
+                del req_map_data[key][0][inner_key]
+                async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Removing Map.{key}[0].{inner_key} from adding a map resulted in code {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and f"{key}[0].{inner_key}" in resp_data["errors"], \
+                        f"{key}[0].{inner_key} not in errors"
 
-        async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-            assert resp.ok, f"PUT /maps/MLXXXAB returned {resp.status}"
-            await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
+
+@pytest.mark.maps
+@pytest.mark.put
+@pytest.mark.post
+async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+    """
+    Test Maplist Mods adding and editing Expert List attributes, and vice versa.
+    """
+    async def assert_map_placements(map_code: str, expected: tuple[int, int, int], mod_type: str):
+        async with btd6ml_test_client.get(f"/maps/{map_code}") as resp:
+            resp_map_data = await resp.json()
+            assert resp_map_data["placement_cur"] == expected[0], \
+                f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
+            assert resp_map_data["placement_all"] == expected[1], \
+                f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
+            assert resp_map_data["difficulty"] == expected[2], \
+                f"{mod_type} Moderator {'did not change' if mod_type != 'Maplist' else 'changed'} Expert Difficulty"
+
+    test_code = valid_codes[0]
+    req_map_data = {
+        **map_payload(test_code),
+        "placement_curver": 10,
+        "placement_allver": 10,
+        "difficulty": 2,
+        "creators": [{"id": "1", "role": None}],
+    }
+
+    # Maplist Mods
+    mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+            f"POST /maps/{test_code} returned {resp.status}"
+
+    async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+        assert resp.ok, f"PUT /maps/MLXXXAA returned {resp.status}"
+        await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
+
+    # Expert Mods
+    mock_discord_api(perms=DiscordPermRoles.EXPLIST_MOD)
+    async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+            f"POST /maps/{test_code} returned {resp.status}"
+
+    async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
+        assert resp.ok, f"PUT /maps/MLXXXAB returned {resp.status}"
+        await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
 
     @pytest.mark.delete
     async def test_forbidden(self, btd6ml_test_client, mock_discord_api):
