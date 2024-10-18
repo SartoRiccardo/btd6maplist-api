@@ -30,7 +30,7 @@ PAGE_ENTRIES = 50
 @src.utils.routedecos.register_user
 async def post(
         request: web.Request,
-        maplist_profile: dict,
+        maplist_profile: dict = None,
         **_kwargs
 ) -> web.Response:
     """
@@ -90,7 +90,7 @@ async def post(
     if MAPLIST_BANNED_ID in maplist_profile["roles"]:
         return web.json_response(
             {"errors": {"": "You are banned from submitting..."}},
-            status=http.HTTPStatus.UNAUTHORIZED,
+            status=http.HTTPStatus.FORBIDDEN,
         )
 
     if not request.content_type.startswith("multipart"):

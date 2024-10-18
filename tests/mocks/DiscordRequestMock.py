@@ -21,12 +21,14 @@ class DiscordRequestMock:
             in_maplist: bool = True,
             wh_message_seed: int = 0,
             user_id: int = 100000,
+            username: str = "test.user",
     ):
         self.perms = perms
         self.unauthorized = unauthorized
         self.in_maplist = in_maplist
         self.wh_rand = random.Random(wh_message_seed)
         self.user_id = user_id
+        self.username = username
 
     async def get_user_profile(self, *args) -> dict:
         if self.unauthorized:
@@ -34,7 +36,7 @@ class DiscordRequestMock:
 
         return {
             "id": str(self.user_id),
-            "username": "test.user",
+            "username": self.username,
             "avatar": "31eb929ef84cce316fa9be34fc9b1c5b",
             "global_name": "Test User",
             # "discriminator": "0",
@@ -72,7 +74,7 @@ class DiscordRequestMock:
             "roles": roles,
             "user": {
                 "id": str(self.user_id),
-                "username": "test.user",
+                "username": self.username,
                 "avatar": "31eb929ef84cce316fa9be34fc9b1c5b",
                 "global_name": "Test User",
                 # "discriminator": '0',

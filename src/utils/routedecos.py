@@ -126,7 +126,7 @@ def require_perms(
 ):
     """
     Must be used with `with_maplist_profile` beforehand.
-    Returns 403 if doesn't have the required perms.
+    Returns 403 if they don't have the required perms.
     Adds `is_admin`, `is_maplist_mod` and `is_explist_mod` to kwargs.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
