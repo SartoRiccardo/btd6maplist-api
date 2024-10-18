@@ -1,9 +1,7 @@
 import http
-import json
 import copy
 import pytest
 import requests
-from aiohttp import FormData
 from ..mocks import DiscordPermRoles
 from ..testutils import stringify_path, to_formdata
 

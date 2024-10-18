@@ -65,5 +65,6 @@ def formdata_field_tester(content: list[tuple[str, Any, dict[str, Any]]]):
         for j, content_info in enumerate(content):
             if i == j:
                 continue
-            form_data.add_field(content_info[0], content_info[1])
+            kwargs = {} if len(content_info) == 2 else content_info[2]
+            form_data.add_field(content_info[0], content_info[1], **kwargs)
         yield form_data, content[i][0]

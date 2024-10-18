@@ -1,11 +1,21 @@
 import http
 import math
+import json
+import pathlib
 import pytest
 import requests
 from ..mocks import DiscordPermRoles
-from ..testutils import to_formdata
+from ..testutils import to_formdata, formdata_field_tester
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
+
+
+def to_subm_formdata(subm_data: dict, img_url: str, tmp_path: pathlib.Path):
+    form_data = to_formdata(subm_data)
+    path = tmp_path / "proof_completion.png"
+    path.write_bytes(requests.get(img_url).content)
+    form_data.add_field("proof_completion", path.open("rb"))
+    return form_data
 
 
 @pytest.mark.get
@@ -73,13 +83,34 @@ class TestGetSubmissions:
 @pytest.mark.post
 @pytest.mark.submissions
 class TestSubmitMap:
-    async def test_submit_map(self, btd6ml_test_client, mock_discord_api):
-        """Test a valid map submission"""
-        pytest.skip("Not Implemented")
-
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api):
+    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, map_submission_payload, valid_codes,
+                                  save_image):
         """Test a submission without the required fields"""
-        pytest.skip("Not Implemented")
+        mock_discord_api()
+
+        full_data = map_submission_payload(valid_codes[0])
+        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        for key in full_data:
+            req_data = {**full_data}
+            del req_data[key]
+
+            form_data = to_formdata(req_data)
+            form_data.add_field("proof_completion", proof_completion.open("rb"))
+            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Submitting map with missing field {key} returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and key in resp_data["errors"], \
+                    f"MapSubmission.{key} missing is not documented"
+
+        form_fields = [
+            ("data", json.dumps(full_data), {"content_type": "application/json"}),
+            ("proof_completion", proof_completion.open("rb")),
+        ]
+        for form_data, field in formdata_field_tester(form_fields):
+            async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Submitting map with missing formdata field {field} returns {resp.status}"
 
     async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
         """Sets every field to another datatype, one by one"""
@@ -166,12 +197,7 @@ class TestHandleSubmissions:
 
         test_code = valid_codes[0]
         req_data = map_submission_payload(test_code)
-        form_data = to_formdata(req_data)
-
-        path = tmp_path / f"proof_completion.png"
-        path.write_bytes(requests.get("https://dummyimage.com/400x300/00ff00/000").content)
-        form_data.add_field("proof_completion", path.open("rb"))
-
+        form_data = to_subm_formdata(req_data, "https://dummyimage.com/400x300/00ff00/000", tmp_path)
         async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
             assert resp.status == http.HTTPStatus.CREATED, \
                 f"Valid submission returned {resp.status}"
