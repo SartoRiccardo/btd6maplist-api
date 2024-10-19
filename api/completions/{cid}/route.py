@@ -4,7 +4,7 @@ import http
 from src.db.queries.completions import get_completion, edit_completion, delete_completion
 from src.utils.validators import validate_completion
 import src.utils.routedecos
-from src.utils.forms import get_submission
+from src.utils.forms import get_completion_request
 from src.utils.embeds import update_run_webhook
 from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 import src.log
@@ -44,6 +44,8 @@ async def put(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -65,7 +67,7 @@ async def put(
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "204":
         description: The resource was modified correctly
@@ -89,7 +91,13 @@ async def put(
       "404":
         description: No completion with that ID was found.
     """
-    data = await get_submission(request, maplist_profile, resource)
+    data = await get_completion_request(
+        request,
+        maplist_profile,
+        is_maplist_mod=is_maplist_mod,
+        is_explist_mod=is_explist_mod,
+        resource=resource,
+    )
     if isinstance(data, web.Response):
         return data
 

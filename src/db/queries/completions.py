@@ -84,7 +84,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
             ARRAY_AGG(cp.proof_url) FILTER (WHERE cp.proof_type = 1) OVER() AS subm_proof_vid,
             run.subm_notes, run.subm_wh_payload,
             
-            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+            lcc.id AS lcc_id, lcc.leftover,
             ARRAY_AGG(ply.user_id) OVER() AS user_ids,
             ARRAY_AGG(u.name) OVER() AS user_names
         FROM runs_with_flags run
@@ -113,7 +113,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         run["no_geraldo"],
         run["current_lcc"],
         run["format"],
-        LCC(run["lcc_id"], run["proof"], run["leftover"]) if run["lcc_id"] else None,
+        LCC(run["lcc_id"], run["leftover"]) if run["lcc_id"] else None,
         list_rm_dupe(run["subm_proof_img"]),
         list_rm_dupe(run["subm_proof_vid"]),
         run["subm_notes"],
@@ -149,11 +149,11 @@ async def edit_completion(
         if lcc:
             lcc_id = await conn.fetchval(
                 """
-                INSERT INTO leastcostchimps(proof, leftover)
-                VALUES($1, $2)
+                INSERT INTO leastcostchimps(leftover)
+                VALUES($1)
                 RETURNING id
                 """,
-                lcc["proof"], lcc["leftover"],
+                lcc["leftover"],
             )
 
         await conn.execute(
@@ -216,11 +216,11 @@ async def add_completion(
         if lcc:
             lcc_id = await conn.fetchval(
                 """
-                INSERT INTO leastcostchimps(proof, leftover)
-                VALUES($1, $2)
+                INSERT INTO leastcostchimps(leftover)
+                VALUES($1)
                 RETURNING id
                 """,
-                lcc["proof"], lcc["leftover"],
+                lcc["leftover"],
             )
 
         comp_id = await conn.fetchval(
@@ -261,6 +261,8 @@ async def add_completion(
             await conn.execute("CALL dupe_comp_to_allver($1)", comp_id)
             await conn.execute("CALL set_comp_as_verification($1)", comp_id)
 
+        return comp_id
+
 
 @postgres
 async def delete_completion(
@@ -268,14 +270,18 @@ async def delete_completion(
         hard_delete: bool = False,
         conn=None,
 ) -> None:
-    q = ("""
+    q = (
+        """
         DELETE FROM list_completions
         WHERE id=$1
-        """) if hard_delete else ("""
+        """
+    ) if hard_delete else (
+        """
         UPDATE list_completions
         SET deleted_on=NOW()
         WHERE id=$1
-        """)
+        """
+    )
 
     await conn.execute(q, cid)
 
@@ -304,7 +310,7 @@ async def get_unapproved_completions(
                 run.subm_notes,
                 run.id AS run_id, run.subm_wh_payload,
                 
-                lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+                lcc.id AS lcc_id, lcc.leftover,
                 ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
                 
                 m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
@@ -357,7 +363,6 @@ async def get_unapproved_completions(
             run["format"],
             LCC(
                 run["lcc_id"],
-                run["proof"],
                 run["leftover"],
             ) if run["lcc_id"] else None,
             list_rm_dupe(run["subm_proof_img"]),
@@ -424,7 +429,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
                 run.subm_notes, run.accepted_by, run.created_on AS run_created_on, run.deleted_on AS run_deleted_on,
                 
-                lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+                lcc.id AS lcc_id, lcc.leftover,
                 
                 m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
                 m.optimal_heros, m.map_preview_url, m.created_on AS map_created_on
@@ -475,7 +480,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
             row["no_geraldo"],
             row["current_lcc"],
             row["format"],
-            None if row["lcc_id"] is None else LCC(row["lcc_id"], row["proof"], row["leftover"]),
+            None if row["lcc_id"] is None else LCC(row["lcc_id"], row["leftover"]),
             list_rm_dupe(row["subm_proof_img"]),
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],

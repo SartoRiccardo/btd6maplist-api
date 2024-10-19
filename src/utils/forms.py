@@ -11,9 +11,11 @@ from config import (
 )
 
 
-async def get_submission(
+async def get_completion_request(
         request: web.Request,
         maplist_profile: dict,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         resource: "src.db.models.ListCompletion" = None,
 ) -> dict | web.Response:
     if resource and \
@@ -23,67 +25,51 @@ async def get_submission(
             status=http.HTTPStatus.UNAUTHORIZED
         )
 
-    proof_ext = None
-    file_contents = None
+    async def validate_json_part(data: dict) -> web.Response | None:
+        if len(errors := await validate_completion(data)):
+            return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
+
+        if not is_maplist_mod and (
+                1 <= data["format"] <= 50 or
+                resource and 1 <= resource.format <= 50):
+            return web.json_response(
+                {"errors": {"format": "You must be a Maplist Moderator"}},
+                status=http.HTTPStatus.FORBIDDEN,
+            )
+
+        if not is_explist_mod and (
+                50 <= data["format"] <= 100 or
+                resource and 51 <= resource.format <= 100):
+            return web.json_response(
+                {"errors": {"format": "You must be an Expert List Moderator"}},
+                status=http.HTTPStatus.FORBIDDEN,
+            )
+
+        if maplist_profile["user"]["id"] in data["user_ids"]:
+            return web.json_response(
+                {"errors": {"": "Cannot edit or accept your own completion"}},
+                status=http.HTTPStatus.FORBIDDEN,
+            )
+
     subm_proof = None
     data = None
 
-    reader = await request.multipart()
-    while part := await reader.next():
-        if part.name == "proof_completion":
-            proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            file_contents = await part.read(decode=False)
+    if request.content_type.startswith("multipart/"):
+        reader = await request.multipart()
+        while part := await reader.next():
+            if part.name == "submission_proof":
+                ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+                proof_fname, _fp = await save_media(await part.read(decode=False), ext)
+                subm_proof = f"{MEDIA_BASE_URL}/{proof_fname}"
 
-        if part.name == "submission_proof":
-            ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            proof_fname, _fp = await save_media(await part.read(decode=False), ext)
-            subm_proof = f"{MEDIA_BASE_URL}/{proof_fname}"
-
-        elif part.name == "data":
-            data = await part.json()
-            if len(errors := await validate_completion(data)):
-                return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
-
-            is_admin = any([role in MAPLIST_ADMIN_IDS for role in maplist_profile["roles"]])
-            is_expmod = MAPLIST_EXPMOD_ID in maplist_profile["roles"]
-            is_listmod = MAPLIST_LISTMOD_ID in maplist_profile["roles"]
-            if not is_admin:
-                if not is_listmod and (
-                        1 <= data["format"] <= 50 or
-                        resource and 1 <= resource.format <= 50):
-                    return web.json_response(
-                        {"errors": {"format": "You must be a Maplist Moderator"}},
-                        status=http.HTTPStatus.UNAUTHORIZED,
-                    )
-
-                if not is_expmod and (
-                        50 <= data["format"] <= 100 or
-                        resource and 51 <= resource.format <= 100):
-                    return web.json_response(
-                        {"errors": {"format": "You must be an Expert List Moderator"}},
-                        status=http.HTTPStatus.UNAUTHORIZED,
-                    )
-
-            if maplist_profile["user"]["id"] in data["user_ids"]:
-                return web.json_response(
-                    {"errors": {"": "Cannot edit or accept your own completion"}},
-                    status=http.HTTPStatus.UNAUTHORIZED
-                )
-
-    if data["lcc"] is not None:
-        if file_contents is None and "proof_completion" not in data["lcc"]:
-            return web.json_response({
-                "errors": {
-                    "lcc.proof_url": "Must compile at least one of these two",
-                    "lcc.proof_file": "Must compile at least one of these two",
-                },
-            }, status=http.HTTPStatus.BAD_REQUEST)
-
-        if "proof_completion" not in data["lcc"]:
-            proof_fname, fpath = await save_media(file_contents, proof_ext)
-            data["lcc"]["proof"] = f"{MEDIA_BASE_URL}/{proof_fname}"
-        else:
-            data["lcc"]["proof"] = data["lcc"]["proof_completion"]
+            elif part.name == "data":
+                data = await part.json()
+                if (response := await validate_json_part(data)) is not None:
+                    return response
+    elif request.content_type == "application/json":
+        data = await request.json()
+        if (response := await validate_json_part(data)) is not None:
+            return response
 
     data["subm_proof"] = subm_proof
 

@@ -13,21 +13,13 @@ class LCC:
         description: >
           The amount of cash saved at the end. Since Least Cash rules can't be
           applied to custom maps, saveup is tracked instead of cash spent.
-      proof:
-        type: string
-        description: >
-          An URL which links to an image or a video proof of the run being beaten with
-          the correct saveup.
     """
     id: int
-    proof: str
     leftover: int
 
     def to_dict(self) -> dict:
         return {
-            # "id": self.id,
             "leftover": self.leftover,
-            "proof": self.proof,
         }
 
 
@@ -70,7 +62,7 @@ class ListCompletion:
         type: array
         items:
           type: string
-        description: URL to the proof images used when submitting.
+        description: URL to the proof videos used when submitting.
     ---
     ListCompletionWithMap:
       allOf:
@@ -79,6 +71,30 @@ class ListCompletion:
         properties:
           map:
             $ref: "#/components/schemas/PartialMap"
+    ---
+    ListCompletionPayload:
+      type: object
+      properties:
+        black_border:
+          type: boolean
+          description: Whether the completion is a black border run
+        no_geraldo:
+          type: boolean
+          description: Whether the completion used an optimal hero or not
+        format:
+          $ref: "#/components/schemas/MaplistFormat"
+        user_ids:
+          type: array
+          items:
+            - $ref: "#/components/schemas/RequestUserID"
+        lcc:
+          nullable: true
+          description: LCC data for the completion
+          type: object
+          properties:
+            leftover:
+              type: integer
+              description: How much money was left over at the very end of the run
     """
     id: int
     map: str | PartialMap

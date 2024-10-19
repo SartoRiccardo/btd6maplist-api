@@ -246,7 +246,7 @@ def parse_runs_payload(
             run["no_geraldo"],
             run["current_lcc"],
             run["format"],
-            LCC(run["lcc_id"], run["proof"], run["leftover"]) if run["lcc_id"] else None,
+            LCC(run["lcc_id"], run["leftover"]) if run["lcc_id"] else None,
             list_rm_dupe(run["subm_proof_img"]),
             list_rm_dupe(run["subm_proof_vid"]),
             run["subm_notes"],
@@ -264,7 +264,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY runs.id) AS subm_proof_vid,
             runs.subm_notes,
 
-            lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+            lccs.id AS lcc_id, lccs.leftover,
 
             ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids,
             ARRAY_AGG(u.name) OVER (PARTITION by runs.id) AS user_names
@@ -321,7 +321,7 @@ async def get_completions_for(
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.id) AS subm_proof_vid,
                 rwf.subm_notes,
                 
-                lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+                lccs.id AS lcc_id, lccs.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids,
                 ARRAY_AGG(u.name) OVER (PARTITION by rwf.id) AS user_names

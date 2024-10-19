@@ -3,7 +3,7 @@ from aiohttp import web
 from src.db.queries.completions import get_completion
 import http
 import src.utils.routedecos
-from src.utils.forms import get_submission
+from src.utils.forms import get_completion_request
 from src.utils.embeds import update_run_webhook
 from src.db.queries.completions import edit_completion
 import src.log
@@ -17,6 +17,8 @@ async def post(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -36,6 +38,16 @@ async def post(
     requestBody:
       required: true
       content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/ListCompletion"
+              submission_proof:
+                type: string
+                format: binary
         application/json:
           schema:
             $ref: "#/components/schemas/ListCompletion"
@@ -68,7 +80,13 @@ async def post(
             status=http.HTTPStatus.BAD_REQUEST,
         )
 
-    data = await get_submission(request, maplist_profile, resource)
+    data = await get_completion_request(
+        request,
+        maplist_profile,
+        is_maplist_mod=is_maplist_mod,
+        is_explist_mod=is_explist_mod,
+        resource=resource,
+    )
     if isinstance(data, web.Response):
         return data
 

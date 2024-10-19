@@ -35,7 +35,7 @@ schema_completion_map = {
         "deleted_on": int | None,
     },
 }
-schema_lcc = {"leftover": int, "proof": str}
+schema_lcc = {"leftover": int}
 
 
 @pytest.mark.get

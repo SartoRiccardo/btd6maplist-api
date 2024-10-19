@@ -70,7 +70,7 @@ async def get_completions_by(
                 m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
                 m.id AS map_id, m.created_on,
                 
-                lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+                lccs.id AS lcc_id, lccs.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
             FROM runs_with_flags rwf
@@ -120,7 +120,7 @@ async def get_completions_by(
             row["no_geraldo"],
             row["current_lcc"],
             row["format"],
-            LCC(row["lcc_id"], row["proof"], row["leftover"]) if row["lcc_id"] else None,
+            LCC(row["lcc_id"], row["leftover"]) if row["lcc_id"] else None,
             list_rm_dupe(row["subm_proof_img"]),
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],
@@ -363,7 +363,7 @@ async def get_completions_on(
         )
         SELECT DISTINCT ON (run_id)
             r.id AS run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
-            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+            lcc.id AS lcc_id, lcc.leftover,
             ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY r.id) AS subm_proof_img,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY r.id) AS subm_proof_vid,
@@ -388,7 +388,7 @@ async def get_completions_on(
             row["no_geraldo"],
             row["current_lcc"],
             row["format"],
-            LCC(row["lcc_id"], row["proof"], row["leftover"]) if row["lcc_id"] else None,
+            LCC(row["lcc_id"], row["leftover"]) if row["lcc_id"] else None,
             list_rm_dupe(row["subm_proof_img"]),
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],
