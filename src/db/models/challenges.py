@@ -47,10 +47,9 @@ class ListCompletion:
         description: The code of the map that was completed
       users:
         type: array
-        description: The players who completed this run. It's an array because some runs can be collabs.
+        description: The players who completed this run.
         items:
-          type: string
-          description: The user's Discord ID.
+          $ref: "#/components/schemas/PartialUser"
       black_border:
         type: boolean
         description: "`true` if the run was black bordered."
@@ -60,6 +59,9 @@ class ListCompletion:
       current_lcc:
         type: boolean
         description: "`true` if the run is the current LCC for the map."
+      lcc:
+        $ref: "#/components/schemas/LCC"
+        nullable: true
       format:
         $ref: "#/components/schemas/MaplistFormat"
       subm_proof_img:
