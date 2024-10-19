@@ -71,10 +71,6 @@ class ListCompletion:
         items:
           type: string
         description: URL to the proof images used when submitting.
-      subm_notes:
-        type: string
-        nullable: true
-        description: Notes the user put when submitting.
     ---
     ListCompletionWithMap:
       allOf:
@@ -134,6 +130,10 @@ class ListCompletionWithMeta(ListCompletion):
           nullable: true
           description: |
             Timestamp of the completion's deletion. Always `null` if not `accepted_by`.
+        subm_notes:
+          type: string
+          nullable: true
+          description: Notes the user put when submitting.
     """
     accepted_by: int | None
     created_on: datetime.datetime | None
