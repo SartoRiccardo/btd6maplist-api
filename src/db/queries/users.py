@@ -334,9 +334,20 @@ async def edit_user(uid: str, name: str | None, oak: str | None, conn=None) -> b
 
 
 @postgres
-async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCompletion]:
+async def get_completions_on(
+        user_id: str,
+        code: str,
+        allowed_formats: list[str] = None,
+        conn=None
+) -> list[ListCompletion]:
+    if allowed_formats is None:
+        allowed_formats = [1, 51]
+    extra_args = []
+    if len(allowed_formats):
+        extra_args.append(allowed_formats)
+
     payload = await conn.fetch(
-        """
+        f"""
         WITH runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
             FROM list_completions r
@@ -345,11 +356,12 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
             JOIN listcomp_players ply
                 ON ply.run = r.id
             WHERE r.map = $2
+                {'AND r.format = ANY($3::int[])' if len(allowed_formats) > 0 else ''}
                 AND ply.user_id = $1
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         )
-        SELECT
+        SELECT DISTINCT ON (run_id)
             r.id AS run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
             lcc.id AS lcc_id, lcc.proof, lcc.leftover,
             ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
@@ -364,7 +376,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = r.lcc
         """,
-        int(user_id), code,
+        int(user_id), code, *extra_args,
     )
 
     return [

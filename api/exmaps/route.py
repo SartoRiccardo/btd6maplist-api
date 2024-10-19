@@ -7,7 +7,7 @@ async def get(_r: web.Request):
     ---
     description: Returns a list of maps in the Expert List.
     tags:
-    - Expert List
+    - Map Lists
     responses:
       "200":
         description: Returns an array of `PartialExpertMap`.

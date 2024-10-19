@@ -8,9 +8,6 @@ class LCC:
     """
     type: object
     properties:
-      id:
-        type: integer
-        description: The unique ID of the LCC.
       leftover:
         type: integer
         description: >
@@ -47,10 +44,9 @@ class ListCompletion:
         description: The code of the map that was completed
       users:
         type: array
-        description: The players who completed this run. It's an array because some runs can be collabs.
+        description: The players who completed this run.
         items:
-          type: string
-          description: The user's Discord ID.
+          $ref: "#/components/schemas/PartialUser"
       black_border:
         type: boolean
         description: "`true` if the run was black bordered."
@@ -60,6 +56,9 @@ class ListCompletion:
       current_lcc:
         type: boolean
         description: "`true` if the run is the current LCC for the map."
+      lcc:
+        $ref: "#/components/schemas/LCC"
+        nullable: true
       format:
         $ref: "#/components/schemas/MaplistFormat"
       subm_proof_img:
@@ -72,10 +71,6 @@ class ListCompletion:
         items:
           type: string
         description: URL to the proof images used when submitting.
-      subm_notes:
-        type: string
-        nullable: true
-        description: Notes the user put when submitting.
     ---
     ListCompletionWithMap:
       allOf:
@@ -135,6 +130,10 @@ class ListCompletionWithMeta(ListCompletion):
           nullable: true
           description: |
             Timestamp of the completion's deletion. Always `null` if not `accepted_by`.
+        subm_notes:
+          type: string
+          nullable: true
+          description: Notes the user put when submitting.
     """
     accepted_by: int | None
     created_on: datetime.datetime | None

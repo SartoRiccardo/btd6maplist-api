@@ -20,7 +20,7 @@ from config import (
     MAPLIST_NEEDSREC_ID,
     WEB_BASE_URL,
 )
-from src.utils.embeds import get_runsubm_embed, send_webhook
+from src.utils.embeds import get_runsubm_embed, send_run_webhook
 
 MAX_FILES = 4
 
@@ -37,10 +37,9 @@ async def post(
 ) -> web.Response:
     """
     ---
-    description: Submits a run to the maplist. Currently all this does its be a proxy for a Discord webhook.
+    description: Submits a run to the maplist.
     tags:
-    - The List
-    - Expert List
+    - Submissions
     requestBody:
       required: true
       content:
@@ -197,5 +196,5 @@ async def post(
     payload_json = json.dumps(json_data)
     form_data.add_field("payload_json", payload_json)
 
-    asyncio.create_task(send_webhook(run_id, hook_url, form_data, payload_json))
+    asyncio.create_task(send_run_webhook(run_id, hook_url, form_data, payload_json))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

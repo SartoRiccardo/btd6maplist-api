@@ -12,6 +12,10 @@ swagger_definitions_str = """
 DiscordID:
   type: string
   description: an user's Discord ID. Is numeric.
+  
+RequestUserID:
+  type: string
+  description: The username or Discord ID of the creator
 
 MaplistFormat:
   type: int
@@ -42,6 +46,26 @@ MapVersionCompatibility:
     * `1` - Only visual changes.\\n
     * `2` - Playable, but not recommended.\\n
     * `3` - Unplayable and/or has gameplay differences.
+
+Btd6Hero:
+  type: string
+  enum:
+    - quincy
+    - gwen
+    - obyn
+    - striker
+    - churchill
+    - ben
+    - ezili
+    - pat
+    - adora
+    - brickell
+    - etienne
+    - sauda
+    - psi
+    - geraldo
+    - corvus
+    - rosalia
 """
 
 
