@@ -161,3 +161,25 @@ def invalidate_field(
 
             for _ in range(appended):
                 current_path.pop()
+
+
+def remove_fields(full_data: Any, current_path=None):
+    if current_path is None:
+        current_path = []
+
+    if isinstance(full_data, dict):
+        for key in full_data:
+            current_path.append(key)
+            yield from remove_fields(full_data[key], current_path=current_path)
+            current_path.pop()
+
+            request_data = copy.deepcopy(full_data)
+            current_data = request_data
+            for path_key in current_path:
+                current_data = current_data[path_key]
+            del current_data[key]
+            yield current_data, stringify_path(current_path + [key])
+    elif isinstance(full_data, list) and len(full_data):
+        current_path.append(0)
+        yield from remove_fields(full_data[0], current_path=current_path)
+        current_path.pop()

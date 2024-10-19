@@ -2,6 +2,7 @@ import http
 import json
 import pytest
 from ..mocks import DiscordPermRoles
+from ..testutils import fuzz_data, remove_fields
 
 HEADERS = {
     "Authorization": "Bearer discord_token",
@@ -75,17 +76,112 @@ class TestTransfer:
         await transfer(*TEST_CODES_1, maplist_first=True)
         await transfer(*TEST_CODES_2, maplist_first=False)
 
-    async def test_transfer_deleted(self, btd6ml_test_client, mock_discord_api):
+    async def test_transfer_deleted(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
         """Test transferring a map's completions to a deleted one or from a non-deleted one"""
-        pytest.skip("Not Implemented")
+        TEST_TO_DEL = ("DELXXAI", "DELXXAB")
+        TEST_FROM_LIVE = ("MLXXXFH", "DELXXAB")
 
-    async def test_transfer_not_exists(self, btd6ml_test_client, mock_discord_api):
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+        async with assert_state_unchanged(f"/maps/{TEST_TO_DEL[0]}/completions"):
+            async with btd6ml_test_client.put(
+                    f"/maps/{TEST_TO_DEL[0]}/completions/transfer",
+                    headers=HEADERS,
+                    data=json.dumps({"code": TEST_TO_DEL[1]}),
+            ) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Transferring completions to a deleted map returns {resp.status}"
+
+        async with assert_state_unchanged(f"/maps/{TEST_FROM_LIVE[0]}/completions"):
+            async with btd6ml_test_client.put(
+                    f"/maps/{TEST_FROM_LIVE[0]}/completions/transfer",
+                    headers=HEADERS,
+                    data=json.dumps({"code": TEST_FROM_LIVE[1]}),
+            ) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Transferring completions from a non-deleted map returns {resp.status}"
+
+    async def test_transfer_not_exists(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
         """
         Test transferring a map's completions to
         or from one that doesn't exist
         """
-        pytest.skip("Not Implemented")
+        TEST_TO_INVALID = ("DELXXAI", "XXXXXXX")
+        TEST_FROM_INVALID = ("XXXXXXX", "DELXXAI")
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_discord_api):
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        async with assert_state_unchanged(f"/maps/{TEST_TO_INVALID[0]}/completions"):
+            async with btd6ml_test_client.put(
+                    f"/maps/{TEST_TO_INVALID[0]}/completions/transfer",
+                    headers=HEADERS,
+                    data=json.dumps({"code": TEST_TO_INVALID[1]}),
+            ) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Transferring completions from a nonexistent map returns {resp.status}"
+
+        async with btd6ml_test_client.put(
+                f"/maps/{TEST_FROM_INVALID[0]}/completions/transfer",
+                headers=HEADERS,
+                data=json.dumps({"code": TEST_FROM_INVALID[1]}),
+        ) as resp:
+            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+                f"Transferring completions to a nonexistent map returns {resp.status}"
+
+    async def test_unauthorized(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
         """Test transferring without the correct perms"""
-        pytest.skip("Not Implemented")
+        TEST_FROM = "DELXXAI"
+
+        async with assert_state_unchanged(f"/maps/{TEST_FROM}/completions"):
+            mock_discord_api(unauthorized=True)
+            async with btd6ml_test_client.put(f"/maps/{TEST_FROM}/completions/transfer") as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Transferring completions while unauthed {resp.status}"
+
+            async with btd6ml_test_client.put(f"/maps/{TEST_FROM}/completions/transfer", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Transferring completions with an invalid token returns {resp.status}"
+
+            mock_discord_api()
+            async with btd6ml_test_client.put(f"/maps/{TEST_FROM}/completions/transfer", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Transferring completions without perms returns {resp.status}"
+
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+        """Sets every field to another datatype, one by one"""
+        TEST_FROM = "DELXXAI"
+
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_transfer_data = {"code": "MLXXXAA"}
+
+        async with assert_state_unchanged(f"/maps/{TEST_FROM}/completions"):
+            for req_data, path, sub_value in fuzz_data(req_transfer_data):
+                async with btd6ml_test_client.put(
+                        f"/maps/{TEST_FROM}/completions/transfer",
+                        headers=HEADERS,
+                        data=json.dumps(req_data),
+                ) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Setting {path} to {sub_value} while transferring completions returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
+
+    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+        """Tests sending the payload with some missing fields"""
+        TEST_FROM = "DELXXAI"
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_transfer_data = {"code": "MLXXXAA"}
+
+        async with assert_state_unchanged(f"/maps/{TEST_FROM}/completions"):
+            for req_data, path in remove_fields(req_transfer_data):
+                async with btd6ml_test_client.put(
+                        f"/maps/{TEST_FROM}/completions/transfer",
+                        headers=HEADERS,
+                        data=json.dumps(req_data),
+                ) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Removing {path} while transferring completions returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
+

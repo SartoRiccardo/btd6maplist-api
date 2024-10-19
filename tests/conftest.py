@@ -111,3 +111,21 @@ def save_image(tmp_path: pathlib.Path):
         path.write_bytes(requests.get(url).content)
         return path
     return save
+
+
+@pytest.fixture(scope="session")
+def assert_state_unchanged(btd6ml_test_client):
+    class AssertStateEquals:
+        def __init__(self, endpoint: str):
+            self.endpoint = endpoint
+            self.prev_value = None
+
+        async def __aenter__(self):
+            async with btd6ml_test_client.get(self.endpoint) as resp:
+                self.prev_value = await resp.json()
+
+        async def __aexit__(self, exception_type, exception_value, exception_traceback):
+            async with btd6ml_test_client.get(self.endpoint) as resp:
+                assert self.prev_value == await resp.json()
+
+    return AssertStateEquals
