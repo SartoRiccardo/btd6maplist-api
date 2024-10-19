@@ -220,7 +220,7 @@ class TestCompletionList:
 
     async def test_unapproved_completions(self, btd6ml_test_client):
         """Test getting unapproved runs, and the pagination"""
-        expected_total = 73
+        expected_total = 75
         expected_pages = math.ceil(expected_total/50)
         for pg in range(1, expected_pages+1):
             async with btd6ml_test_client.get(f"/completions/unapproved?page={pg}") as resp:

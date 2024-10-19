@@ -27,6 +27,18 @@ class TestValidateCompletions:
 
     @pytest.mark.post
     @pytest.mark.put
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        """Sets all properties to every possible value, one by one"""
+        pytest.skip("Not Implemented")
+
+    @pytest.mark.post
+    @pytest.mark.put
+    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api):
+        """Test adding and editing a completion with missing fields in the payload"""
+        pytest.skip("Not Implemented")
+
+    @pytest.mark.post
+    @pytest.mark.put
     @pytest.mark.delete
     async def test_forbidden(self, btd6ml_test_client, mock_discord_api):
         """Test a user adding, editing or deleting a completion if they don't have perms"""
