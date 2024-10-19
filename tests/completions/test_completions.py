@@ -1,13 +1,15 @@
 import pytest
 
 
+@pytest.mark.completions
+@pytest.mark.get
 async def get_completion(btd6ml_test_client):
     """Test getting a completion"""
     pytest.skip("Not Implemented")
 
 
-@pytest.mark.maps
 @pytest.mark.post
+@pytest.mark.completions
 async def test_add(btd6ml_test_client, mock_discord_api):
     """
     Test that adding a correct completion payload works, and can only be set with the correct perms
@@ -31,7 +33,7 @@ class TestValidateCompletions:
         pytest.skip("Not Implemented")
 
 
-@pytest.mark.maps
+@pytest.mark.completions
 class TestEditCompletion:
     @pytest.mark.put
     async def test_edit(self, btd6ml_test_client, mock_discord_api):
