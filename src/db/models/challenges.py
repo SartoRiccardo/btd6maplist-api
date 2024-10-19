@@ -8,9 +8,6 @@ class LCC:
     """
     type: object
     properties:
-      id:
-        type: integer
-        description: The unique ID of the LCC.
       leftover:
         type: integer
         description: >
