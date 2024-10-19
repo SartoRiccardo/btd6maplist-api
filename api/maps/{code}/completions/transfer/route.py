@@ -26,9 +26,9 @@ async def validate_map_is_valid(json_body: dict) -> dict:
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.validate_json_body(validate_map_is_valid)
 @src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.require_perms()
+@src.utils.routedecos.validate_json_body(validate_map_is_valid)
 async def put(
         _r: web.Request,
         resource: "src.db.models.PartialMap" = None,
