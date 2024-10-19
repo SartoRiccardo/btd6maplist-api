@@ -9,11 +9,14 @@ from src.db.queries.maps import get_completions_for
 from src.db.queries.completions import add_completion
 from src.utils.forms import get_submission
 
-
 PAGE_ENTRIES = 50
 
 
-async def get(request: web.Request):
+@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
+async def get(
+        request: web.Request,
+        **kwargs,
+) -> web.Response:
     """
     ---
     description: Returns a list of up to 50 maplist completions of this map.
