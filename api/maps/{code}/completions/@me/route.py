@@ -10,7 +10,9 @@ import src.utils.routedecos
 async def get(request: web.Request, discord_profile: dict, **_kw) -> web.Response:
     """
     ---
-    description: Returns a list of up to 50 maplist completions of this map.
+    description: |
+      Returns a player's completions on the specified map. Unlike all other endpoints
+      that return completions, this only returns both formats 1 and 51.
     tags:
     - Completions
     parameters:

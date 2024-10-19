@@ -17,3 +17,4 @@ tmp
 tmp-test
 **/gentestdata.py
 .coverage
+**/output.txt

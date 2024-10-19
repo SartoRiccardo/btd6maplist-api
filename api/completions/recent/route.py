@@ -19,13 +19,22 @@ async def get(request: web.Request) -> web.Response:
       description: The formats of the completions to get, comma separated.
     responses:
       "200":
-        description: Returns an array of `ListCompletionWithMeta`.
+        description: Returns an array of completions.
         content:
           application/json:
             schema:
               type: array
               items:
-                $ref: "#/components/schemas/ListCompletionWithMeta"
+                allOf:
+                - $ref: "#/components/schemas/ListCompletionWithMeta"
+                - type: object
+                  properties:
+                    map:
+                      $ref: "#/components/schemas/PartialMap"
+                    users:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/DiscordID"
     """
     formats = [int(fmt) for fmt in request.query.get("formats", "1,51").split(",")]
     comps = await get_recent(limit=AMOUNT, formats=formats)
