@@ -9,7 +9,9 @@ PAGE_ENTRIES = 50
 async def get(request: web.Request) -> web.Response:
     """
     ---
-    description: Returns a list of unapproved runs.
+    description: |
+      Returns a list of unapproved runs. Unlike other completion endpoints,
+      this returns runs of all formats.
     tags:
     - Completions
     parameters:

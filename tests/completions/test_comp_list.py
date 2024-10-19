@@ -63,11 +63,13 @@ class TestCompletionList:
             compl_ids.add(compl["id"])
             assert compl["format"] in allowed_formats, \
                 "Found a different format than expected"
-            assert compl["deleted_on"] is None, f"Completion[{i}] is deleted"
-            if only_pending:
-                assert compl["accepted_by"] is None, f"Completion[{i}] is accepted"
-            else:
-                assert compl["accepted_by"] is not None, f"Completion[{i}] is pending"
+            if "deleted_on" in compl:
+                assert compl["deleted_on"] is None, f"Completion[{i}] is deleted"
+            if "accepted_by" in compl:
+                if only_pending:
+                    assert compl["accepted_by"] is None, f"Completion[{i}] is accepted"
+                else:
+                    assert compl["accepted_by"] is not None, f"Completion[{i}] is pending"
             if schema_comp is not None:
                 assert len(src.utils.validators.check_fields(compl, schema_comp)) == 0, \
                     f"Error while validating Completion[{i}]"
@@ -75,6 +77,15 @@ class TestCompletionList:
                     assert len(src.utils.validators.check_fields(compl["lcc"], schema_lcc)) == 0, \
                         f"Error while validating Completion[{i}].lcc"
         return compl_ids
+
+    @staticmethod
+    async def assert_empty_pages(btd6ml_test_client, endpoint: str):
+        async with btd6ml_test_client.get(endpoint) as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Getting overflown page completions returns {resp.status}"
+            resp_data = await resp.json()
+            assert resp_data["total"] == 0, "Total completions on overflown page differ from expected"
+            assert resp_data["pages"] == 0, "Total pages on overflown page differ from expected"
 
     async def test_map_completions(self, btd6ml_test_client):
         """Test getting a map's completions"""
@@ -116,10 +127,7 @@ class TestCompletionList:
                     compl_ids=compl_ids,
                 )
 
-        async with btd6ml_test_client.get(f"/maps/MLXXXAB/completions?formats=1,51,2&page={expected_pages+1}") as resp:
-            resp_data = await resp.json()
-            assert resp_data["pages"] == 0, "Total pages on overflown page differs from expected"
-            assert resp_data["total"] == 0, "Total completions on overflown page differ from expected"
+        await self.assert_empty_pages(btd6ml_test_client, f"/maps/MLXXXAB/completions?formats=1,51,2&page={expected_pages+1}")
 
     async def test_user_completions(self, btd6ml_test_client):
         """Test getting a user's completions"""
@@ -158,20 +166,15 @@ class TestCompletionList:
         for pg in range(1, expected_pages+1):
             async with btd6ml_test_client.get(f"/users/42/completions?formats=1,51,2&page={pg}") as resp:
                 resp_data = await resp.json()
-                assert resp_data["pages"] == expected_pages, "Total pages differs from expected"
                 assert resp_data["total"] == expected_total, "Total completions differ from expected"
+                assert resp_data["pages"] == expected_pages, "Total pages differs from expected"
                 compl_ids = self.validate_comp_list(
                     resp_data["completions"],
                     allowed_formats=[1, 2, 51],
                     compl_ids=compl_ids,
                 )
 
-        async with btd6ml_test_client.get(f"/users/42/completions?formats=1,51,2&page={expected_pages+1}") as resp:
-            resp_data = await resp.json()
-            assert resp_data["pages"] == 0, "Total pages on overflown page differs from expected"
-            assert resp_data["total"] == 0, "Total completions on overflown page differ from expected"
-
-        pytest.skip("Not Implemented")
+        await self.assert_empty_pages(btd6ml_test_client, f"/users/42/completions?formats=1,51,2&page={expected_pages+1}")
 
     async def test_own_completions_on(self, btd6ml_test_client, mock_discord_api):
         """Test getting a user's own completions on a map"""
@@ -214,3 +217,23 @@ class TestCompletionList:
             resp_data = await resp.json()
             assert len(resp_data) == 5, "Total completions differ from expected"
             self.validate_comp_list(resp_data, schema_completion_map, allowed_formats=[2])
+
+    async def test_unapproved_completions(self, btd6ml_test_client):
+        """Test getting unapproved runs, and the pagination"""
+        expected_total = 73
+        expected_pages = math.ceil(expected_total/50)
+        for pg in range(1, expected_pages+1):
+            async with btd6ml_test_client.get(f"/completions/unapproved?page={pg}") as resp:
+                assert resp.status == http.HTTPStatus.OK, \
+                    f"Getting unapproved completions returns {resp.status}"
+                resp_data = await resp.json()
+                assert resp_data["total"] == expected_total, "Total completions differ from expected"
+                assert resp_data["pages"] == expected_pages, "Total pages differ from expected"
+                self.validate_comp_list(
+                    resp_data["completions"],
+                    schema_completion_map,
+                    only_pending=True,
+                    allowed_formats=[1, 2, 51]
+                )
+
+        await self.assert_empty_pages(btd6ml_test_client, f"/completions/unapproved?page={expected_pages+1}")
