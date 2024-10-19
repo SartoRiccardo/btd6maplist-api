@@ -5,6 +5,7 @@ import config
 import importlib.util
 import aiohttp
 from typing import Any
+from collections.abc import Generator
 
 
 def override_config():
@@ -74,7 +75,7 @@ def formdata_field_tester(content: list[tuple[str, Any, dict[str, Any]]]):
 def fuzz_data(
         full_data: dict,
         extra_expected: dict = None,
-):
+) -> Generator[tuple[dict, str, list | dict | float | str | None], None, None]:
     extra_expected = {} if extra_expected is None else extra_expected
     test_values = [[], {}, 1.7, "a", None]
 
@@ -126,7 +127,8 @@ def invalidate_field(
         full_data: dict,
         schema: dict | list,
         validations: list[tuple[Any, str]],
-        current_path: list = None):
+        current_path: list = None
+) -> Generator[tuple[dict, str, str], None, None]:
     if current_path is None:
         current_path = []
 
@@ -163,7 +165,7 @@ def invalidate_field(
                 current_path.pop()
 
 
-def remove_fields(full_data: Any, current_path=None):
+def remove_fields(full_data: Any, current_path=None) -> Generator[tuple[dict, str], None, None]:
     if current_path is None:
         current_path = []
 
