@@ -1,12 +1,16 @@
 from aiohttp import web
 import math
-from src.db.queries.users import get_completions_by
-
+import src.utils.routedecos
+from src.db.queries.users import get_completions_by, get_user_min
 
 PAGE_ENTRIES = 50
 
 
-async def get(request: web.Request):
+@src.utils.routedecos.validate_resource_exists(get_user_min, "uid")
+async def get(
+        request: web.Request,
+        **kwargs,
+) -> web.Response:
     """
     ---
     description: Returns a list of up to 50 maplist completions by the user.
@@ -19,6 +23,12 @@ async def get(request: web.Request):
       schema:
         type: integer
       description: The user's Discord ID.
+    - in: query
+      name: formats
+      required: false
+      schema:
+        type: list
+      description: Formats to show. Defaults to `1,51`.
     - in: query
       name: page
       required: false
@@ -43,7 +53,14 @@ async def get(request: web.Request):
                   type: array
                   description: The player's completions
                   items:
-                    $ref: "#/components/schemas/ListCompletionWithMap"
+                    allOf:
+                    - $ref: "#/components/schemas/ListCompletionWithMap"
+                    - type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            $ref: "#/components/schemas/DiscordID"
     """
     page = request.query.get("page")
     if not (page and page.isnumeric()):
