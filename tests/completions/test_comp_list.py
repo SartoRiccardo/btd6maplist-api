@@ -3,6 +3,8 @@ import math
 import pytest
 import src.utils.validators
 
+HEADERS = {"Authorization": "Bearer test_token"}
+
 schema_completion = {
     "id": int,
     "map": str,
@@ -14,9 +16,12 @@ schema_completion = {
     "subm_proof_img": [str],
     "subm_proof_vid": [str],
 }
-schema_completion_map = {
+schema_completion_usr = {
     **schema_completion,
     "users": [str],
+}
+schema_completion_map = {
+    **schema_completion_usr,
     "map": {
         "name": str,
         "code": str,
@@ -46,6 +51,7 @@ class TestCompletionList:
             schema_comp: dict = None,
             compl_ids: set = None,
             allowed_formats: list = None,
+            only_pending: bool = False,
     ) -> set:
         if compl_ids is None:
             compl_ids = set()
@@ -57,6 +63,11 @@ class TestCompletionList:
             compl_ids.add(compl["id"])
             assert compl["format"] in allowed_formats, \
                 "Found a different format than expected"
+            assert compl["deleted_on"] is None, f"Completion[{i}] is deleted"
+            if only_pending:
+                assert compl["accepted_by"] is None, f"Completion[{i}] is accepted"
+            else:
+                assert compl["accepted_by"] is not None, f"Completion[{i}] is pending"
             if schema_comp is not None:
                 assert len(src.utils.validators.check_fields(compl, schema_comp)) == 0, \
                     f"Error while validating Completion[{i}]"
@@ -164,8 +175,42 @@ class TestCompletionList:
 
     async def test_own_completions_on(self, btd6ml_test_client, mock_discord_api):
         """Test getting a user's own completions on a map"""
-        pytest.skip("Not Implemented")
+        TEST_UID = 8
+        TEST_CODE = "MLXXXBA"
+
+        # Player #8: {'tot': 5, 'na': 1, 'del': 1, 'fmt2': 1, 'delmap': 0}
+        fmt2 = 1
+        expected_total = 5 - (1+1+fmt2)
+
+        mock_discord_api(unauthorized=True)
+        async with btd6ml_test_client.get(f"/maps/{TEST_CODE}/completions/@me") as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Getting own completions when not authed returns {resp.status}"
+
+        async with btd6ml_test_client.get(f"/maps/{TEST_CODE}/completions/@me", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Getting own completions with an invalid token returns {resp.status}"
+
+        mock_discord_api(user_id=TEST_UID)
+        async with btd6ml_test_client.get(f"/maps/{TEST_CODE}/completions/@me", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Getting own completions authenticated returns {resp.status}"
+            resp_data = await resp.json()
+            assert len(resp_data) == expected_total, "Total completions differ from expected"
+            self.validate_comp_list(resp_data, schema_completion_usr)
 
     async def test_recent_completions(self, btd6ml_test_client):
         """Test recent completions"""
-        pytest.skip("Not Implemented")
+        async with btd6ml_test_client.get(f"/completions/recent") as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Getting recent completions returns {resp.status}"
+            resp_data = await resp.json()
+            assert len(resp_data) == 5, "Total completions differ from expected"
+            self.validate_comp_list(resp_data, schema_completion_map)
+
+        async with btd6ml_test_client.get(f"/completions/recent?formats=2") as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Getting recent completions returns {resp.status}"
+            resp_data = await resp.json()
+            assert len(resp_data) == 5, "Total completions differ from expected"
+            self.validate_comp_list(resp_data, schema_completion_map, allowed_formats=[2])
