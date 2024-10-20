@@ -15,6 +15,5 @@ __pycache__
 .DS_Store
 tmp
 tmp-test
-**/gentestdata.py
 .coverage
 **/output.txt
