@@ -82,9 +82,9 @@ async def get(
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.require_perms()
+@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         request: web.Request,
         maplist_profile: dict = None,
@@ -116,13 +116,13 @@ async def post(
             required: [data]
             properties:
               data:
-                $ref: "#/components/schemas/ListCompletion"
+                $ref: "#/components/schemas/ListCompletionPayload"
               submission_proof:
                 type: string
                 format: binary
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "200":
         description: The resource was added.

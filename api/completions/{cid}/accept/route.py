@@ -38,19 +38,9 @@ async def post(
     requestBody:
       required: true
       content:
-        multipart/form-data:
-          schema:
-            type: object
-            required: [data]
-            properties:
-              data:
-                $ref: "#/components/schemas/ListCompletion"
-              submission_proof:
-                type: string
-                format: binary
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "204":
         description: The completion was accepted
