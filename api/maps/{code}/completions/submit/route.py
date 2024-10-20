@@ -1,4 +1,3 @@
-import re
 import asyncio
 import http
 import aiohttp.hdrs
@@ -43,44 +42,52 @@ async def post(
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
             type: object
+            required: [data, proof_completion]
             properties:
-              notes:
-                type: string
-                description: Additional notes about the run.
-                nullable: true
-              format:
-                $ref: "#/components/schemas/MaplistFormat"
-              black_border:
-                type: boolean
-                description: Whether the run is black bordered.
-              no_geraldo:
-                type: boolean
-                description: If the run didn't use the optimal hero (not necessarily geraldo).
-              current_lcc:
-                type: boolean
-                description: Whether the run is a LCC attempt.
-              video_proof_url:
+              data:
+                type: object
+                properties:
+                  notes:
+                    type: string
+                    description: Additional notes about the run.
+                    nullable: true
+                  format:
+                    $ref: "#/components/schemas/MaplistFormat"
+                  black_border:
+                    type: boolean
+                    description: Whether the run is black bordered.
+                  no_geraldo:
+                    type: boolean
+                    description: If the run didn't use the optimal hero (not necessarily geraldo).
+                  current_lcc:
+                    type: boolean
+                    description: Whether the run is an LCC attempt.
+                  leftover:
+                    type: integer
+                    description: Leftover of your LCC attempt, if it's an LCC attempt.
+                    nullable: true
+                  video_proof_url:
+                    type: array
+                    items:
+                      type: string
+                    description: |
+                      URL to video proofs of you beating some hard rounds.
+                      Can submit up to 5 URLs. For some types of completions, you
+                      must submit at least one. Refer to submission rules on the website
+                      for that.
+              proof_completion:
                 type: array
                 items:
                   type: string
-                description: |
-                  URL to video proof of you beating some hard rounds.
-                  Can be omitted if not needed.
-              leftover:
-                type: integer
-                description: |
-                  Leftover of your LCC attempt.
-                  Can be omitted if not needed.
-                nullable: true
+                  format: binary
     responses:
-      "204":
-        description: The map was submitted
+      "201":
+        description: The completion was submitted
       "400":
-        description: |
-          One of the fields is badly formatted.
+        description: One of the fields is badly formatted.
         content:
           application/json:
             schema:
@@ -112,37 +119,31 @@ async def post(
     embeds = []
     hook_url = ""
     data = None
-    proof_fnames: list[str | None] = [None for _ in range(MAX_FILES)]
+    proof_fnames: list[str] = []
+
+    if not request.content_type.startswith("multipart/"):
+        return web.json_response(
+            {"errors": {"": "Invalid Content-Type, must be multipart/form-data"}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
 
     reader = await request.multipart()
     while part := await reader.next():
-        if match := re.match(r"proof_completion\[(\d+)]", part.name):
-            findex = int(match.group(1))
-            if findex >= MAX_FILES:
-                return web.json_response(
-                    {"errors": {[part.name]: f"Can upload max {MAX_FILES} files, Found index {findex}"}},
-                    status=HTTPStatus.BAD_REQUEST
-                )
-            if proof_fnames[findex] is not None:
-                return web.json_response(
-                    {"errors": {[part.name]: "Duplicate index"}},
-                    status=HTTPStatus.BAD_REQUEST
-                )
-
+        if part.name == "proof_completion" and len(proof_fnames) < MAX_FILES:
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
             fname, _fpath = await save_media(file_contents, proof_ext)
-            proof_fnames[findex] = f"{MEDIA_BASE_URL}/{fname}"
+            proof_fnames.append(f"{MEDIA_BASE_URL}/{fname}")
 
         elif part.name == "data":
             data = await part.json()
             if len(errors := await validate_completion_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
-            if MAPLIST_NEEDSREC_ID in maplist_profile["roles"] and "video_proof_url" not in data:
+            if MAPLIST_NEEDSREC_ID in maplist_profile["roles"] and len(data["video_proof_url"]) == 0:
                 return web.json_response(
                     {"errors": {"video_proof_url": "You must submit a recording"}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
+                    status=http.HTTPStatus.BAD_REQUEST,
                 )
 
             embeds = get_runsubm_embed(data, discord_profile, resource)
@@ -151,11 +152,16 @@ async def post(
                     {"errors": {"format": "Submitted experts run for non-experts map"}},
                     status=HTTPStatus.BAD_REQUEST,
                 )
-            # if (resource.placement_cur == -1 or resource.placement_all == -1) and data["format"] in range(1, 50):
-            #     return web.json_response(
-            #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
-            #         status=HTTPStatus.BAD_REQUEST,
-            #     )
+            if resource.placement_cur == -1 and data["format"] == 1:
+                return web.json_response(
+                    {"errors": {"format": "Submitted maplist (current version) run for non-experts map"}},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+            if resource.placement_all == -1 and data["format"] == 2:
+                return web.json_response(
+                    {"errors": {"format": "Submitted maplist (all versions) run for non-experts map"}},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
             hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
 
     proof_fnames = [url for url in proof_fnames if url is not None]
@@ -197,4 +203,7 @@ async def post(
     form_data.add_field("payload_json", payload_json)
 
     asyncio.create_task(send_run_webhook(run_id, hook_url, form_data, payload_json))
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(
+        status=http.HTTPStatus.CREATED,
+        headers={"Location": f"/completions/{run_id}"}
+    )

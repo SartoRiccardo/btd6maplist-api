@@ -23,11 +23,11 @@ async def submit_run(
         if lcc_info:
             lcc_id = await conn.fetchval(
                 """
-                INSERT INTO leastcostchimps(proof, leftover)
-                VALUES($1, $2)
+                INSERT INTO leastcostchimps(leftover)
+                VALUES($1)
                 RETURNING id
                 """,
-                lcc_info["proof"], lcc_info["leftover"]
+                lcc_info["leftover"]
             )
 
         run_id = await conn.fetchval(

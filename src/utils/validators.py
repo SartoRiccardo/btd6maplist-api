@@ -255,6 +255,11 @@ async def validate_completion_submission(body: dict) -> dict:
             errors["leftover"] = "Must be greater than 0"
     if body["format"] not in [1, 2, 51]:
         errors["format"] = "Must be a valid format"
+    if body["notes"] is not None:
+        if len(body["notes"]) == 0:
+            errors["notes"] = "Notes cannot be an empty string"
+        elif len(body["notes"]) > MAX_LONG_TEXT_LEN:
+            errors["notes"] = f"Notes cannot be longer than {MAX_LONG_TEXT_LEN} characters"
     return errors
 
 
