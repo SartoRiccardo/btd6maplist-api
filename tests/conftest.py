@@ -125,7 +125,8 @@ def assert_state_unchanged(btd6ml_test_client):
                 self.prev_value = await resp.json()
 
         async def __aexit__(self, exception_type, exception_value, exception_traceback):
-            async with btd6ml_test_client.get(self.endpoint) as resp:
-                assert self.prev_value == await resp.json()
+            if exception_type != AssertionError:
+                async with btd6ml_test_client.get(self.endpoint) as resp:
+                    assert self.prev_value == await resp.json()
 
     return AssertStateEquals

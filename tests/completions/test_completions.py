@@ -1,6 +1,7 @@
 import pytest
 import http
 from ..mocks import DiscordPermRoles
+from ..testutils import fuzz_data, remove_fields
 
 HEADERS = {"Authorization": "Bearer test_token"}
 
@@ -53,9 +54,7 @@ async def test_add(btd6ml_test_client, mock_discord_api, completion_payload):
     expected_value = {
         "id": 0,  # Set later
         "map": "MLXXXAA",
-        "users": [
-            {"id": "1", "name": "usr1"},
-        ],
+        "users": [{"id": "1", "name": "usr1"}],
         "black_border": False,
         "no_geraldo": False,
         "current_lcc": False,
@@ -113,15 +112,55 @@ class TestValidateCompletions:
 
     @pytest.mark.post
     @pytest.mark.put
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, completion_payload, assert_state_unchanged):
         """Sets all properties to every possible value, one by one"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_comp_data = completion_payload()
+        extra_expected = {
+            "lcc": [None],
+        }
+
+        for req_data, path, sub_value in fuzz_data(req_comp_data, extra_expected):
+            async with assert_state_unchanged("/maps/MLXXXAA/completions"):
+                async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Setting {path} to {sub_value} while adding a completion returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
+
+            async with assert_state_unchanged(f"/completions/1"):
+                async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Setting {path} to {sub_value} while editing a completion returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
 
     @pytest.mark.post
     @pytest.mark.put
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api):
+    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+                                  assert_state_unchanged):
         """Test adding and editing a completion with missing fields in the payload"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_comp_data = completion_payload()
+
+        for req_data, path in remove_fields(req_comp_data):
+            async with assert_state_unchanged("/maps/MLXXXAA/completions"):
+                async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Removing {path} while adding a completion returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
+
+            async with assert_state_unchanged(f"/completions/1"):
+                async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Removing {path} while editing a completion returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
 
     @pytest.mark.post
     @pytest.mark.put

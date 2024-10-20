@@ -2,7 +2,7 @@ import asyncio
 import validators
 from aiohttp import web
 import http
-from typing import Type, Any
+from typing import Type, Any, get_args
 import re
 import src.utils.routedecos
 import src.http
@@ -41,7 +41,7 @@ def get_repeated_indexes(l: list) -> list[int]:
 
 def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str = "") -> dict:
     if isinstance(body, dict):
-        if schema == dict:
+        if dict in get_args(schema):
             return {}
         if not isinstance(schema, dict):
             return {f"{path}"[1:]: "Item cannot be an object"}
@@ -264,11 +264,10 @@ async def validate_completion(body: dict) -> dict[str, str]:
         "no_geraldo": bool,
         "format": int,
         "user_ids": [str],
+        "lcc": dict | None,
     }
     if len(check := check_fields(body, check_fields_exists)):
         return check
-    if "lcc" not in body:
-        return {"lcc": "Missing"}
 
     errors = {}
 
@@ -276,12 +275,10 @@ async def validate_completion(body: dict) -> dict[str, str]:
         check_lcc_exists = {
             "leftover": int,
         }
-        if len(check := check_fields(body["lcc"], check_lcc_exists)):
+        if len(check := check_fields(body["lcc"], check_lcc_exists, path=".lcc")):
             return check
 
-        if "proof_completion" in body["lcc"] and not validators.url(body["lcc"]["proof_completion"]):
-            errors["lcc.proof_url"] = "Must be a valid URL"
-        elif 0 > body["lcc"]["leftover"]:
+        if 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
 
     if body["format"] not in [1, 2, 51]:
