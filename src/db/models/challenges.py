@@ -86,7 +86,7 @@ class ListCompletion:
         user_ids:
           type: array
           items:
-            - $ref: "#/components/schemas/RequestUserID"
+            $ref: "#/components/schemas/RequestUserID"
         lcc:
           nullable: true
           description: LCC data for the completion
@@ -109,13 +109,17 @@ class ListCompletion:
     subm_notes: str | None
 
     def to_dict(self) -> dict:
+        user_list = self.user_ids
+        if len(user_list):
+            if isinstance(user_list[0], int):
+                user_list = sorted(str(usr) for usr in user_list)
+            else:
+                user_list = [usr.to_dict() for usr in sorted(user_list, key=lambda x: x.id, reverse=True)]
+
         return {
             "id": self.id,
             "map": self.map.to_dict() if hasattr(self.map, "to_dict") else self.map,
-            "users": [
-                str(usr) if isinstance(usr, int) else usr.to_dict()
-                for usr in self.user_ids
-            ],
+            "users": user_list,
             "black_border": self.black_border,
             "no_geraldo": self.no_geraldo,
             "current_lcc": self.current_lcc,
