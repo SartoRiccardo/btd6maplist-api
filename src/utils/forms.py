@@ -22,7 +22,7 @@ async def get_completion_request(
             int(maplist_profile["user"]["id"]) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
         return web.json_response(
             {"errors": {"": "Cannot edit or accept your own completion"}},
-            status=http.HTTPStatus.UNAUTHORIZED
+            status=http.HTTPStatus.FORBIDDEN
         )
 
     async def validate_json_part(data: dict) -> web.Response | None:
