@@ -145,12 +145,14 @@ def invalidate_field(
             request_data = copy.deepcopy(full_data)
             current_data = request_data
             for i, path_key in enumerate(current_path):
-                while isinstance(current_data, list):
+                while isinstance(current_data, list) and \
+                        isinstance(current_data[0], dict | list):
                     appended += 1
                     current_path.append(0)
                     current_data = current_data[0]
                 current_data = current_data[path_key]
-            while isinstance(current_data, list):
+            while isinstance(current_data, list) and \
+                    isinstance(current_data[0], dict | list):
                 appended += 1
                 current_path.append(0)
                 current_data = current_data[0]

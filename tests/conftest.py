@@ -123,6 +123,7 @@ def assert_state_unchanged(btd6ml_test_client):
         async def __aenter__(self):
             async with btd6ml_test_client.get(self.endpoint) as resp:
                 self.prev_value = await resp.json()
+                return self.prev_value
 
         async def __aexit__(self, exception_type, exception_value, exception_traceback):
             if exception_type != AssertionError:

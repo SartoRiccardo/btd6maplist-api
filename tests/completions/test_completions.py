@@ -1,7 +1,7 @@
 import pytest
 import http
 from ..mocks import DiscordPermRoles
-from ..testutils import fuzz_data, remove_fields
+from ..testutils import fuzz_data, remove_fields, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_token"}
 
@@ -106,9 +106,51 @@ async def test_add(btd6ml_test_client, mock_discord_api, completion_payload):
 class TestValidateCompletions:
     @pytest.mark.post
     @pytest.mark.put
-    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api):
+    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+                                  assert_state_unchanged):
         """Test adding and editing a completion with invalid fields in the payload"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_completion_data = completion_payload()
+
+        async def call_endpoints(
+                req_data: dict,
+                error_path: str,
+                error_msg: str = "",
+        ):
+            error_msg = error_msg.replace("[keypath]", error_path)
+            async with assert_state_unchanged("/maps/MLXXXAA/completions"):
+                async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and error_path in resp_data["errors"], \
+                        f"\"{error_path}\" was not in response.errors"
+            async with assert_state_unchanged("/completions/1"):
+                async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Editing {error_msg} returned {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and error_path in resp_data["errors"], \
+                        f"\"{error_path}\" was not in response.errors"
+
+        # User fields
+        validations = [
+            ("999999999", "a completion with a nonexistent user"),
+            ("a", "a completion with a nonexistent username"),
+        ]
+        invalid_schema = {"user_ids": [0]}
+        for req_data, edited_path, error_msg in invalidate_field(req_completion_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # Non-negative fields
+        validations = [(-2, f"a completion with a negative [keypath]")]
+        invalid_schema = {None: ["format"], "lcc": ["leftover"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_completion_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # Integer too large
+        validations = [(999999, f"a completion with a [keypath] too large")]
+        invalid_schema = {None: ["format"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_completion_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
 
     @pytest.mark.post
     @pytest.mark.put
@@ -165,9 +207,81 @@ class TestValidateCompletions:
     @pytest.mark.post
     @pytest.mark.put
     @pytest.mark.delete
-    async def test_forbidden(self, btd6ml_test_client, mock_discord_api):
+    async def test_forbidden(self, btd6ml_test_client, mock_discord_api, completion_payload, assert_state_unchanged):
         """Test a user adding, editing or deleting a completion if they don't have perms"""
-        pytest.skip("Not Implemented")
+        async with assert_state_unchanged("/maps/MLXXXAA/completions"):
+            mock_discord_api(unauthorized=True)
+            async with btd6ml_test_client.post("/maps/MLXXXAA/completions") as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Adding a completion without providing authorization returns {resp.status}"
+            async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Adding a completion with and invalid token returns {resp.status}"
+
+            mock_discord_api()
+            async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Adding a completion without permissions returns {resp.status}"
+
+        async with assert_state_unchanged("/completions/1"):
+            mock_discord_api(unauthorized=True)
+            async with btd6ml_test_client.put("/completions/1") as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Editing a completion without providing authorization returns {resp.status}"
+            async with btd6ml_test_client.put("/completions/1", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Editing a completion with and invalid token returns {resp.status}"
+
+            async with btd6ml_test_client.delete("/completions/1") as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Deleting a completion without providing authorization returns {resp.status}"
+            async with btd6ml_test_client.delete("/completions/1", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                    f"Deleting a completion with and invalid token returns {resp.status}"
+
+            mock_discord_api()
+            async with btd6ml_test_client.put("/completions/1", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Editing a completion without permissions returns {resp.status}"
+            async with btd6ml_test_client.delete("/completions/1", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Deleting a completion without permissions returns {resp.status}"
+
+    @pytest.mark.put
+    @pytest.mark.post
+    async def test_own_completion(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+                                  completion_payload):
+        """Test editing one's own completion, or adding themselves to a completion"""
+        comp_id = 27
+        async with assert_state_unchanged(f"/completions/{comp_id}") as completion_og:
+            completed_by = completion_og["users"][0]["id"]
+            mock_discord_api(perms=DiscordPermRoles.ADMIN, user_id=completed_by)
+
+            req_data = completion_payload()
+            req_data["user_ids"] = ["1"]
+            async with btd6ml_test_client.put(f"/completions/{comp_id}", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Changing one's own completion and removing oneself returns {resp.status}"
+
+            req_data["user_ids"] = [usr["id"] for usr in completion_og["users"]]
+            async with btd6ml_test_client.put(f"/completions/{comp_id}", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Changing one's own completion while leaving users unchanged returns {resp.status}"
+
+        comp_id = 28
+        async with assert_state_unchanged(f"/completions/{comp_id}"):
+            req_data = completion_payload()
+            req_data["user_ids"].append(completed_by)
+            async with btd6ml_test_client.put(f"/completions/{comp_id}", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Adding oneself to another completion returns {resp.status}"
+
+        async with assert_state_unchanged("/maps/MLXXXAA/completions"):
+            req_data = completion_payload()
+            req_data["user_ids"].append(completed_by)
+            async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                    f"Adding oneself to another completion returns {resp.status}"
 
 
 @pytest.mark.completions
@@ -178,20 +292,27 @@ class TestEditCompletion:
         pytest.skip("Not Implemented")
 
     @pytest.mark.put
-    async def test_admin_edit_perms(self, btd6ml_test_client, mock_discord_api):
+    async def test_admin_edit_perms(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+                                    completion_payload):
         """Test Maplist Mods editing Expert List completions, and vice versa"""
-        pytest.skip("Not Implemented")
+        async def call_as_mod(perms: int, completion_id: int):
+            mod_name_str = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
+            comp_name_str = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
 
-    @pytest.mark.post
-    @pytest.mark.put
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api):
-        """Test editing a completion with some missing fields"""
-        pytest.skip("Not Implemented")
+            mock_discord_api(perms=perms)
+            async with assert_state_unchanged(f"/completions/{completion_id}") as completion:
+                req_data = completion_payload()
+                async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                        f"Editing an {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+                req_data["format"] = completion["format"]
+                async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                        f"Editing an {comp_name_str} completion as a {mod_name_str} Mod while leaving the format " \
+                        f"unchanged returns {resp.status}"
 
-    @pytest.mark.put
-    async def test_edit_own_completion(self, btd6ml_test_client, mock_discord_api):
-        """Test editing one's own completion, or adding themselves to a completion"""
-        pytest.skip("Not Implemented")
+        await call_as_mod(DiscordPermRoles.MAPLIST_MOD, 10)
+        await call_as_mod(DiscordPermRoles.EXPLIST_MOD, 17)
 
     @pytest.mark.delete
     async def test_delete(self, btd6ml_test_client, mock_discord_api):
