@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import http
 from ..mocks import DiscordPermRoles
@@ -287,11 +289,43 @@ class TestValidateCompletions:
 @pytest.mark.completions
 class TestEditCompletion:
     @pytest.mark.put
-    async def test_edit(self, btd6ml_test_client, mock_discord_api):
+    async def test_edit(self, btd6ml_test_client, mock_discord_api, completion_payload):
         """Test editing a completion with a correct payload"""
-        pytest.skip("Not Implemented")
+        req_data = completion_payload()
+        req_data["lcc"] = None  # LCC tests go in ./test_leastcostchimps.py
+
+        expected_completion = {
+            "id": 1,
+            "map": "MLXXXAA",
+            "users": [
+                {"id": "1", "name": "usr1"},
+            ],
+            "black_border": False,
+            "no_geraldo": False,
+            "current_lcc": False,
+            "lcc": None,
+            "format": 1,
+            "subm_proof_img": [],
+            "subm_proof_vid": [
+                "https://youtu.be/JDwNAlvz",
+                "https://youtu.be/DcNFeVto",
+            ],
+            "accepted_by": "35",
+            "created_on": 1728770986 + 3600 * ((1+1) % 100),
+            "deleted_on": None,
+            "subm_notes": None,
+        }
+
+        mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+        async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Editing a completion with a correct payload returns {resp.status}"
+            async with btd6ml_test_client.get("/completions/1") as resp_get:
+                assert expected_completion == await resp_get.json(), \
+                    "Modified completion differs from expected"
 
     @pytest.mark.put
+    @pytest.mark.delete
     async def test_admin_edit_perms(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
                                     completion_payload):
         """Test Maplist Mods editing Expert List completions, and vice versa"""
@@ -301,20 +335,35 @@ class TestEditCompletion:
 
             mock_discord_api(perms=perms)
             async with assert_state_unchanged(f"/completions/{completion_id}") as completion:
+                async with btd6ml_test_client.delete(f"/completions/{completion_id}", headers=HEADERS) as resp:
+                    assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                        f"Deleting a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+
                 req_data = completion_payload()
                 async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
                     assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                        f"Editing an {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+                        f"Editing a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+
                 req_data["format"] = completion["format"]
                 async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
                     assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                        f"Editing an {comp_name_str} completion as a {mod_name_str} Mod while leaving the format " \
+                        f"Editing a {comp_name_str} completion as a {mod_name_str} Mod while leaving the format " \
                         f"unchanged returns {resp.status}"
 
         await call_as_mod(DiscordPermRoles.MAPLIST_MOD, 10)
         await call_as_mod(DiscordPermRoles.EXPLIST_MOD, 17)
 
     @pytest.mark.delete
-    async def test_delete(self, btd6ml_test_client, mock_discord_api):
+    async def test_delete(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
         """Test editing a completion, more than once"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        async with btd6ml_test_client.delete("/completions/17", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Deleting a completion returns {resp.status}"
+
+        await asyncio.sleep(1)
+        async with assert_state_unchanged("/completions/17"):
+            async with btd6ml_test_client.delete("/completions/17", headers=HEADERS) as resp:
+                assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                    f"Deleting a completion twice returns {resp.status}"
+
