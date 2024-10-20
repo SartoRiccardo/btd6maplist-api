@@ -332,7 +332,44 @@ class TestValidateCompletion:
         proof_img = save_image(2)
         req_submission_data = comp_subm_payload()
         req_submission_data["format"] = 3
-        pytest.skip("Not Implemented")
+
+        req_form = to_formdata(req_submission_data)
+        req_form.add_field("proof_completion", proof_img.open("rb"))
+        async with assert_state_unchanged("/completions/unapproved"):
+            async with btd6ml_test_client.post(
+                    "/maps/MLXXXAA/completions/submit",
+                    headers=HEADERS,
+                    data=req_form,
+            ) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Submitting with an invalid format returned {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and "format" in resp_data["errors"], \
+                    "\"format\" is not in errors"
+
+        TEST_FORMATS = [
+            ("ELXXXAA", (1, 2)),
+            ("MLXXXAA", (2, 51)),
+            # ("MLAXXAA", (1, 51)),
+        ]
+        for code, formats in TEST_FORMATS:
+            for fmt in formats:
+                req_submission_data = comp_subm_payload()
+                req_submission_data["format"] = fmt
+
+                req_form = to_formdata(req_submission_data)
+                req_form.add_field("proof_completion", proof_img.open("rb"))
+                async with assert_state_unchanged("/completions/unapproved"):
+                    async with btd6ml_test_client.post(
+                            f"/maps/{code}/completions/submit",
+                            headers=HEADERS,
+                            data=req_form,
+                    ) as resp:
+                        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                            f"Submitting with format {fmt} on map that shouldn't accept it returned {resp.status}"
+                        resp_data = await resp.json()
+                        assert "errors" in resp_data and "format" in resp_data["errors"], \
+                            "\"format\" is not in errors"
 
 
 @pytest.mark.submissions

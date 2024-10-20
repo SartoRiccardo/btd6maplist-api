@@ -100,7 +100,7 @@ class Map:
     created_on: int
     optimal_heros: list[str]
     # Many-To-One
-    creators: list[tuple[int, str]]
+    creators: list[tuple[int, str | None]]
     additional_codes: list[tuple[str, str | None]]
     verifications: list[tuple[str, int]]
     map_data_compatibility: list[tuple[int, int]]
@@ -305,7 +305,7 @@ def random_maps() -> tuple[int, list[Map]]:
             f"MLXX{num_to_letters(plc-1)}",
             f"Maplist Map {plc}",
             plc,
-            plc-5 if 0 < plc-5 <= 50 else (50 + (plc-55)//2) if (plc-5) % 2 == 0 and plc-5 > 50 else -1,
+            plc-5 if 1 < plc-5 <= 50 else (50 + (plc-55)//2) if (plc-5) % 2 == 0 and plc-5 > 50 else -1,
             -1 if plc < 40 or plc >= 55 else plc % 4,
             (
                 None if plc < 20 else
@@ -568,6 +568,27 @@ def gen_extra_lccs(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, 
     return comp_uid, lcc_uid, [new_completion() for _ in range(12)]
 
 
+def gen_extra_maps(map_uid: int = 1) -> tuple[int, list[Map]]:
+    maps = [
+        Map(
+            map_uid, "MLAXXAA", f"Maplist Map All Versions 1",
+            -1, 1, -1,
+            None, None, None, None,
+            start_timestamp,
+            ["geraldo"], [(1, None)], [], [], [], [],
+        ),
+        Map(
+            map_uid+1, "ELXXXAA", f"Expert Map 1",
+            -1, -1, 1,
+            None, None, None, None,
+            start_timestamp,
+            ["geraldo"], [(1, None)], [], [], [], [],
+        ),
+    ]
+    map_uid += len(maps)
+    return map_uid, maps
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -580,6 +601,9 @@ if __name__ == '__main__':
     comp_uid, lcc_uid, completions_rec = completions_recent(maps[10], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lccs = gen_extra_lccs(maps[0], comp_uid=comp_uid, lcc_uid=lcc_uid)
     completions += completions_rec + completions_pro + completions_lccs
+
+    map_uid, extra_maps = gen_extra_maps(map_uid)
+    maps += extra_maps
 
     with open(bpath / "01_maps.csv", "w") as fout:
         fout.write("\n".join(

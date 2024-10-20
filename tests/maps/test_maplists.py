@@ -38,7 +38,7 @@ class TestMaplists:
         async with btd6ml_test_client.get("/maps?version=all") as resp:
             assert resp.ok, f"GET /maps returned {resp.status}"
             resp_data = await resp.json()
-            assert resp_data[0]["code"] == "MLXXXAF", "First map code differs from expected"
+            assert resp_data[0]["code"] == "MLAXXAA", "First map code differs from expected"
             assert resp_data[-1]["code"] == "MLXXXFE", "Last map code differs from expected"
             assert len(resp_data) == 50, "Maplist length differs from expected"
             for i, map_data in enumerate(resp_data):

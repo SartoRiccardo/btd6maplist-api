@@ -3,7 +3,7 @@
 3	MLXXXAC	Maplist Map 3	3	-1	-1	\N	\N	brickell	\N	2024-10-13 00:09:46.000000	\N	\N
 4	MLXXXAD	Maplist Map 4	4	-1	-1	\N	\N	churchill	\N	2024-10-13 00:09:46.000000	\N	\N
 5	MLXXXAE	Maplist Map 5	5	-1	-1	\N	\N	psi	\N	2024-10-13 00:09:46.000000	\N	\N
-6	MLXXXAF	Maplist Map 6	6	1	-1	\N	\N	ezili	\N	2024-10-13 00:09:46.000000	\N	\N
+6	MLXXXAF	Maplist Map 6	6	-1	-1	\N	\N	ezili	\N	2024-10-13 00:09:46.000000	\N	\N
 7	MLXXXAG	Maplist Map 7	7	2	-1	\N	\N	psi	\N	2024-10-13 00:09:46.000000	\N	\N
 8	MLXXXAH	Maplist Map 8	8	3	-1	\N	\N	ben	\N	2024-10-13 00:09:46.000000	\N	\N
 9	MLXXXAI	Maplist Map 9	9	4	-1	\N	\N	brickell	\N	2024-10-13 00:09:46.000000	\N	\N
@@ -68,3 +68,5 @@
 68	DELXXAI	Deleted Maplist Map 8	-1	-1	-1	\N	\N		\N	2024-10-13 00:09:46.000000	2024-10-14 00:09:46.000000	\N
 69	DELXXAJ	Deleted Maplist Map 9	-1	-1	-1	\N	\N		\N	2024-10-13 00:09:46.000000	2024-10-14 00:09:46.000000	\N
 70	DELXXBA	Deleted Maplist Map 10	-1	-1	-1	\N	\N		\N	2024-10-13 00:09:46.000000	2024-10-14 00:09:46.000000	\N
+71	MLAXXAA	Maplist Map All Versions 1	-1	1	-1	\N	\N	geraldo	\N	2024-10-13 00:09:46.000000	\N	\N
+72	ELXXXAA	Expert Map 1	-1	-1	1	\N	\N	geraldo	\N	2024-10-13 00:09:46.000000	\N	\N
