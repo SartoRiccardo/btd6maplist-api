@@ -106,9 +106,32 @@ async def btd6ml_test_client(btd6ml_app, aiohttp_client):
 
 @pytest.fixture
 def save_image(tmp_path: pathlib.Path):
-    def save(url: str, filename: str) -> pathlib.Path:
+    images = [
+        "https://dummyimage.com/300x200/000/fff",
+        "https://dummyimage.com/400x300/00ff00/000",
+        "https://dummyimage.com/600x400/0000ff/fff",
+        "https://dummyimage.com/800x600/ff0000/fff",
+        "https://dummyimage.com/200x200/ff00ff/fff",
+        "https://dummyimage.com/500x300/ffff00/000",
+        "https://dummyimage.com/700x500/ff6600/fff",
+        "https://dummyimage.com/900x700/663399/fff",
+        "https://dummyimage.com/250x150/9966cc/fff",
+        "https://dummyimage.com/450x350/00cccc/000",
+        "https://dummyimage.com/650x450/cc00cc/fff",
+        "https://dummyimage.com/850x650/339966/fff",
+        "https://dummyimage.com/150x100/ff9933/000",
+        "https://dummyimage.com/350x250/33cc99/fff",
+        "https://dummyimage.com/550x350/3399ff/000",
+        "https://dummyimage.com/750x550/996633/fff",
+        "https://dummyimage.com/950x750/cc9966/fff",
+        "https://dummyimage.com/100x100/6699cc/000",
+        "https://dummyimage.com/300x250/663366/fff",
+        "https://dummyimage.com/500x400/ff6699/000",
+    ]
+
+    def save(index: int, filename: str = "image.png") -> pathlib.Path:
         path = tmp_path / filename
-        path.write_bytes(requests.get(url).content)
+        path.write_bytes(requests.get(images[index % len(images)]).content)
         return path
     return save
 

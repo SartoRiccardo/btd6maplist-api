@@ -90,7 +90,7 @@ class TestSubmitMap:
         mock_discord_api()
 
         full_data = map_submission_payload(valid_codes[0])
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         for key in full_data:
             req_data = {**full_data}
             del req_data[key]
@@ -117,7 +117,7 @@ class TestSubmitMap:
         """Sets every field to another datatype, one by one"""
         mock_discord_api()
 
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         valid_data = map_submission_payload(
             valid_codes[0],
             notes="Test Submission Notes",
@@ -139,7 +139,7 @@ class TestSubmitMap:
         """Test submitting a map with invalid fields in the payload"""
         mock_discord_api()
 
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         valid_data = map_submission_payload(
             valid_codes[0],
             notes="Test Submission Notes",
@@ -199,7 +199,7 @@ class TestSubmitMap:
         """Test a submission from a user with a banned role"""
         mock_discord_api(perms=DiscordPermRoles.BANNED)
 
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         valid_data = map_submission_payload(valid_codes[1])
 
         form_data = to_formdata(valid_data)
@@ -216,7 +216,7 @@ class TestSubmitMap:
         USERNAME = "new_user"
         mock_discord_api(user_id=USER_ID, username=USERNAME)
 
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         valid_data = map_submission_payload(valid_codes[1])
 
         form_data = to_formdata(valid_data)
@@ -259,7 +259,7 @@ class TestHandleSubmissions:
         TEST_CODE = valid_codes[4]
 
         mock_discord_api()
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         valid_data = map_submission_payload(TEST_CODE)
 
         form_data = to_formdata(valid_data)

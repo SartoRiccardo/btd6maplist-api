@@ -1,11 +1,17 @@
 import pytest
+import http
+from ..mocks import DiscordPermRoles
+from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field
 
 
 @pytest.mark.post
 @pytest.mark.submissions
 class TestSubmitCompletion:
-    async def test_submit_completion(self, btd6ml_test_client, mock_discord_api):
+    async def test_submit_completion(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image):
         """Test a valid completion submission"""
+        req_submission = comp_subm_payload()
+        req_form = to_formdata(req_submission)
+
         pytest.skip("Not Implemented")
 
     async def test_missing_fields(self, btd6ml_test_client, mock_discord_api):

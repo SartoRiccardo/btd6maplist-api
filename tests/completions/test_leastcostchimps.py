@@ -51,7 +51,7 @@ class TestAddLCC:
         """
         Test adding an LCC with the correct payload, once with a suboptimal LCC and once with an optimal one
         """
-        proof_completion = save_image("https://dummyimage.com/400x300/00ff00/000", "proof_completion.png")
+        proof_completion = save_image(1)
         mock_discord_api(perms=DiscordPermRoles.ADMIN)
 
         req_comp_data = completion_payload()

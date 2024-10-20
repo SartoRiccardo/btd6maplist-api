@@ -12,3 +12,18 @@ def completion_payload():
             "format": 1,
         }
     return make
+
+
+@pytest.fixture
+def comp_subm_payload():
+    def make():
+        return {
+            "notes": None,
+            "format": 1,
+            "black_border": False,
+            "no_geraldo": False,
+            "current_lcc": False,
+            "leftover": None,
+            "video_proof_url": [],
+        }
+    return make

@@ -344,7 +344,7 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
-async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload, valid_codes, tmp_path):
+async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload, valid_codes, save_image):
     """Test adding and editing map with images in the payload works"""
     async def assert_images(code: str, expected: tuple[str, str], full: bool = False):
         async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
@@ -356,13 +356,8 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
 
     mock_discord_api(perms=DiscordPermRoles.ADMIN)
 
-    image_urls = [
-        "https://dummyimage.com/400x300/00ff00/000",
-        "https://dummyimage.com/600x400/0000ff/fff",
-    ]
-    for i, url in enumerate(image_urls):
-        path = tmp_path / f"image{i}.png"
-        path.write_bytes(requests.get(url).content)
+    r6_start_path = save_image(1, filename="r6start.png")
+    preview_path = save_image(2, filename="preview.png")
 
     req_map_data = {
         **map_payload(valid_codes[0]),
@@ -370,8 +365,8 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
         "creators": [{"id": "1", "role": None}],
     }
     form_data = to_formdata(req_map_data)
-    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    form_data.add_field("r6_start", r6_start_path.open("rb"))
+    form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Adding a map with images in the payload return {resp.status}"
         await assert_images(
@@ -382,8 +377,8 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
         )
 
     form_data = to_formdata(req_map_data)
-    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    form_data.add_field("r6_start", r6_start_path.open("rb"))
+    form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Editing a map with images in the payload return {resp.status}"
         await assert_images(
@@ -398,8 +393,8 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
         "r6_start": "https://example.com/img1.png",
         "map_preview_url": "https://example.com/img2.png",
     })
-    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    form_data.add_field("r6_start", r6_start_path.open("rb"))
+    form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data):
         assert resp.ok, f"Editing a map with images in the payload and json body return {resp.status}"
         await assert_images(
@@ -412,8 +407,8 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
         "r6_start": "https://example.com/img1.png",
         "map_preview_url": "https://example.com/img2.png",
     })
-    form_data.add_field("r6_start", (tmp_path/"image0.png").open("rb"))
-    form_data.add_field("map_preview_url", (tmp_path/"image1.png").open("rb"))
+    form_data.add_field("r6_start", r6_start_path.open("rb"))
+    form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.post(f"/maps", headers=HEADERS, data=form_data):
         assert resp.ok, f"Adding a map with images in the payload and json body return {resp.status}"
         await assert_images(
