@@ -75,6 +75,7 @@ def formdata_field_tester(content: list[tuple[str, Any, dict[str, Any]]]):
 def fuzz_data(
         full_data: dict,
         extra_expected: dict = None,
+        int_as_float: bool = False,
 ) -> Generator[tuple[dict, str, list | dict | float | str | None], None, None]:
     extra_expected = {} if extra_expected is None else extra_expected
     test_values = [[], {}, 1.7, "a", None]
@@ -92,6 +93,9 @@ def fuzz_data(
         original_type = current_data[key_path[-1]]
         if original_type is not None:
             original_type = original_type.__class__
+        if original_type is int and int_as_float:
+            original_type = float
+
         for dtype in test_values:
             dtype_cls = dtype if dtype is None else dtype.__class__
             if isinstance(extra_types, list) and dtype_cls in extra_types or \
