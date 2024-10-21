@@ -106,9 +106,8 @@ async def post(
         )
 
     maplist_cfg = await get_config()
-    map_count = next(cfg for cfg in maplist_cfg if cfg.name == "map_count")
     if resource.difficulty == -1 and \
-            resource.placement_cur not in range(1, map_count.value + 1):
+            resource.placement_cur not in range(1, maplist_cfg["map_count"] + 1):
         return web.json_response(
             {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
             status=http.HTTPStatus.BAD_REQUEST,
