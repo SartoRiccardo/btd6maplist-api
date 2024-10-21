@@ -27,6 +27,7 @@ async def init_client_session(_app):
             "data.ninjakiwi.com": 3600*24,
             "discord.com": 60*60,
         },
+        allowed_codes=(200, 404, 401),
         include_headers=True,
     )
 
