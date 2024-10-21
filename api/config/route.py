@@ -37,9 +37,9 @@ async def get(_r: web.Request):
             schema:
               type: array
               items:
-                $ref: "#/components/schemas/ConfigVar"
+                type: object
     """
-    return web.json_response([cfg.to_dict() for cfg in await get_config()])
+    return web.json_response(await get_config())
 
 
 async def put_validate(body: dict) -> dict:
@@ -53,8 +53,7 @@ async def put_validate(body: dict) -> dict:
     errors = {}
     config = await get_config()
     for key in body["config"]:
-        idx = index_where(config, lambda x: x.name == key)
-        vtype = type(config[idx].value)
+        vtype = type(config[key])
         try:
             body["config"][key] = vtype(body["config"][key])
         except ValueError:
@@ -87,9 +86,7 @@ async def put(
       content:
         application/json:
           schema:
-            type: array
-            items:
-              $ref: "#/components/schemas/ConfigVar"
+            type: object
     responses:
       "200":
         description: |
