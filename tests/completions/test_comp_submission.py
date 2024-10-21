@@ -516,5 +516,13 @@ class TestHandleSubmissions(CompletionTest):
 
     @pytest.mark.delete
     async def test_reject_submission(self, btd6ml_test_client, mock_discord_api):
-        """Test rejecting a completion submission"""
-        pytest.skip("Not Implemented")
+        """Test rejecting a completion submission hard deletes it"""
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        async with btd6ml_test_client.delete("/completions/29", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Deleting a completion returns {resp.status}"
+
+        async with btd6ml_test_client.get("/completions/29", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+                f"Getting a deleted completion submission returned {resp.status}"
+            assert resp.headers["Content-Length"] == "0", "Deleted completion returned some content"

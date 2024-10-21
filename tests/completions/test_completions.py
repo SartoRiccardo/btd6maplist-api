@@ -217,30 +217,6 @@ class TestValidateCompletions(CompletionTest):
                 endpoint_get="/completions/17",
         )
 
-        # async def call_as_mod(perms: int, completion_id: int):
-        #     mod_name_str = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
-        #     comp_name_str = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
-        #
-        #     mock_discord_api(perms=perms)
-        #     async with assert_state_unchanged(f"/completions/{completion_id}") as completion:
-        #         async with btd6ml_test_client.delete(f"/completions/{completion_id}", headers=HEADERS) as resp:
-        #             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-        #                 f"Deleting a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
-        #
-        #         req_data = completion_payload()
-        #         async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
-        #             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-        #                 f"Editing a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
-        #
-        #         req_data["format"] = completion["format"]
-        #         async with btd6ml_test_client.put(f"/completions/{completion_id}", headers=HEADERS, json=req_data) as resp:
-        #             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-        #                 f"Editing a {comp_name_str} completion as a {mod_name_str} Mod while leaving the format " \
-        #                 f"unchanged returns {resp.status}"
-        #
-        # await call_as_mod(DiscordPermRoles.MAPLIST_MOD, 10)
-        # await call_as_mod(DiscordPermRoles.EXPLIST_MOD, 17)
-
 
 @pytest.mark.completions
 class TestEditCompletion:
