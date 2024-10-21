@@ -2,6 +2,7 @@ import pytest
 import http
 from ..mocks import DiscordPermRoles
 from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field, remove_fields
+from .CompletionTest import CompletionTest
 import config
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -373,45 +374,147 @@ class TestValidateCompletion:
 
 
 @pytest.mark.submissions
-class TestHandleSubmissions:
-    @pytest.mark.put
-    async def test_accept_submission(self, btd6ml_test_client, mock_discord_api):
-        """Test accepting a submission"""
-        pytest.skip("Not Implemented")
+class TestHandleSubmissions(CompletionTest):
+    @pytest.mark.post
+    async def test_accept_submission(self, btd6ml_test_client, mock_discord_api, completion_payload,
+                                     assert_state_unchanged):
+        """Test accepting (and editing) a submission"""
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+        expected_value = {
+            "id": 16,
+            "map": "MLXXXAB",
+            "users": [{"id": "1", "name": "usr1"}],
+            "black_border": False,
+            "no_geraldo": False,
+            "current_lcc": False,
+            "lcc": {"leftover": 1},
+            "format": 1,
+            "subm_proof_img": [
+                "https://dummyimage.com/150x100/ff9933/000",
+                "https://dummyimage.com/900x700/663399/fff",
+                "https://dummyimage.com/200x200/ff00ff/fff",
+            ],
+            "subm_proof_vid": [
+                "https://youtu.be/lpiZWTSe",
+                "https://youtu.be/BZAfQqmI",
+            ],
+            "accepted_by": "100000",
+            "created_on": 0,  # Set later
+            "deleted_on": None,
+            "subm_notes": None,
+        }
+        req_data = completion_payload()
+        async with btd6ml_test_client.put("/completions/16/accept", headers=HEADERS, json=req_data) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Trying to accept a submission returns {resp.status}"
+            async with btd6ml_test_client.get("/completions/16") as resp_get:
+                resp_data = await resp_get.json()
+                expected_value["created_on"] = resp_data["created_on"]
+                assert expected_value == resp_data
+
+        async with assert_state_unchanged("/completions/16"):
+            async with btd6ml_test_client.put("/completions/16/accept", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Trying to accept an already accepted submission returns {resp.status}"
+
+    @pytest.mark.post
+    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+                                  assert_state_unchanged):
+        """Test adding and editing a completion with invalid fields in the payload"""
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_completion_data = completion_payload()
+
+        async def call_endpoints(
+                req_data: dict,
+                error_path: str,
+                error_msg: str = "",
+        ):
+            error_msg = error_msg.replace("[keypath]", error_path)
+            async with assert_state_unchanged("/completions/29"):
+                async with btd6ml_test_client.put("/completions/29/accept", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and error_path in resp_data["errors"], \
+                        f"\"{error_path}\" was not in response.errors"
+
+        await self._test_invalid_fields(req_completion_data, call_endpoints)
+
+    @pytest.mark.post
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, completion_payload, assert_state_unchanged):
+        """Sets all properties to every possible value, one by one"""
+        await self._test_fuzz(
+            btd6ml_test_client,
+            mock_discord_api,
+            completion_payload,
+            assert_state_unchanged,
+            endpoint_put="/completions/29/accept",
+            endpoint_get_put="/completions/29",
+        )
+
+    @pytest.mark.post
+    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+                                  assert_state_unchanged):
+        """Test accepting and editing a completion with missing fields in the payload"""
+        await self._test_missing_fields(
+            btd6ml_test_client,
+            mock_discord_api,
+            completion_payload,
+            assert_state_unchanged,
+            endpoint_put="/completions/29/accept",
+            endpoint_get_put="/completions/29",
+        )
+
+    @pytest.mark.post
+    async def test_forbidden(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+        """Test a user accepting a completion if they don't have perms"""
+        await self._test_forbidden(
+            btd6ml_test_client,
+            mock_discord_api,
+            assert_state_unchanged,
+            endpoint_put="/completions/29/accept",
+            endpoint_get_put="/completions/29",
+        )
+
+    @pytest.mark.post
+    async def test_accept_own(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+                                  completion_payload):
+        """Test accepting and editing one's own completion, or adding themselves to a completion"""
+        await self._test_own_completion(
+            btd6ml_test_client,
+            mock_discord_api,
+            assert_state_unchanged,
+            completion_payload,
+            endpoint_put_own="/completions/29/accept",
+            endpoint_get_own="/completions/29",
+            endpoint_put_other="/completions/36/accept",
+            endpoint_get_other="/completions/36",
+        )
 
     @pytest.mark.put
-    async def test_accept_edit_submission(self, btd6ml_test_client, mock_discord_api):
-        """Test accepting and editing a submission"""
-        pytest.skip("Not Implemented")
-
-    @pytest.mark.put
-    async def test_accept_edit_invalid_fields(self, btd6ml_test_client, mock_discord_api):
-        """
-        Test accepting and editing a submission, while editing some fields so they become invalid
-        """
-        pytest.skip("Not Implemented")
-
-    @pytest.mark.put
-    async def test_accept_edit_missing_fields(self, btd6ml_test_client, mock_discord_api):
-        """
-        Test accepting and editing a submission, with some fields being missing
-        """
-        pytest.skip("Not Implemented")
-
-    @pytest.mark.put
-    async def test_accept_own(self, btd6ml_test_client, mock_discord_api):
-        """Test accepting one's own completion"""
-        pytest.skip("Not Implemented")
+    async def test_scoped_edit_perms(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+                                     completion_payload):
+        """Test Maplist Mods accepting Expert List completions, and vice versa"""
+        await self._test_scoped_edit_perms(
+            mock_discord_api,
+            assert_state_unchanged,
+            btd6ml_test_client,
+            completion_payload,
+            DiscordPermRoles.MAPLIST_MOD,
+            endpoint_put="/completions/11/accept",
+            endpoint_get="/completions/11",
+        )
+        await self._test_scoped_edit_perms(
+                mock_discord_api,
+                assert_state_unchanged,
+                btd6ml_test_client,
+                completion_payload,
+                DiscordPermRoles.EXPLIST_MOD,
+                endpoint_put="/completions/4/accept",
+                endpoint_get="/completions/4",
+        )
 
     @pytest.mark.delete
     async def test_reject_submission(self, btd6ml_test_client, mock_discord_api):
         """Test rejecting a completion submission"""
-        pytest.skip("Not Implemented")
-
-    @pytest.mark.delete
-    async def test_reject_accept_forbidden(self, btd6ml_test_client, mock_discord_api):
-        """
-        Test rejecting or accepting a completion submission without having the perms to do so.
-        List mods shouldn't reject a map submitted to the expert list, and vice versa.
-        """
         pytest.skip("Not Implemented")
