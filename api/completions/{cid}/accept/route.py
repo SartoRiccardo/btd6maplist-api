@@ -13,7 +13,7 @@ import src.log
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.require_perms()
-async def post(
+async def put(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
