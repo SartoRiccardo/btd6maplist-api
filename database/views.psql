@@ -26,7 +26,7 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 
 CREATE OR REPLACE VIEW lccs_by_map AS
 SELECT DISTINCT ON (r.map, r.format)
-    r.map, r.format, lcc.id
+    r.map, r.format, lcc.leftover, lcc.id
 FROM list_completions r
 JOIN leastcostchimps lcc
     ON r.lcc = lcc.id
@@ -267,9 +267,15 @@ ORDER BY placement ASC, user_id DESC;
 
 
 CREATE OR REPLACE VIEW experts_lcc_leaderboard AS
-WITH leaderboard AS (
+WITH valid_lccs AS (
+    SELECT DISTINCT ON (map) *
+    FROM lccs_by_map
+    WHERE (format BETWEEN 51 AND 100 OR format = 1)
+    ORDER BY map, leftover DESC
+),
+leaderboard AS (
     SELECT lcp.user_id, COUNT(lcp.user_id) AS score
-    FROM lccs_by_map lccs
+    FROM valid_lccs lccs
     JOIN list_completions r
         ON r.lcc = lccs.id
     JOIN maps m
@@ -277,10 +283,6 @@ WITH leaderboard AS (
     JOIN listcomp_players lcp
         ON r.id = lcp.run
     WHERE m.difficulty >= 0
-        AND (
-            lccs.format BETWEEN 51 AND 100
-            OR lccs.format = 1
-        )
         AND m.deleted_on IS NULL
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
