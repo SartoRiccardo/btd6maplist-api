@@ -151,6 +151,57 @@ def assert_state_unchanged(btd6ml_test_client):
         async def __aexit__(self, exception_type, exception_value, exception_traceback):
             if exception_type != AssertionError:
                 async with btd6ml_test_client.get(self.endpoint) as resp:
-                    assert self.prev_value == await resp.json()
+                    assert self.prev_value == await resp.json(), \
+                        f"{self.endpoint} state changed"
 
     return AssertStateEquals
+
+
+@pytest.fixture
+def completion_payload():
+    def make():
+        return {
+            "user_ids": ["1"],
+            "black_border": False,
+            "no_geraldo": False,
+            "lcc": {"leftover": 1},
+            "format": 1,
+        }
+    return make
+
+
+@pytest.fixture
+def comp_subm_payload():
+    def make():
+        return {
+            "notes": None,
+            "format": 1,
+            "black_border": False,
+            "no_geraldo": False,
+            "current_lcc": False,
+            "leftover": None,
+            "video_proof_url": [],
+        }
+    return make
+
+
+@pytest.fixture
+def map_payload():
+    def generate(code: str, creators: dict = None):
+        return {
+            "code": code,
+            "name": "Test Map Data",
+            "placement_allver": -1,
+            "placement_curver": -1,
+            "difficulty": -1,
+            "r6_start": None,
+            "map_data": None,
+            "map_preview_url": None,
+            "additional_codes": [],
+            "creators": creators if creators is not None else [{"id": "1", "role": None}],
+            "verifiers": [],
+            "aliases": [],
+            "version_compatibilities": [],
+            "optimal_heros": [],
+        }
+    return generate

@@ -1,6 +1,5 @@
 import re
 import yaml
-from .ConfigVar import ConfigVar
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .User import User, PartialUser, MaplistProfile, MaplistMedals
@@ -81,7 +80,6 @@ def remove_init_indent(docstring: str, init_padding: int) -> str:
 
 
 entities = [
-    ConfigVar,
     Map,
     PartialMap,
     PartialExpertMap,

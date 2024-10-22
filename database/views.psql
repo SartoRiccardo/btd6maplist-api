@@ -249,8 +249,10 @@ completion_points AS (
     FROM list_completions lc
     JOIN listcomp_players ply
         ON lc.id = ply.run
-    WHERE lc.format BETWEEN 51 AND 100
-        OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+    WHERE (
+            lc.format BETWEEN 51 AND 100
+            OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+        )
         AND lc.accepted_by IS NOT NULL
         AND lc.deleted_on IS NULL
 ),

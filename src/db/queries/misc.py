@@ -1,7 +1,6 @@
 import asyncio
 from typing import Any
 import src.db.connection
-from src.db.models import ConfigVar
 postgres = src.db.connection.postgres
 
 
