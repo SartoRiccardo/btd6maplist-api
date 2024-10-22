@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 list_to_int = ["list", "experts"]
+MAPLIST_FORMATS = [1, 2, 51]
 
 
 @lru_cache()
