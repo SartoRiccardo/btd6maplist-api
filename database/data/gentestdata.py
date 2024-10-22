@@ -565,7 +565,8 @@ def gen_extra_lccs(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, 
         lcc_uid += 1
         return comp
 
-    return comp_uid, lcc_uid, [new_completion() for _ in range(12)]
+    lccs = [new_completion() for _ in range(12)]
+    return comp_uid, lcc_uid, lccs
 
 
 def gen_extra_maps(map_uid: int = 1) -> tuple[int, list[Map]]:
@@ -589,6 +590,41 @@ def gen_extra_maps(map_uid: int = 1) -> tuple[int, list[Map]]:
     return map_uid, maps
 
 
+def gen_lb_completions(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int, list[Completion]]:
+    rand_comps = random.Random(3157)
+    comps = []
+    for seed in range(2**3):
+        no_geraldo = bool(seed & 0b001)
+        black_border = bool(seed & 0b010)
+        has_lcc = bool(seed & 0b100)
+
+        for x in range(rand_comps.randint(1, 2)):
+            comps.append(
+                Completion(
+                    comp_uid,
+                    map,
+                    no_geraldo,
+                    black_border,
+                    start_timestamp + comp_uid,
+                    None,
+                    None,
+                    3,
+                    1,
+                    None,
+                    None,
+                    LCC(lcc_uid, 999_999_999) if has_lcc else None,
+                    [47],
+                    [],
+                    [],
+                )
+            )
+            comp_uid += 1
+            if has_lcc:
+                lcc_uid += 1
+
+    return comp_uid, lcc_uid, comps
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -600,7 +636,8 @@ if __name__ == '__main__':
     comp_uid, lcc_uid, completions_pro = pro_user_completions(maps, comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_rec = completions_recent(maps[10], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lccs = gen_extra_lccs(maps[0], comp_uid=comp_uid, lcc_uid=lcc_uid)
-    completions += completions_rec + completions_pro + completions_lccs
+    comp_uid, lcc_uid, completions_lb = gen_lb_completions(maps[37], comp_uid=comp_uid, lcc_uid=lcc_uid)
+    completions += completions_rec + completions_pro + completions_lccs + completions_lb
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps

@@ -20,7 +20,7 @@ async def test_submit_completion(btd6ml_test_client, mock_discord_api, comp_subm
     ]
 
     expected_completion = {
-        "id": 666,
+        "id": 0,  # Set later
         "map": "MLXXXAA",
         "users": [
             {"id": str(SUBMITTER_ID), "name": f"usr{SUBMITTER_ID}"},
@@ -52,6 +52,7 @@ async def test_submit_completion(btd6ml_test_client, mock_discord_api, comp_subm
             assert resp_get.status == http.HTTPStatus.OK, \
                 f"Fetching newly submitted completion returns {resp_get.status}"
             completion = await resp_get.json()
+            expected_completion["id"] = completion["id"]
             expected_completion["created_on"] = completion["created_on"]
             assert expected_completion == completion, "New submission differs from expected"
 
@@ -63,7 +64,7 @@ async def test_multi_images_urls(btd6ml_test_client, mock_discord_api, comp_subm
     SUBMITTER_ID = 28
 
     expected_completion = {
-        "id": 666,
+        "id": 0,  # Set later
         "map": "MLXXXAA",
         "users": [{"id": str(SUBMITTER_ID), "name": f"usr{SUBMITTER_ID}"}],
         "black_border": False,
@@ -106,6 +107,7 @@ async def test_multi_images_urls(btd6ml_test_client, mock_discord_api, comp_subm
             assert resp_get.status == http.HTTPStatus.OK, \
                 f"Fetching newly submitted completion returns {resp_get.status}"
             completion = await resp_get.json()
+            expected_completion["id"] = completion["id"]
             expected_completion["created_on"] = completion["created_on"]
             assert expected_completion == completion, "New submission differs from expected"
 
