@@ -94,16 +94,3 @@ def new_user_payload():
             "name": name if name else f"usr{uid}",
         }
     return generate
-
-
-@pytest.fixture
-def bot_user_payload():
-    def generate(uid: int):
-        return {
-            "user": {
-                "id": str(uid),
-                "username": f"user{uid}",
-                "name": f"User {uid}",
-            },
-        }
-    return generate

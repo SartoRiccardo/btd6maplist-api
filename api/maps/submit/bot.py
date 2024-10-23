@@ -21,7 +21,7 @@ async def post(
     if len(errors := await validate_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
-    if not (btd6_map := await ninja_kiwi_api().get_btd6_map(json_data["code"])):
+    if (btd6_map := await ninja_kiwi_api().get_btd6_map(json_data["code"])) is None:
         return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
     proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
@@ -52,4 +52,4 @@ async def post(
         await send_map_submission_webhook(hook_url, json_data["code"], wh_data)
 
     asyncio.create_task(update_wh())
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(status=http.HTTPStatus.CREATED)

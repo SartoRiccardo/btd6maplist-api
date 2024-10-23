@@ -9,6 +9,7 @@ HEADERS = {"Authorization": "Bearer test_token"}
 
 @pytest.mark.bot
 @pytest.mark.put
+@pytest.mark.users
 class TestBotReadRules:
     user_id = 8888
 
