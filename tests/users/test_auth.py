@@ -4,7 +4,8 @@ import http
 
 @pytest.mark.users
 class TestAuth:
-    async def test_get_self(self, btd6ml_test_client, mock_discord_api):
+    async def test_get_self(self, btd6ml_test_client, mock_discord_api, calc_user_profile_medals,
+                            calc_usr_placements):
         """Test getting one's own profile"""
         USER_ID = 37
         mock_discord_api(user_id=USER_ID)
@@ -21,56 +22,13 @@ class TestAuth:
                     map_min[key] = map_data[key]
                 expected_created_maps.append(map_min)
 
-
-        expected_medals = {
-            "black_border": 0,
-            "no_geraldo": 0,
-            "lccs": 0,
-            "wins": 0,
-        }
-        async with btd6ml_test_client.get(f"/users/{USER_ID}/completions?formats=1,2,51") as resp:
-            comps = (await resp.json())["completions"]
-            comps = [
-                {
-                    "map": cmp["map"]["code"],
-                    "black_border": cmp["black_border"],
-                    "no_geraldo": cmp["no_geraldo"],
-                    "current_lcc": cmp["current_lcc"],
-                    "format": cmp["format"]
-                }
-                for cmp in comps
-            ]
-            comps = sorted(
-                comps, key=lambda x: (x["map"], x["black_border"], x["no_geraldo"], x["current_lcc"], x["format"])
-            )
-
-            added_medals = 0b0000  # In order of the keys declared in expected_medals
-            for i, comp in enumerate(comps):
-                if i == 0 or comp["map"] != comps[i-1]["map"]:
-                    added_medals = 0
-
-                if not added_medals & 0b0001:
-                    added_medals |= 0b0001
-                    expected_medals["wins"] += 1
-                if comp["black_border"] and not added_medals & 0b1000:
-                    added_medals |= 0b1000
-                    expected_medals["black_border"] += 1
-                if comp["no_geraldo"] and not added_medals & 0b0100:
-                    added_medals |= 0b0100
-                    expected_medals["no_geraldo"] += 1
-                if comp["current_lcc"] and not added_medals & 0b0010:
-                    added_medals |= 0b0010
-                    expected_medals["lccs"] += 1
-
+        expected_medals, comps = await calc_user_profile_medals(USER_ID)
         expected_maplist_profile = {
             "id": "37",
             "name": "usr37",
             "oak": None,
             "has_seen_popup": True,
-            "maplist": {
-                "all": {"lccs": 0.0, "lccs_placement": None, "points": 121.0, "pts_placement": 37},
-                "current": {"lccs": 1.0, "lccs_placement": 14, "points": 174.0, "pts_placement": 34},
-            },
+            "maplist": await calc_usr_placements(USER_ID),
             "completions": comps,
             "medals": expected_medals,
             "created_maps": expected_created_maps,

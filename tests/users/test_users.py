@@ -1,16 +1,32 @@
 import pytest
+import http
 
 
 @pytest.mark.get
 @pytest.mark.users
 class TestGetUsers:
-    async def test_get_user(self, btd6ml_test_client):
+    async def test_get_user(self, btd6ml_test_client, calc_user_profile_medals, calc_usr_placements):
         """Test getting a user by ID"""
-        pytest.skip("Not Implemented")
+        USER_ID = 33
+        expected_medals, _comps = await calc_user_profile_medals(USER_ID)
+        expected_profile = {
+            "id": str(USER_ID),
+            "name": f"usr{USER_ID}",
+            "maplist": await calc_usr_placements(USER_ID),
+            "medals": expected_medals,
+            "created_maps": [],
+            "avatarURL": None,
+            "bannerURL": None,
+        }
+        async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
+            assert await resp.json() == expected_profile, \
+                "User profile differs from expected"
 
     async def test_invalid_user(self, btd6ml_test_client):
         """Test getting a nonexistent user by ID, or an invalid string as an ID"""
-        pytest.skip("Not Implemented")
+        async with btd6ml_test_client.get("/users/doesntexist") as resp:
+            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+                f"Nonexistent user returned {resp.status}"
 
 
 @pytest.mark.post
