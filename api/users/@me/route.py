@@ -1,9 +1,7 @@
-import http
 import re
 from aiohttp import web
 from src.db.queries.users import edit_user, get_user_min
 from src.utils.validators import check_fields
-import src.http
 from src.requests import ninja_kiwi_api
 import src.utils.routedecos
 import string
@@ -28,6 +26,8 @@ async def put_validate(body: dict) -> dict:
         errors["name"] = f"Name must be under {NAME_MAX_LEN} characters"
     elif not re.match("^[" + NAME_CHARS.replace(".", "\\.") + "]+$", body["name"]):
         errors["name"] = f"Allowed characters for name: {NAME_CHARS}"
+    elif await get_user_min(body["name"]) is not None:
+        errors["name"] = "That name is already taken!"
 
     if "oak" not in body:
         errors["oak"] = "Missing"
@@ -95,12 +95,6 @@ async def put(
       "401":
         description: Your token is missing, or invalid.
     """
-    if (other := await get_user_min(json_body["name"])) is not None and other.id != int(request.match_info["uid"]):
-        return web.json_response(
-            {"errors": {"name": "An user by that name already exists!"}, "data": {}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
-
     oak = json_body["oak"] if json_body["oak"] is not None else None
     await edit_user(
         discord_profile["id"],

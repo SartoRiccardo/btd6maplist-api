@@ -144,17 +144,25 @@ class TestAddUser:
 @pytest.mark.put
 @pytest.mark.users
 class TestEditSelf:
-    async def test_edit(self, btd6ml_test_client, mock_discord_api, profile_payload, validate_user):
+    async def test_edit(self, btd6ml_test_client, mock_discord_api, profile_payload, validate_user,
+                        mock_ninja_kiwi_api):
         """Test editing one's own profile"""
         USER_ID = 33
         USERNAME = "New Name 33"
         mock_discord_api(user_id=USER_ID)
-        req_usr_data = profile_payload(USERNAME)
+        mock_ninja_kiwi_api()
+        req_usr_data = profile_payload(USERNAME, oak="oak_test123")
 
         async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Editing a profile with a correct payload returns {resp.status}"
-            await validate_user(USER_ID, name=USERNAME)
+            extra = {
+                "avatarURL":
+                    "https://static-api.nkstatic.com/appdocs/4/assets/opendata/a5d32db006cb5d8d535a14494320fc92_ProfileAvatar26.png",
+                "bannerURL":
+                    "https://static-api.nkstatic.com/appdocs/4/assets/opendata/aaeaf38ca1c20d6df888cae9c3c99abe_ProfileBanner43.png",
+            }
+            await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api, profile_payload,
                                        assert_state_unchanged):
@@ -186,9 +194,40 @@ class TestEditSelf:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" was not in response.errors"
 
-    async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api):
+    async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api, profile_payload, assert_state_unchanged,
+                                mock_ninja_kiwi_api):
         """Test editing one's own profile with missing or invalid fields"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+
+        req_usr_data = profile_payload("Cool Username")
+
+        async def call_endpoints(req_data: dict, error_path: str, error_msg: str = ""):
+            error_msg = error_msg.replace("[keypath]", error_path)
+            async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Setting {error_msg} returned %d" % resp.status
+                resp_data = await resp.json()
+                assert "errors" in resp_data and error_path in resp_data["errors"], \
+                    f"\"{error_path}\" was not in response.errors"
+
+        validations = [
+            ("usr1", "the name as an already taken one"),
+            ("a"*1000, "a name too long"),
+            ("", "an empty name"),
+            ("test&&&space", "a name with invalid characters"),
+        ]
+        invalid_schema = {None: ["name"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_usr_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        mock_ninja_kiwi_api(error_on_user=True)
+        validations = [
+            ("", "an empty OAK"),
+            ("oak_...--??eaf", "a malformatted OAK"),
+            ("oak_thiswillthrowanerror", "an invalid OAK"),
+        ]
+        invalid_schema = {None: ["oak"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_usr_data, invalid_schema, validations):
+            await call_endpoints(req_data, edited_path, error_msg)
 
     async def test_edit_unauthorized(self, mock_discord_api, btd6ml_test_client):
         """Test calling the endpoint without proper authorization"""
