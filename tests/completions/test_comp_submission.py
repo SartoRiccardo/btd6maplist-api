@@ -1,7 +1,7 @@
 import pytest
 import http
 from ..mocks import DiscordPermRoles
-from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field, remove_fields
+from ..testutils import to_formdata, fuzz_data, invalidate_field, remove_fields
 from .CompletionTest import CompletionTest
 import config
 

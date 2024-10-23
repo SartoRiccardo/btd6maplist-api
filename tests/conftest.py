@@ -1,5 +1,6 @@
 import asyncio
 import json
+import aiohttp
 import os.path
 import pathlib
 import pytest
@@ -296,3 +297,18 @@ def finish_sign():
         )
         return base64.b64encode(signature).decode()
     return sign
+
+
+@pytest.fixture
+def submission_formdata(save_image, partial_sign, finish_sign):
+    def generate(data_str: str, files: list[tuple[str, pathlib.Path]], pre_sign: str = ""):
+        form_data = aiohttp.FormData()
+        contents_hash = partial_sign((pre_sign + data_str).encode())
+        for name, path in files:
+            with path.open("rb") as fin:
+                contents_hash = partial_sign(fin.read(), current=contents_hash)
+            form_data.add_field(name, path.open("rb"))
+        form_data.add_field("data", json.dumps({"data": data_str, "signature": finish_sign(contents_hash)}))
+        return form_data
+
+    return generate

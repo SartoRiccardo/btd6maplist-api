@@ -2,7 +2,6 @@ import asyncio
 import pytest
 import http
 from ..mocks import DiscordPermRoles
-from ..testutils import fuzz_data, remove_fields, invalidate_field
 from .CompletionTest import CompletionTest
 
 HEADERS = {"Authorization": "Bearer test_token"}
