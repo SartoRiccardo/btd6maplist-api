@@ -25,11 +25,9 @@ class NinjaKiwiRequests:
     @staticmethod
     async def get_btd6_user_deco(oak: str) -> dict | None:
         profile = await NinjaKiwiRequests.get_btd6_user(oak)
-        if not profile:
-            return None
         return {
-            "avatarURL": profile["avatarURL"],
-            "bannerURL": profile["bannerURL"],
+            "avatarURL": profile["avatarURL"] if profile else None,
+            "bannerURL": profile["bannerURL"] if profile else None,
         }
 
     @staticmethod

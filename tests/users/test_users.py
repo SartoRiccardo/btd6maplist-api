@@ -171,7 +171,7 @@ class TestEditSelf:
         req_usr_data = profile_payload("Newer Name 33")
 
         for req_data, path in remove_fields(req_usr_data):
-            async with assert_state_unchanged(f"/users/33"):
+            async with assert_state_unchanged("/users/33"):
                 async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_data) as resp:
                     assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                         f"Editing oneself with a missing {path} returns {resp.status}"
@@ -186,7 +186,7 @@ class TestEditSelf:
         extra_expected = {"oak": [str]}
 
         for req_data, path, sub_value in fuzz_data(req_usr_data, extra_expected):
-            async with assert_state_unchanged(f"/users/33"):
+            async with assert_state_unchanged("/users/33"):
                 async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_data) as resp:
                     assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                         f"Setting User.{path} to {sub_value} while editing oneself returns {resp.status}"

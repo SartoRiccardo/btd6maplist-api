@@ -57,7 +57,7 @@ def mock_discord_api():
 
 @pytest.fixture(autouse=True)
 def mock_ninja_kiwi_api():
-    src.requests.set_discord_api(src.requests.NinjaKiwiRequests)
+    src.requests.set_ninja_kiwi_api(src.requests.NinjaKiwiRequests)
 
     def set_mock(**kwargs):
         src.requests.set_ninja_kiwi_api(NinjaKiwiMock(**kwargs))
