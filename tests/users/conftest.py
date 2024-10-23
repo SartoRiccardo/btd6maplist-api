@@ -1,4 +1,5 @@
 import pytest_asyncio
+import pytest
 
 
 @pytest_asyncio.fixture
@@ -73,3 +74,23 @@ async def calc_usr_placements(btd6ml_test_client):
         }
         return placements
     return calculate
+
+
+@pytest.fixture
+def profile_payload():
+    def generate(name: str, oak: str = None):
+        return {
+            "name": name,
+            "oak": oak,
+        }
+    return generate
+
+
+@pytest.fixture
+def new_user_payload():
+    def generate(uid: int, name: str = None):
+        return {
+            "discord_id": str(uid),
+            "name": name if name else f"usr{uid}",
+        }
+    return generate

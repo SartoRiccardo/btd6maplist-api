@@ -7,26 +7,6 @@ from ..testutils import fuzz_data, remove_fields, invalidate_field
 HEADERS = {"Authorization": "Bearer test_token"}
 
 
-@pytest.fixture
-def profile_payload():
-    def generate(name: str, oak: str = None):
-        return {
-            "name": name,
-            "oak": oak,
-        }
-    return generate
-
-
-@pytest.fixture
-def new_user_payload():
-    def generate(uid: int, name: str = None):
-        return {
-            "discord_id": str(uid),
-            "name": name if name else f"usr{uid}",
-        }
-    return generate
-
-
 @pytest_asyncio.fixture
 async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_placements):
     async def assert_user(user_id, name: str = None, profile_overrides: dict = None):
@@ -73,7 +53,7 @@ class TestAddUser:
     async def test_add_user(self, btd6ml_test_client, mock_discord_api, new_user_payload, validate_user):
         """Test adding a user with a valid payload"""
         USER_ID = 2000000
-        USERNAME = "Test_User_2M"
+        USERNAME = "Test User 2M"
         mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
 
         req_data = new_user_payload(USER_ID, USERNAME)
@@ -114,21 +94,51 @@ class TestAddUser:
         for req_data, edited_path, error_msg in invalidate_field(req_user_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_add_missing_fields(self, btd6ml_test_client, mock_discord_api):
-        """Test adding a user, with missing properties"""
-        pytest.skip("Not Implemented")
+    async def test_add_missing_fields(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+                                      new_user_payload):
+        """Test adding a user with missing properties"""
+        USER_ID = 2000001
+        USERNAME = "Test User 2M1"
+        mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        req_usr_data = new_user_payload(USER_ID, USERNAME)
+        for req_data, path in remove_fields(req_usr_data):
+            async with assert_state_unchanged(f"/users/{USER_ID}"):
+                async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Creating a user with a missing {path} returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" is not in the returned errors"
+
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, new_user_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        req_usr_data = new_user_payload(2000001, "Test User 2M1")
+
+        for req_data, path, sub_value in fuzz_data(req_usr_data):
+            async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Setting User.{path} to {sub_value} while adding a user returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and path in resp_data["errors"], \
+                    f"\"{path}\" was not in response.errors"
 
     async def test_add_unauthorized(self, btd6ml_test_client, mock_discord_api):
         """Test adding a user without having the perms to do so"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(unauthorized=True)
+        async with btd6ml_test_client.post("/users") as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Creating a user without an Authorization header returns {resp.status}"
 
-    async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api):
-        """Test editing one's own profile with missing or invalid fields"""
-        pytest.skip("Not Implemented")
+        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Creating a user with an invalid token returns {resp.status}"
+
+        mock_discord_api()
+        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Creating a user without the necessary permissions returns {resp.status}"
 
 
 @pytest.mark.put

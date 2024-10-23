@@ -141,18 +141,26 @@ def assert_state_unchanged(btd6ml_test_client):
     class AssertStateEquals:
         def __init__(self, endpoint: str):
             self.endpoint = endpoint
+            self.prev_code = 0
+            self.prev_length = 0
             self.prev_value = None
 
         async def __aenter__(self):
             async with btd6ml_test_client.get(self.endpoint) as resp:
-                self.prev_value = await resp.json()
+                self.prev_code = resp.status
+                self.prev_length = int(resp.headers.get("Content-Length", "0"))
+                if self.prev_length:
+                    self.prev_value = await resp.json()
                 return self.prev_value
 
         async def __aexit__(self, exception_type, exception_value, exception_traceback):
             if exception_type != AssertionError:
                 async with btd6ml_test_client.get(self.endpoint) as resp:
-                    assert self.prev_value == await resp.json(), \
-                        f"{self.endpoint} state changed"
+                    assert self.prev_code == resp.status, f"{self.endpoint} response code changed"
+                    content_length = int(resp.headers.get("Content-Length", "0"))
+                    assert self.prev_length == content_length, f"{self.endpoint} Content-Length code changed"
+                    if content_length > 0:
+                        assert self.prev_value == await resp.json(), f"{self.endpoint} state changed"
 
     return AssertStateEquals
 
