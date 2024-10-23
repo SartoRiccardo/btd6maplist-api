@@ -2,7 +2,6 @@ import http
 import config
 import aiohttp
 import random
-from typing import Any
 
 
 class DiscordPermRoles:

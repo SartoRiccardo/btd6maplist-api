@@ -1,6 +1,5 @@
 import asyncio
 import pathlib
-
 import pytest
 import pytest_asyncio
 import importlib
@@ -8,6 +7,7 @@ import requests
 import src.db.connection
 import src.requests
 from .mocks.DiscordRequestMock import DiscordRequestMock
+from .mocks.NinjaKiwiMock import NinjaKiwiMock
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
 btd6maplist_api = importlib.import_module("btd6maplist-api")
@@ -52,6 +52,15 @@ def mock_discord_api():
 
     def set_mock(**kwargs):
         src.requests.set_discord_api(DiscordRequestMock(**kwargs))
+    return set_mock
+
+
+@pytest.fixture(autouse=True)
+def mock_ninja_kiwi_api():
+    src.requests.set_discord_api(src.requests.NinjaKiwiRequests)
+
+    def set_mock(**kwargs):
+        src.requests.set_discord_api(NinjaKiwiMock(**kwargs))
     return set_mock
 
 
