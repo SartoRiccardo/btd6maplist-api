@@ -113,7 +113,7 @@ class TestAuth:
 
         async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
             assert resp.status == http.HTTPStatus.OK, \
-                f"Omitting discord_token returns {resp.status}"
+                f"Authenticating as a new user returns {resp.status}"
 
         expected_maplist_profile = {
             "id": str(USER_ID),

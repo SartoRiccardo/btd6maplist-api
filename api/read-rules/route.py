@@ -12,4 +12,4 @@ async def put(
         **_kwargs
 ) -> web.Response:
     await read_rules(int(discord_profile["id"]))
-    return web.Response(status=http.HTTPStatus.OK)
+    return web.Response(status=http.HTTPStatus.NO_CONTENT)
