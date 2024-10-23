@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os.path
 import pathlib
 import pytest
 import pytest_asyncio
@@ -10,7 +12,17 @@ from .mocks.DiscordRequestMock import DiscordRequestMock
 from .mocks.NinjaKiwiMock import NinjaKiwiMock
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, utils
+import base64
 btd6maplist_api = importlib.import_module("btd6maplist-api")
+
+private_key = None
+privkey_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "btd6maplist-bot.test.pem")
+with open(privkey_path, "rb") as fin:
+    private_key = serialization.load_pem_private_key(
+        fin.read(), password=None,
+    )
 
 
 def pytest_collection_modifyitems(items):
@@ -222,3 +234,52 @@ def map_payload():
             "optimal_heros": [],
         }
     return generate
+
+
+@pytest.fixture
+def sign_message():
+    def sign(message: bytes | dict | str) -> str:
+        if isinstance(message, dict):
+            message = json.dumps(message)
+        if isinstance(message, str):
+            message = message.encode()
+
+        # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/#signing
+        signature = private_key.sign(
+            message,
+            padding=padding.PSS(
+                padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH,
+            ),
+            algorithm=hashes.SHA256(),
+        )
+        return base64.b64encode(signature).decode()
+    return sign
+
+
+@pytest.fixture
+def partial_sign():
+    def sign(message: bytes, current: hashes.Hash | None = None) -> hashes.Hash:
+        if current is None:
+            current = hashes.Hash(hashes.SHA256())
+        current.update(message)
+        return current
+    return sign
+
+
+@pytest.fixture
+def finish_sign():
+    def sign(current: hashes.Hash) -> str:
+        sha256 = hashes.SHA256()
+
+        digest = current.finalize()
+        signature = private_key.sign(
+            digest,
+            padding.PSS(
+                padding.MGF1(sha256),
+                salt_length=padding.PSS.MAX_LENGTH,
+            ),
+            utils.Prehashed(sha256),
+        )
+        return base64.b64encode(signature).decode()
+    return sign

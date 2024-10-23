@@ -17,7 +17,7 @@ async def get(
     case it needs to be faster for the 3-second interaction limit.
     """
     deco = {"avatarURL": None, "bannerURL": None}
-    if resource.oak and not request.query.get("no_load_oak", False):
+    if resource.oak and not (request.query.get("no_load_oak", "false").lower() == "true"):
         deco = await ninja_kiwi_api().get_btd6_user_deco(resource.oak)
     return web.json_response({
         **resource.to_dict(profile=True),
@@ -34,7 +34,10 @@ async def put(
         resource: "src.db.models.PartialUser" = None,
         **_kwargs
 ) -> web.Response:
-    """This bot route only modifies the user's OAK."""
+    """
+    This bot route only modifies the user's OAK.
+    There are no server-side checks on the validity of the OAK.
+    """
     if json_data["user"]["id"] != request.match_info["uid"]:
         return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
 

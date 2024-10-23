@@ -43,8 +43,6 @@ class TestAuth:
                 key=lambda x: (x["map"], x["black_border"], x["no_geraldo"], x["current_lcc"], x["format"]),
             )
 
-            assert resp_data["maplist_profile"]["completions"] == comps, "What"
-
             assert resp_data["maplist_profile"] == expected_maplist_profile, \
                 "Maplist profile differs from expected"
 

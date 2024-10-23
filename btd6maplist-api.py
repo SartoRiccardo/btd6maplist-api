@@ -8,7 +8,7 @@ import aiohttp_swagger
 import importlib
 from importlib import util
 import contextlib
-from config import APP_HOST, APP_PORT, CORS_ORIGINS, PERSISTENT_DATA_PATH, BOT_PUBKEY
+import config
 import aiohttp_client_cache
 from aiohttp import web
 import src.http
@@ -21,7 +21,7 @@ from src.utils.colors import green, yellow, blue, red
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
 async def init_client_session(_app):
     cache = aiohttp_client_cache.SQLiteBackend(
-        cache_name=os.path.join(PERSISTENT_DATA_PATH, ".cache", "aiohttp-requests.db"),
+        cache_name=os.path.join(config.PERSISTENT_DATA_PATH, ".cache", "aiohttp-requests.db"),
         expire_after=0,
         urls_expire_after={
             "data.ninjakiwi.com": 3600*24,
@@ -34,7 +34,7 @@ async def init_client_session(_app):
     async def init_session():
         async with aiohttp_client_cache.CachedSession(cache=cache) as session:
             src.http.set_session(session)
-            src.http.set_bot_pubkey(BOT_PUBKEY)
+            src.http.set_bot_pubkey(config.BOT_PUBKEY)
             while True:
                 await session.delete_expired_responses()
                 await asyncio.sleep(3600 * 24 * 5)
@@ -144,7 +144,7 @@ def get_routes(cur_path: None | list = None) -> list:
             sys.modules[bmodule] = route
             spec.loader.exec_module(route)
 
-            cors_origins = route.cors_origins if hasattr(route, "cors_origins") else CORS_ORIGINS
+            cors_origins = route.cors_origins if hasattr(route, "cors_origins") else config.CORS_ORIGINS
             api_route = "/" + "/".join(cur_path) + suffix
             methods = []
             for method in allowed_methods:
@@ -217,4 +217,4 @@ if __name__ == '__main__':
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain("api.btd6maplist.crt", "api.btd6maplist.key")
 
-    web.run_app(app, host=APP_HOST, port=APP_PORT, ssl_context=ssl_context)
+    web.run_app(app, host=config.APP_HOST, port=config.APP_PORT, ssl_context=ssl_context)
