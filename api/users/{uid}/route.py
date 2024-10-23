@@ -89,7 +89,7 @@ async def put(request: web.Request, json_body: dict = None, discord_profile: dic
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Profile"
+            $ref: "#/components/schemas/ProfilePayload"
     responses:
       "200":
         description: |

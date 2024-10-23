@@ -28,6 +28,16 @@ class PartialUser:
             description: |
               Whether the user has already been notified there are rules
               to submissions.
+    ---
+    ProfilePayload:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The user's name.
+        type: string
+        nullable: true
+        description: The user's NinjaKiwi OpenData Access Key
     """
     id: int
     name: str

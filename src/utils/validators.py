@@ -321,7 +321,12 @@ async def validate_discord_user(body: dict) -> dict[str, str]:
         errors["discord_id"] = "Must be numeric"
     else:
         body["discord_id"] = int(body["discord_id"])
-    body["name"] = body["name"].lower()
+    if len(body["name"]) == 0:
+        errors["name"] = "Name cannot be blank"
+    elif len(body["name"]) > MAX_TEXT_LEN:
+        errors["name"] = f"Name cannot be more than {MAX_TEXT_LEN} characters long"
+    elif (match := re.search(r"[^\w _\.]", body["name"])) is not None:
+        errors["name"] = f"Name cannot contain the character: {match.group(0)}"
 
     return errors
 
