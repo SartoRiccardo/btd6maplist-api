@@ -144,22 +144,58 @@ class TestAddUser:
 @pytest.mark.put
 @pytest.mark.users
 class TestEditSelf:
-    async def test_edit(self, btd6ml_test_client, mock_discord_api):
+    async def test_edit(self, btd6ml_test_client, mock_discord_api, profile_payload, validate_user):
         """Test editing one's own profile"""
-        pytest.skip("Not Implemented")
+        USER_ID = 33
+        USERNAME = "New Name 33"
+        mock_discord_api(user_id=USER_ID)
+        req_usr_data = profile_payload(USERNAME)
 
-    async def test_edit_other(self, btd6ml_test_client, mock_discord_api):
-        """Test editing someone else's profile"""
-        pytest.skip("Not Implemented")
+        async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Editing a profile with a correct payload returns {resp.status}"
+            await validate_user(USER_ID, name=USERNAME)
 
-    async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api):
+    async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api, profile_payload,
+                                       assert_state_unchanged):
         """Test editing one's own profile with missing fields"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(user_id=33)
+        req_usr_data = profile_payload("Newer Name 33")
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        for req_data, path in remove_fields(req_usr_data):
+            async with assert_state_unchanged(f"/users/33"):
+                async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Editing oneself with a missing {path} returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" is not in the returned errors"
+
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, profile_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        pytest.skip("Not Implemented")
+        mock_discord_api(user_id=33)
+        req_usr_data = profile_payload("Newer Name 33")
+        extra_expected = {"oak": [str]}
+
+        for req_data, path, sub_value in fuzz_data(req_usr_data, extra_expected):
+            async with assert_state_unchanged(f"/users/33"):
+                async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_data) as resp:
+                    assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                        f"Setting User.{path} to {sub_value} while editing oneself returns {resp.status}"
+                    resp_data = await resp.json()
+                    assert "errors" in resp_data and path in resp_data["errors"], \
+                        f"\"{path}\" was not in response.errors"
 
     async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api):
         """Test editing one's own profile with missing or invalid fields"""
         pytest.skip("Not Implemented")
+
+    async def test_edit_unauthorized(self, mock_discord_api, btd6ml_test_client):
+        """Test calling the endpoint without proper authorization"""
+        mock_discord_api(unauthorized=True)
+        async with btd6ml_test_client.post("/users") as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Editing oneself without an Authorization header returns {resp.status}"
+        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Editing oneself with an invalid token returns {resp.status}"

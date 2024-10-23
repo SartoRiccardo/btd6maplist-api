@@ -35,9 +35,10 @@ class PartialUser:
         name:
           type: string
           description: The user's name.
-        type: string
-        nullable: true
-        description: The user's NinjaKiwi OpenData Access Key
+        oak:
+          type: string
+          nullable: true
+          description: The user's NinjaKiwi OpenData Access Key
     """
     id: int
     name: str
