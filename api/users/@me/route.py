@@ -4,6 +4,7 @@ from aiohttp import web
 from src.db.queries.users import edit_user, get_user_min
 from src.utils.validators import check_fields
 import src.http
+from src.requests import ninja_kiwi_api
 import src.utils.routedecos
 import string
 
@@ -36,8 +37,8 @@ async def put_validate(body: dict) -> dict:
         # elif len(body["oak"]) != 24:
         #     errors["oak"] = "OAKs must be 24 characters long"
         else:
-            nk_response = await src.http.http.get(f"https://data.ninjakiwi.com/btd6/save/{body['oak']}")
-            if not nk_response.ok or not (await nk_response.json())["success"]:
+            nk_response = await ninja_kiwi_api().get_btd6_user_save(body["oak"])
+            if nk_response is None:
                 errors["oak"] = "This OAK doesn't work"
 
     return errors

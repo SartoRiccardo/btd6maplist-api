@@ -7,7 +7,7 @@ from src.utils.files import save_media
 from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission, check_prev_map_submission
-from src.ninjakiwi import get_btd6_map
+from src.requests import ninja_kiwi_api
 from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID, MEDIA_BASE_URL
 from src.utils.embeds import (
     get_mapsubm_embed,
@@ -19,7 +19,6 @@ from src.utils.misc import list_to_int
 from src.db.queries.mapsubmissions import (
     add_map_submission,
     get_map_submissions,
-    get_map_submission,
 )
 
 PAGE_ENTRIES = 50
@@ -119,7 +118,7 @@ async def post(
             if not data["proposed"] in range(len(propositions[data["type"]])):
                 return web.json_response({"errors": {"proposed": "Out of range"}}, status=HTTPStatus.BAD_REQUEST)
 
-            if not (btd6_map := await get_btd6_map(data["code"])):
+            if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
                 return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
             embeds = get_mapsubm_embed(data, discord_profile, btd6_map)
