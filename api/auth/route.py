@@ -32,7 +32,7 @@ async def post(request: web.Request):
                   type: object
                   description: Check out Discord's documentation for this field's schema.
                 maplist_profile:
-                  $ref: "#/components/schemas/Profile"
+                  $ref: "#/components/schemas/FullProfile"
       "401":
         description: "`discord_token` is missing or invalid."
     """
