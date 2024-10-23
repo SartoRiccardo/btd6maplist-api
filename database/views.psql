@@ -24,7 +24,8 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 -- LCCs for each list map --
 ----------------------------
 
-CREATE OR REPLACE VIEW lccs_by_map AS
+DROP VIEW IF EXISTS lccs_by_map CASCADE;
+CREATE VIEW lccs_by_map AS
 SELECT DISTINCT ON (r.map, r.format)
     r.map, r.format, lcc.leftover, lcc.id
 FROM list_completions r
