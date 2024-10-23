@@ -28,8 +28,16 @@ class TestAddUser:
         """Test adding a user, with missing properties"""
         pytest.skip("Not Implemented")
 
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        """Test setting every field to a different data type, one by one"""
+        pytest.skip("Not Implemented")
+
     async def test_add_unauthorized(self, btd6ml_test_client, mock_discord_api):
         """Test adding a user without having the perms to do so"""
+        pytest.skip("Not Implemented")
+
+    async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api):
+        """Test editing one's own profile with missing or invalid fields"""
         pytest.skip("Not Implemented")
 
 
@@ -46,6 +54,10 @@ class TestEditSelf:
 
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api):
         """Test editing one's own profile with missing fields"""
+        pytest.skip("Not Implemented")
+
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        """Test setting every field to a different data type, one by one"""
         pytest.skip("Not Implemented")
 
     async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api):

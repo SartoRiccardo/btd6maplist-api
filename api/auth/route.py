@@ -33,13 +33,13 @@ async def post(request: web.Request):
                   description: Check out Discord's documentation for this field's schema.
                 maplist_profile:
                   $ref: "#/components/schemas/Profile"
-      "400":
+      "401":
         description: "`discord_token` is missing or invalid."
     """
     if "discord_token" not in request.query:
         return web.json_response(
             {"error": 'Missing discord_token'},
-            status=http.HTTPStatus.BAD_REQUEST,
+            status=http.HTTPStatus.UNAUTHORIZED,
         )
 
     token = request.query["discord_token"]
@@ -48,7 +48,7 @@ async def post(request: web.Request):
     except aiohttp.ClientError:
         return web.json_response(
             {"error": 'Invalid discord_token'},
-            status=http.HTTPStatus.BAD_REQUEST,
+            status=http.HTTPStatus.UNAUTHORIZED,
         )
 
     await create_user(disc_profile["id"], disc_profile["username"])

@@ -140,15 +140,19 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
             FROM list_completions r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
-                AND r.accepted_by IS NOT NULL
+            WHERE r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
+                AND r.new_version IS NULL
         )
         SELECT
             rwf.id AS run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc, rwf.format
         FROM runs_with_flags rwf
         JOIN listcomp_players ply
             ON ply.run = rwf.id
+        JOIN maps m
+            ON m.code = rwf.map
         WHERE ply.user_id = $1
+            AND m.deleted_on IS NULL
         """,
         uid
     )
@@ -244,9 +248,13 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
+            JOIN maps m
+                ON rwf.map = m.code
             WHERE ply.user_id = $1
                 AND rwf.accepted_by IS NOT NULL
                 AND rwf.deleted_on IS NULL
+                AND rwf.new_version IS NULL
+                AND m.deleted_on IS NULL
             GROUP BY rwf.map
         )
         SELECT

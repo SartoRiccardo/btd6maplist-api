@@ -129,6 +129,15 @@ class ListCompletion:
             "subm_proof_vid": self.subm_proof_vid if self.subm_proof_vid else [],
         }
 
+    def to_profile_dict(self) -> dict:
+        return {
+            "map": self.map.code if isinstance(self.map, PartialMap) else self.map,
+            "black_border": self.black_border,
+            "no_geraldo": self.no_geraldo,
+            "current_lcc": self.current_lcc,
+            "format": self.format,
+        }
+
 
 @dataclass
 class ListCompletionWithMeta(ListCompletion):
