@@ -15,7 +15,8 @@ import src.http
 import src.log
 import src.db.connection
 import src.db.models
-from src.utils.colors import green, yellow, blue, red
+from src.utils.colors import green, yellow, blue, red, underline
+from tests.testutils import override_config, clear_db_patch_data
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -210,11 +211,21 @@ def get_application(
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    app = get_application()
+    override_config()
+    clear_db_patch_data()
+    app = get_application(
+        with_swagger=False,
+        init_database=False,
+    )
 
     ssl_context = None
     if os.path.exists("api.btd6maplist.crt") and os.path.exists("api.btd6maplist.key"):
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain("api.btd6maplist.crt", "api.btd6maplist.key")
 
+    print(f"\n\n"
+          f"{red('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')}\n"
+          f"{red('!!!')} RUNNING THE TEST BRANCH, WHICH HAS {underline('/reset-test')} {red('!!!')}\n"
+          f"{red('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')}"
+          f"\n\n")
     web.run_app(app, host=config.APP_HOST, port=config.APP_PORT, ssl_context=ssl_context)

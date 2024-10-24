@@ -1,7 +1,7 @@
 import os
 import asyncpg
 import config
-from src.utils.colors import red, purple
+from src.utils.colors import red, purple, underline
 from functools import wraps
 
 pool: asyncpg.Pool | None
@@ -15,6 +15,8 @@ async def start(should_init_database: bool = True):
             user=config.DB_USER, password=config.DB_PSWD,
             database=config.DB_NAME, host=config.DB_HOST,
         )
+        print(f"{red('[PSQL/Test]')} Database: {underline(config.DB_NAME)}")
+        print(f"{red('[PSQL/Test]')} Persistent Data Path: {underline(config.PERSISTENT_DATA_PATH)}")
         print(f"{purple('[PSQL]')} Connected")
         if should_init_database:
             await init_database()
