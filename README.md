@@ -20,10 +20,6 @@ openssl genrsa -out btd6maplist-bot.pem 3072
 openssl rsa -in btd6maplist-bot.pem -pubout -out btd6maplist-bot.pub.pem
 ```
 3. Copy `config.example.py` into `config.py` and fill out the fields accordingly.
-4. If using Docker, create a volume for either `PERSISTENT_DATA_PATH` or its contents:
-   - `PERSISTENT_DATA_PATH/.cache` *(HTTP requests cache, optional)*
-   - `PERSISTENT_DATA_PATH/logs`
-   - `PERSISTENT_DATA_PATH/media`
 
 ## Bot Routes
 
@@ -37,4 +33,6 @@ Simply create the route you wanna make in the `api` folder, and at the endpoint 
 
 ## Testing
 
-To test the application, you must make a `config.test.py` where you override values in `config.py`. You don't have to put every config there, just the ones you want to override. You also need an empty PostgreSQL database. The testing suit will automatically wipe and initialize it and use it.
+To test the application, you must make a `config.test.py` where you override values in `config.py`. You don't have to put every config there, just the ones you want to override.
+- You need an empty PostgreSQL database. The testing suit will automatically wipe and initialize it and use it.
+- You need to create `tests/btd6maplist-bot.test.pem` with the method described above, for Bot Route tests.
