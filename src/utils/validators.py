@@ -243,6 +243,8 @@ async def validate_completion_submission(body: dict) -> dict:
         errors[f"video_proof_url"] = f"Can submit up to {MAX_PROOF_URL} URLs"
     else:
         for i, url in enumerate(body["video_proof_url"]):
+            if len(url) > MAX_TEXT_LEN:
+                errors[f"video_proof_url[{i}]"] = f"URLs must be long max. {MAX_TEXT_LEN} each"
             if not validators.url(url):
                 errors[f"video_proof_url[{i}]"] = "Invalid video URL"
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \

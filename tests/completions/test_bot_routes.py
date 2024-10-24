@@ -136,6 +136,7 @@ class TestHandleSubmissions:
 @pytest.mark.post
 class TestSubmission:
     MAP_CODE = "MLXXXCC"
+    SUBMITTER_ID = 30
 
     async def test_submit_completion(self, btd6ml_test_client, mock_discord_api, comp_subm_payload,
                                      save_image, submission_formdata):
@@ -177,13 +178,81 @@ class TestSubmission:
                 expected["created_on"] = resp_data["created_on"]
                 assert resp_data == expected, "Submitted completion differs from expected"
 
-    async def test_invalid(self, btd6ml_test_client, mock_discord_api):
+    async def test_invalid(self, btd6ml_test_client, mock_discord_api, save_image, submission_formdata,
+                           assert_state_unchanged, comp_subm_payload):
         """Test submitting with some invalid fields"""
-        pytest.skip("Not Implemented")
+        mock_discord_api()
+        images = [(f"proof_completion[0]", save_image(0))]
+        req_subm_data = comp_subm_payload(self.SUBMITTER_ID)
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api):
+        async def call_endpoints(req_data: dict, error_path: str, error_msg: str = ""):
+            req_form = submission_formdata(json.dumps(req_data), images, pre_sign=self.MAP_CODE)
+            async with assert_state_unchanged("/completions/unapproved"), \
+                    btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Submitting {error_msg} returned %d" % resp.status
+                resp_data = await resp.json()
+                assert "errors" in resp_data and error_path in resp_data["errors"], \
+                    f"\"{error_path}\" was not in response.errors"
+
+        # Requires proof
+        validations = [
+            (True, "a [keypath] completion with no video proof"),
+        ]
+        invalid_schema = {None: ["current_lcc", "no_geraldo", "black_border"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_subm_data, invalid_schema, validations):
+            error_msg = error_msg.replace("[keypath]", edited_path)
+            await call_endpoints(req_data, "video_proof_url", error_msg)
+
+        req_subm_data["current_lcc"] = True
+        req_subm_data["video_proof_url"] = ["https://youtu.be/iaegfi3186"]
+        await call_endpoints(req_subm_data, "leftover", "an LCC completion without a leftover")
+
+        req_subm_data["leftover"] = 3000
+
+        # String fields
+        validations = [
+            ("", f"a completion with an empty [keypath]"),
+            ("https://youtube.com/" + "a" * 1000, f"a completion with a [keypath] too long"),
+        ]
+        invalid_schema = {None: ["notes"], "video_proof_url": [0]}
+        for req_data, edited_path, error_msg in invalidate_field(req_subm_data, invalid_schema, validations):
+            error_msg = error_msg.replace("[keypath]", edited_path)
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # Non-negative fields
+        validations = [(-2, f"a map with a negative [keypath]")]
+        invalid_schema = {None: ["format", "leftover"]}
+        for req_data, edited_path, error_msg in invalidate_field(req_subm_data, invalid_schema, validations):
+            error_msg = error_msg.replace("[keypath]", edited_path)
+            await call_endpoints(req_data, edited_path, error_msg)
+
+        # Too much proof
+        req_subm_data["video_proof_url"] = ["https://youtu.be/iaegfi3186"] * 10
+        await call_endpoints(req_subm_data, "video_proof_url", "a completion with too many proof URLs")
+
+    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, save_image, submission_formdata,
+                        comp_subm_payload):
         """Test setting every field to a different datatype, one by one"""
-        pytest.skip("Not Implemented")
+        SUBMITTER_ID = 30
+        mock_discord_api()
+        images = [(f"proof_completion[0]", save_image(0))]
+        req_subm_data = comp_subm_payload(SUBMITTER_ID)
+        req_subm_data["video_proof_url"] = ["https://youtu.be/aefhUOEF"]
+        extra_expected = {"notes": [str], "leftover": [int]}
+
+        for req_data, path, sub_value in fuzz_data(req_subm_data, extra_expected):
+            if "submitter" in path:
+                continue
+            if "leftover" in path:
+                req_data["current_lcc"] = True
+
+            req_form = submission_formdata(json.dumps(req_data), images, pre_sign=self.MAP_CODE)
+            async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Setting {path} to {sub_value} while editing a map returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and path in resp_data["errors"], \
+                    f"\"{path}\" was not in response.errors"
 
     async def test_submit_signature(self, btd6ml_test_client, mock_discord_api, comp_subm_payload,
                                     save_image, partial_sign, finish_sign):
