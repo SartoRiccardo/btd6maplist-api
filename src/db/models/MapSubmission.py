@@ -31,7 +31,7 @@ class MapSubmission:
         type: string
         description: The URL to an image of the map being completed
       created_on:
-        type: int
+        type: integer
         description: Date of the submission.
     """
     code: str

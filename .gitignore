@@ -2,7 +2,7 @@ api.btd6maplist.key*
 api.btd6maplist.crt*
 *.pem
 config.py
-compose.yaml
+config.test.py
 
 # Python
 venv
@@ -13,3 +13,6 @@ __pycache__
 # Misc
 .DS_Store
 tmp
+tmp-test
+.coverage
+**/output.txt

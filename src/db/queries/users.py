@@ -70,7 +70,7 @@ async def get_completions_by(
                 m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
                 m.id AS map_id, m.created_on,
                 
-                lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+                lccs.id AS lcc_id, lccs.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
             FROM runs_with_flags rwf
@@ -120,7 +120,7 @@ async def get_completions_by(
             row["no_geraldo"],
             row["current_lcc"],
             row["format"],
-            LCC(row["lcc_id"], row["proof"], row["leftover"]) if row["lcc_id"] else None,
+            LCC(row["lcc_id"], row["leftover"]) if row["lcc_id"] else None,
             list_rm_dupe(row["subm_proof_img"]),
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],
@@ -140,15 +140,19 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
             FROM list_completions r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
-                AND r.accepted_by IS NOT NULL
+            WHERE r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
+                AND r.new_version IS NULL
         )
         SELECT
             rwf.id AS run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc, rwf.format
         FROM runs_with_flags rwf
         JOIN listcomp_players ply
             ON ply.run = rwf.id
+        JOIN maps m
+            ON m.code = rwf.map
         WHERE ply.user_id = $1
+            AND m.deleted_on IS NULL
         """,
         uid
     )
@@ -244,9 +248,13 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
+            JOIN maps m
+                ON rwf.map = m.code
             WHERE ply.user_id = $1
                 AND rwf.accepted_by IS NOT NULL
                 AND rwf.deleted_on IS NULL
+                AND rwf.new_version IS NULL
+                AND m.deleted_on IS NULL
             GROUP BY rwf.map
         )
         SELECT
@@ -334,9 +342,20 @@ async def edit_user(uid: str, name: str | None, oak: str | None, conn=None) -> b
 
 
 @postgres
-async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCompletion]:
+async def get_completions_on(
+        user_id: str,
+        code: str,
+        allowed_formats: list[str] = None,
+        conn=None
+) -> list[ListCompletion]:
+    if allowed_formats is None:
+        allowed_formats = [1, 51]
+    extra_args = []
+    if len(allowed_formats):
+        extra_args.append(allowed_formats)
+
     payload = await conn.fetch(
-        """
+        f"""
         WITH runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
             FROM list_completions r
@@ -345,13 +364,14 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
             JOIN listcomp_players ply
                 ON ply.run = r.id
             WHERE r.map = $2
+                {'AND r.format = ANY($3::int[])' if len(allowed_formats) > 0 else ''}
                 AND ply.user_id = $1
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         )
-        SELECT
+        SELECT DISTINCT ON (run_id)
             r.id AS run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
-            lcc.id AS lcc_id, lcc.proof, lcc.leftover,
+            lcc.id AS lcc_id, lcc.leftover,
             ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY r.id) AS subm_proof_img,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY r.id) AS subm_proof_vid,
@@ -364,7 +384,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = r.lcc
         """,
-        int(user_id), code,
+        int(user_id), code, *extra_args,
     )
 
     return [
@@ -376,7 +396,7 @@ async def get_completions_on(user_id: str, code: str, conn=None) -> list[ListCom
             row["no_geraldo"],
             row["current_lcc"],
             row["format"],
-            LCC(row["lcc_id"], row["proof"], row["leftover"]) if row["lcc_id"] else None,
+            LCC(row["lcc_id"], row["leftover"]) if row["lcc_id"] else None,
             list_rm_dupe(row["subm_proof_img"]),
             list_rm_dupe(row["subm_proof_vid"]),
             row["subm_notes"],

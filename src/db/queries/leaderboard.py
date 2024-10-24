@@ -22,14 +22,14 @@ def get_lb_list(payload) -> tuple[list[LeaderboardEntry], int]:
 async def get_maplist_leaderboard(
         idx_start: int = 0,
         amount: int = 50,
-        format: Literal["current", "all", "experts"] = True,
+        format: int = 1,
         conn=None,
 ) -> tuple[list[LeaderboardEntry], int]:
-    lb_view = "list_curver_leaderboard"
-    if format == "all":
-        lb_view = "list_allver_leaderboard"
-    elif format == "experts":
-        lb_view = "experts_leaderboard"
+    lb_views = {
+        1: "list_curver_leaderboard",
+        2: "list_allver_leaderboard",
+        51: "experts_leaderboard",
+    }
 
     payload = await conn.fetch(
         f"""
@@ -37,7 +37,7 @@ async def get_maplist_leaderboard(
             COUNT(*) OVER(),
             lb.score, lb.placement,
             u.discord_id, u.name
-        FROM {lb_view} lb
+        FROM {lb_views[format]} lb
         JOIN users u
             ON u.discord_id = lb.user_id
         ORDER BY lb.placement
@@ -51,14 +51,14 @@ async def get_maplist_leaderboard(
 
 @postgres
 async def get_maplist_lcc_leaderboard(
-        format: Literal["current", "all", "experts"] = True,
+        format: int = 1,
         conn=None
 ) -> tuple[list[LeaderboardEntry], int]:
-    lb_view = "list_curver_lcclb"
-    if format == "all":
-        lb_view = "list_allver_lcclb"
-    elif format == "experts":
-        lb_view = "experts_lcc_leaderboard"
+    lb_views = {
+        1: "list_curver_lcclb",
+        2: "list_allver_lcclb",
+        51: "experts_lcc_leaderboard",
+    }
 
     payload = await conn.fetch(
         f"""
@@ -66,7 +66,7 @@ async def get_maplist_lcc_leaderboard(
             COUNT(*) OVER(),
             lb.score, lb.placement,
             u.discord_id, u.name
-        FROM {lb_view} lb
+        FROM {lb_views[format]} lb
         JOIN users u
             ON u.discord_id = lb.user_id
         ORDER BY lb.placement

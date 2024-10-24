@@ -1,0 +1,9 @@
+services:
+  btd6maplist_api:
+    build:
+      context: .
+    volumes:
+      - ./bin:/app/bin
+      - ./media:/appuser/media
+      - ./logs:/appuser/logs
+      - ./data:/appuser/data

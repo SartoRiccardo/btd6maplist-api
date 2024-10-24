@@ -1,0 +1,19 @@
+INSERT INTO completion_proofs
+    (run, proof_type, proof_url)
+SELECT
+    runs.id, 0,
+    CASE
+        WHEN lcc.proof LIKE '%drive.google.com%' THEN
+            'https://drive.google.com/thumbnail?sz=w1000&id=' || SUBSTRING(lcc.proof FROM '\/file\/d\/([a-zA-Z0-9_-]+)')
+        ELSE lcc.proof
+    END
+FROM leastcostchimps lcc
+LEFT JOIN completion_proofs cp
+    ON lcc.proof = cp.proof_url
+JOIN list_completions runs
+    ON runs.lcc = lcc.id
+WHERE cp.proof_url IS NULL
+    AND lcc.proof IS NOT NULL
+    AND LENGTH(lcc.proof) > 0;
+
+ALTER TABLE leastcostchimps DROP COLUMN proof;

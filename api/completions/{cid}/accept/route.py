@@ -3,7 +3,7 @@ from aiohttp import web
 from src.db.queries.completions import get_completion
 import http
 import src.utils.routedecos
-from src.utils.forms import get_submission
+from src.utils.forms import get_completion_request
 from src.utils.embeds import update_run_webhook
 from src.db.queries.completions import edit_completion
 import src.log
@@ -13,10 +13,12 @@ import src.log
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 @src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.require_perms()
-async def post(
+async def put(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -25,7 +27,7 @@ async def post(
       Accept a completion. Must be a Maplist and/or Expert List Moderator,
       depending on the completion's old and new `format`s.
     tags:
-    - Completions
+    - Submissions
     parameters:
     - in: path
       name: cid
@@ -38,7 +40,7 @@ async def post(
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "204":
         description: The completion was accepted
@@ -68,7 +70,13 @@ async def post(
             status=http.HTTPStatus.BAD_REQUEST,
         )
 
-    data = await get_submission(request, maplist_profile, resource)
+    data = await get_completion_request(
+        request,
+        maplist_profile,
+        is_maplist_mod=is_maplist_mod,
+        is_explist_mod=is_explist_mod,
+        resource=resource,
+    )
     if isinstance(data, web.Response):
         return data
 

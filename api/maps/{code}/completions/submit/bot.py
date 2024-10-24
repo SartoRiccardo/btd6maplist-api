@@ -11,7 +11,7 @@ from src.db.queries.maps import get_map
 from src.db.queries.misc import get_config
 from src.db.queries.completions import submit_run
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, MEDIA_BASE_URL, WEB_BASE_URL
-from src.utils.embeds import get_runsubm_embed, send_webhook
+from src.utils.embeds import get_runsubm_embed, send_run_webhook
 
 MAX_FILES = 4
 compl_files = [f"proof_completion[{n}]" for n in range(MAX_FILES)]
@@ -40,9 +40,8 @@ async def post(
     #     )
 
     maplist_cfg = await get_config()
-    map_count = next(cfg for cfg in maplist_cfg if cfg.name == "map_count")
     if resource.difficulty == -1 and \
-            resource.placement_cur not in range(1, map_count.value + 1):
+            resource.placement_cur not in range(1, maplist_cfg["map_count"] + 1):
         return web.json_response(
             {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
             status=http.HTTPStatus.BAD_REQUEST,
@@ -92,6 +91,9 @@ async def post(
     form_data.add_field("payload_json", payload_json)
 
     hook_url = WEBHOOK_LIST_RUN if 0 < json_data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
-    asyncio.create_task(send_webhook(run_id, hook_url, form_data, payload_json))
+    asyncio.create_task(send_run_webhook(run_id, hook_url, form_data, payload_json))
 
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(
+        status=http.HTTPStatus.CREATED,
+        headers={"Location": f"/completions/{run_id}"}
+    )
