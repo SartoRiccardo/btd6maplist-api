@@ -196,7 +196,7 @@ def get_application(
         init_database: bool = True,
 ) -> web.Application:
     app = web.Application(
-        client_max_size=1024**2 * 3,
+        client_max_size=1024**2 * 12,
     )
     app.add_routes(get_routes())
 
