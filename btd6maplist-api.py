@@ -190,7 +190,7 @@ async def redirect_to_swagger(r):
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     app = web.Application(
-        client_max_size=1024**2 * 3,
+        client_max_size=1024**2 * 12,
     )
     app.add_routes(get_routes())
     swagger(app)
