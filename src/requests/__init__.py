@@ -1,8 +1,8 @@
-from .DiscordRequests import DiscordRequests
+from .DiscordRequestsMock import DiscordRequestsMock
 from .NinjaKiwiRequests import NinjaKiwiRequests
 
 
-__discord_api = DiscordRequests
+__discord_api = DiscordRequestsMock
 __ninja_kiwi_api = NinjaKiwiRequests
 
 
