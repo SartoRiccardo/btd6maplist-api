@@ -72,8 +72,11 @@ def rm_nulls(l: list[Any | None]) -> list:
     return [x for x in l if x is not None]
 
 
-def User(user_id: int) -> str:
-    name = f"usr{user_id}"
+def User(user_id: int, username: str = None) -> str:
+    if username is None:
+        name = f"usr{user_id}"
+    else:
+        name = username
     if user_id == 100000:
         name = "Authenticated User"
 
@@ -651,6 +654,15 @@ if __name__ == '__main__':
             User(user_id) for user_id in range(1, USER_COUNT+1))
         )
         fout.write(f"\n{User(100000)}")
+        extra_users = [
+            # Home page users
+            (513869624157405186, "Mera"),
+            (300761010569216001, "Derpskull"),
+            (388338653937532929, "Issimo"),
+            (508409944736006154, "Moone"),
+            (1077309729942024302, "Sarto"),
+        ]
+        fout.write("\n" + "\n".join(f"{User(uid, name)}" for uid, name in extra_users))
     with open(bpath / "03_map_aliases.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_aliases() for x in maps
