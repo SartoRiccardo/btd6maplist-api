@@ -1,3 +1,4 @@
+import os
 from aiohttp import web
 import src.db.connection
 import config
@@ -35,4 +36,7 @@ async def reset_database(conn=None):
     )
     if len(drops):
         await conn.execute("\n".join(d[0] for d in drops))
+    dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
+    if os.path.exists(dbinfo_path):
+        os.remove(dbinfo_path)
     await src.db.connection.init_database(test=True, conn=conn)
