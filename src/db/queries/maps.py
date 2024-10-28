@@ -258,7 +258,7 @@ def parse_runs_payload(
 async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         """
-        SELECT
+        SELECT DISTINCT ON (run_id)
             runs.id AS run_id, runs.map, runs.black_border, runs.no_geraldo, TRUE AS current_lcc, runs.format,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY runs.id) AS subm_proof_img,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY runs.id) AS subm_proof_vid,
