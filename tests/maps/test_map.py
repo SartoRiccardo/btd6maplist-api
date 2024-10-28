@@ -54,6 +54,11 @@ class TestGetMaps:
                 assert resp_map_data[key] == exp_value, \
                     f"Map.{key} differs from expected"
 
+            lcc_ids = set()
+            for lcc in resp_map_data["lccs"]:
+                assert lcc["id"] not in lcc_ids, "Found duplicate LCC completion"
+                lcc_ids.add(lcc["id"])
+
     async def test_not_exists(self, btd6ml_test_client):
         """Test getting a map that doesn't exist"""
         async with btd6ml_test_client.get(f"/maps/AAAAAAA") as resp:
