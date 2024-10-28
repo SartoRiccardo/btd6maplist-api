@@ -313,7 +313,7 @@ def random_maps() -> tuple[int, list[Map]]:
             (
                 None if plc < 20 else
                 f"https://youtu.be/{rand_str(rand_images)}" if plc < 30 else
-                rand_images.choice(images) if plc < 40 else
+                rand_images.choice(images)+".png" if plc < 40 else
                 f"https://drive.google.com/file/d/{rand_str(rand_images, k=32)}/view"
             ),
             None,
