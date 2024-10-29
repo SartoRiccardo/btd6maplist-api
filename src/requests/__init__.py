@@ -1,9 +1,9 @@
 from .DiscordRequestsMock import DiscordRequestsMock
-from .NinjaKiwiRequests import NinjaKiwiRequests
+from .NinjaKiwiMock import NinjaKiwiMock
 
 
 __discord_api = DiscordRequestsMock
-__ninja_kiwi_api = NinjaKiwiRequests
+__ninja_kiwi_api = NinjaKiwiMock
 
 
 def discord_api():
