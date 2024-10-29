@@ -1,3 +1,4 @@
+import http
 import re
 from aiohttp import web
 from src.db.queries.users import edit_user, get_user_min
@@ -26,8 +27,6 @@ async def put_validate(body: dict) -> dict:
         errors["name"] = f"Name must be under {NAME_MAX_LEN} characters"
     elif not re.match("^[" + NAME_CHARS.replace(".", "\\.") + "]+$", body["name"]):
         errors["name"] = f"Allowed characters for name: {NAME_CHARS}"
-    elif await get_user_min(body["name"]) is not None:
-        errors["name"] = "That name is already taken!"
 
     if "oak" not in body:
         errors["oak"] = "Missing"
@@ -48,7 +47,7 @@ async def put_validate(body: dict) -> dict:
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.validate_json_body(put_validate)
 async def put(
-        request: web.Request,
+        _r: web.Request,
         json_body: dict = None,
         discord_profile: dict = None,
         **_kwargs
@@ -95,6 +94,13 @@ async def put(
       "401":
         description: Your token is missing, or invalid.
     """
+    if (other := await get_user_min(json_body["name"])) is not None and \
+            str(other.id) != discord_profile["id"]:
+        return web.json_response(
+            {"errors": {"name": "That name is already taken!"}, "data": {}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
+
     oak = json_body["oak"] if json_body["oak"] is not None else None
     await edit_user(
         discord_profile["id"],
@@ -102,7 +108,7 @@ async def put(
         oak,
     )
     return web.json_response({
-        "errors": [],
+        "errors": {},
         "data": {
             "name": json_body["name"],
             "oak": oak,

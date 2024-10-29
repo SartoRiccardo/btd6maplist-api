@@ -164,6 +164,17 @@ class TestEditSelf:
             }
             await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
+    async def test_edit_leave_name(self, btd6ml_test_client, mock_discord_api, profile_payload, mock_ninja_kiwi_api,
+                                   assert_state_unchanged):
+        """Test editing one's own profile while leaving the name unchanged"""
+        USER_ID = 29
+        mock_discord_api(user_id=USER_ID)
+        mock_ninja_kiwi_api()
+        req_usr_data = profile_payload(f"usr{USER_ID}", oak="oak_test123")
+
+        async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
+            assert resp.status == http.HTTPStatus.OK
+
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api, profile_payload,
                                        assert_state_unchanged):
         """Test editing one's own profile with missing fields"""
