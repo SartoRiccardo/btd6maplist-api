@@ -259,7 +259,6 @@ async def test_fuzz(btd6ml_test_client, mock_discord_api, map_payload, valid_cod
             assert "errors" in resp_data and path in resp_data["errors"], \
                 f"\"{path}\" was not in response.errors"
 
-
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
@@ -287,6 +286,8 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
             test_add: bool = True,
     ):
         error_msg = error_msg.replace("[keypath]", error_path)
+        if "aliases" in error_path:
+            error_path += ".alias"
         if test_add:
             async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_data)) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, f"Adding {error_msg} returned %d" % resp.status
@@ -342,6 +343,12 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
     # Integer too large
     validations = [(999999, f"a map with a [keypath] too large")]
     invalid_schema = {None: ["difficulty"]}
+    for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
+        await call_endpoints(req_data, edited_path, error_msg)
+
+    # Already taken aliases
+    validations = [("ml20", f"an already taken alias")]
+    invalid_schema = {"aliases": [0]}
     for req_data, edited_path, error_msg in invalidate_field(req_map_data, invalid_schema, validations):
         await call_endpoints(req_data, edited_path, error_msg)
 

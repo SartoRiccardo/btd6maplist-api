@@ -119,10 +119,15 @@ async def validate_full_map(
     else:
         map_res = await get_map(body["code"])
 
-        async def check_alias(a: str):
-            return not (map_res is None or a in map_res.aliases) and await alias_exists(a)
+        async def cannot_be_taken(a: str) -> bool:
+            """Returns True if the alias cannot be taken"""
+            exists = await alias_exists(a)
+            if map_res is None:
+                return exists
+            else:
+                return a not in map_res.aliases and exists
         dup_aliases = await asyncio.gather(*[
-            check_alias(alias) for alias in body["aliases"]
+            cannot_be_taken(alias) for alias in body["aliases"]
         ])
         for i, isdup in enumerate(dup_aliases):
             if isdup:
