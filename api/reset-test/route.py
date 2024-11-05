@@ -1,9 +1,10 @@
+import asyncio
 import os
 import asyncpg.exceptions
 from aiohttp import web
 import src.db.connection
 import config
-from retry import retry
+from src.utils.colors import red
 
 
 async def get(_r: web.Request) -> web.Response:
@@ -27,7 +28,6 @@ async def get(_r: web.Request) -> web.Response:
 
 
 @src.db.connection.postgres
-@retry(exceptions=asyncpg.exceptions.DeadlockDetectedError, tries=3, delay=1)
 async def reset_database(conn=None):
     """Copied from the test suite, didn't want to refactor it so it wasn't a fixture"""
     drops = await conn.fetch(
@@ -38,7 +38,15 @@ async def reset_database(conn=None):
         """
     )
     if len(drops):
-        await conn.execute("\n".join(d[0] for d in drops))
+        tries = 3
+        while tries:
+            try:
+                await conn.execute("\n".join(d[0] for d in drops))
+                break
+            except asyncpg.exceptions.DeadlockDetectedError:
+                await asyncio.sleep(1)
+                tries -= 1
+                print(f"{red('[PSQL/Deadlock]')} Retrying {tries} more times...")
     dbinfo_path = os.path.join(config.PERSISTENT_DATA_PATH, "data", "dbinfo.txt")
     if os.path.exists(dbinfo_path):
         os.remove(dbinfo_path)
