@@ -5,6 +5,7 @@ from src.db.queries.mapsubmissions import add_map_submission_wh
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
 import src.http
+from ..requests import discord_api
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
 
 propositions = {
@@ -111,11 +112,8 @@ def get_runsubm_embed(
     return embeds
 
 
-async def send_webhook(run_id: int, hook_url: str, form_data: aiohttp.FormData, payload_json: str) -> None:
-    resp = await src.http.http.post(hook_url + "?wait=true", data=form_data)
-    if not resp.ok:
-        raise Exception(f"Webhook returned with: {resp.status}")
-    msg_id = (await resp.json())["id"]
+async def send_run_webhook(run_id: int, hook_url: str, form_data: aiohttp.FormData, payload_json: str) -> None:
+    msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
     await add_completion_wh_payload(run_id, f"{msg_id};{payload_json}")
 
 
@@ -126,8 +124,8 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
     content = json.loads(payload)
     content["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
     hook_url = WEBHOOK_LIST_RUN if 0 < comp.format <= 50 else WEBHOOK_EXPLIST_RUN
-    await src.http.http.patch(hook_url + f"/messages/{msg_id}", json=content)
-    await add_completion_wh_payload(comp.id, None)
+    if await discord_api().patch_webhook(hook_url, msg_id, content):
+        await add_completion_wh_payload(comp.id, None)
 
 
 async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail: bool = False):
@@ -137,9 +135,8 @@ async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail:
     msg_id, wh_data = mapsubm.wh_data.split(";", 1)
     wh_data = json.loads(wh_data)
     wh_data["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
-    async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
-        if resp.ok:
-            await add_map_submission_wh(mapsubm.code, None)
+    if await discord_api().patch_webhook(hook_url, msg_id, wh_data):
+        await add_map_submission_wh(mapsubm.code, None)
 
 
 async def send_map_submission_webhook(hook_url: str, code: str, wh_data: dict) -> None:
@@ -147,11 +144,9 @@ async def send_map_submission_webhook(hook_url: str, code: str, wh_data: dict) -
     wh_data_str = json.dumps(wh_data)
     form_data.add_field("payload_json", wh_data_str)
 
-    async with src.http.http.post(hook_url + "?wait=true", data=form_data) as resp:
-        msg_id = (await resp.json())["id"]
-        await add_map_submission_wh(code, f"{msg_id};{wh_data_str}")
+    msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
+    await add_map_submission_wh(code, f"{msg_id};{wh_data_str}")
 
 
 async def delete_map_submission_webhook(hook_url: str, msg_id: str) -> None:
-    async with src.http.http.delete(hook_url + f"/messages/{msg_id}") as _r:
-        pass
+    await discord_api().delete_webhook(hook_url, msg_id)

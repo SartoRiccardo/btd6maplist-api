@@ -8,11 +8,12 @@ import cryptography.exceptions
 from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
-from config import MAPLIST_GUILD_ID, MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
+from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
 import src.http
 from src.db.queries.users import create_user, get_user_min
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+from ..requests import discord_api
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -59,23 +60,21 @@ def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
         if token == "":
             return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
 
-        disc_response = await src.http.http.get(
-            f"https://discord.com/api/v10/users/@me/guilds/{MAPLIST_GUILD_ID}/member",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        if disc_response.status == 404:
-            return web.json_response(
-                {"errors": {"": "You don't seem to be in the maplist discord..."}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
-        if not disc_response.ok:
-            return web.json_response(
-                {"errors": {"": "Couldn't verify your Maplist account"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+        try:
+            profile = await discord_api().get_maplist_profile(token)
+            return await handler(request, *args, **kwargs, token=token, maplist_profile=profile)
+        except aiohttp.ClientResponseError as exc:
+            if exc.status == http.HTTPStatus.NOT_FOUND:
+                return web.json_response(
+                    {"errors": {"": "You don't seem to be in the maplist discord..."}, "data": {}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
+            else:
+                return web.json_response(
+                    {"errors": {"": "Couldn't verify your Maplist account"}, "data": {}},
+                    status=http.HTTPStatus.UNAUTHORIZED,
+                )
 
-        profile = await disc_response.json()
-        return await handler(request, *args, **kwargs, token=token, maplist_profile=profile)
     return wrapper
 
 
@@ -92,18 +91,15 @@ def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
                 status=http.HTTPStatus.UNAUTHORIZED,
             )
 
-        disc_response = await src.http.http.get(
-            f"https://discord.com/api/v10/users/@me",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        if not disc_response.ok:
+        try:
+            profile = await discord_api().get_user_profile(token)
+            return await handler(request, *args, **kwargs, token=token, discord_profile=profile)
+        except aiohttp.ClientResponseError:
             return web.json_response(
                 {"errors": {"": "Couldn't verify your Discord account"}, "data": {}},
                 status=http.HTTPStatus.UNAUTHORIZED,
             )
 
-        profile = await disc_response.json()
-        return await handler(request, *args, **kwargs, token=token, discord_profile=profile)
     return wrapper
 
 
@@ -130,7 +126,7 @@ def require_perms(
 ):
     """
     Must be used with `with_maplist_profile` beforehand.
-    Returns 401 if doesn't have the required perms.
+    Returns 403 if they don't have the required perms.
     Adds `is_admin`, `is_maplist_mod` and `is_explist_mod` to kwargs.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
@@ -147,7 +143,7 @@ def require_perms(
             if not (is_admin or is_explist_mod or is_list_mod):
                 return web.json_response(
                     {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
+                    status=http.HTTPStatus.FORBIDDEN,
                 )
 
             return await handler(
@@ -157,6 +153,7 @@ def require_perms(
                 is_admin=is_admin,
                 is_explist_mod=is_explist_mod,
                 is_list_mod=is_list_mod,
+                is_maplist_mod=is_list_mod,  # Alias cause I keep mixing them up
             )
         return wrapper
     return deco

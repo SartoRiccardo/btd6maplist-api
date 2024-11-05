@@ -24,9 +24,10 @@ FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) 
 -- LCCs for each list map --
 ----------------------------
 
-CREATE OR REPLACE VIEW lccs_by_map AS
+DROP VIEW IF EXISTS lccs_by_map CASCADE;
+CREATE VIEW lccs_by_map AS
 SELECT DISTINCT ON (r.map, r.format)
-    r.map, r.format, lcc.id
+    r.map, r.format, lcc.leftover, lcc.id
 FROM list_completions r
 JOIN leastcostchimps lcc
     ON r.lcc = lcc.id
@@ -249,8 +250,10 @@ completion_points AS (
     FROM list_completions lc
     JOIN listcomp_players ply
         ON lc.id = ply.run
-    WHERE lc.format BETWEEN 51 AND 100
-        OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+    WHERE (
+            lc.format BETWEEN 51 AND 100
+            OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+        )
         AND lc.accepted_by IS NOT NULL
         AND lc.deleted_on IS NULL
 ),
@@ -267,9 +270,15 @@ ORDER BY placement ASC, user_id DESC;
 
 
 CREATE OR REPLACE VIEW experts_lcc_leaderboard AS
-WITH leaderboard AS (
+WITH valid_lccs AS (
+    SELECT DISTINCT ON (map) *
+    FROM lccs_by_map
+    WHERE (format BETWEEN 51 AND 100 OR format = 1)
+    ORDER BY map, leftover DESC
+),
+leaderboard AS (
     SELECT lcp.user_id, COUNT(lcp.user_id) AS score
-    FROM lccs_by_map lccs
+    FROM valid_lccs lccs
     JOIN list_completions r
         ON r.lcc = lccs.id
     JOIN maps m
@@ -277,10 +286,6 @@ WITH leaderboard AS (
     JOIN listcomp_players lcp
         ON r.id = lcp.run
     WHERE m.difficulty >= 0
-        AND (
-            lccs.format BETWEEN 51 AND 100
-            OR lccs.format = 1
-        )
         AND m.deleted_on IS NULL
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL

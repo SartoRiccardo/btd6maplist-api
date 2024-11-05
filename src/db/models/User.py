@@ -28,6 +28,17 @@ class PartialUser:
             description: |
               Whether the user has already been notified there are rules
               to submissions.
+    ---
+    ProfilePayload:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The user's name.
+        oak:
+          type: string
+          nullable: true
+          description: The user's NinjaKiwi OpenData Access Key
     """
     id: int
     name: str
@@ -139,6 +150,11 @@ class User(PartialUser):
             $ref: "#/components/schemas/PartialMap"
         medals:
           $ref: "#/components/schemas/MaplistMedals"
+    ---
+    FullProfile:
+      allOf:
+      - $ref: "#/components/schemas/Profile"
+      - $ref: "#/components/schemas/User"
     """
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
@@ -161,5 +177,5 @@ class User(PartialUser):
             "medals": self.medals.to_dict(),
         }
         if with_completions:
-            data["completions"] = [c.to_dict() for c in self.completions]
+            data["completions"] = [c.to_profile_dict() for c in self.completions]
         return data

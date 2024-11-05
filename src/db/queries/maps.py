@@ -71,13 +71,13 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
     if code.isnumeric():  # Current version index
         placement_union = """
             UNION
-            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_curver = $1::int
+            SELECT 3 AS ord, m.* FROM maps m WHERE m.placement_curver = $1::int
         """
     elif code.startswith("@") and code[1:].isnumeric():  # All versions idx
         code = code[1:]
         placement_union = """
             UNION
-            SELECT 4 AS ord, m.* FROM maps m WHERE m.placement_allver = $1::int
+            SELECT 3 AS ord, m.* FROM maps m WHERE m.placement_allver = $1::int
         """
 
     payload = await conn.fetch(
@@ -110,7 +110,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
                 
                 UNION
                 
-                SELECT 3 AS ord, m.*
+                SELECT 4 AS ord, m.*
                 FROM maps m
                 JOIN map_aliases a
                     ON m.id = a.map
@@ -246,7 +246,7 @@ def parse_runs_payload(
             run["no_geraldo"],
             run["current_lcc"],
             run["format"],
-            LCC(run["lcc_id"], run["proof"], run["leftover"]) if run["lcc_id"] else None,
+            LCC(run["lcc_id"], run["leftover"]) if run["lcc_id"] else None,
             list_rm_dupe(run["subm_proof_img"]),
             list_rm_dupe(run["subm_proof_vid"]),
             run["subm_notes"],
@@ -258,13 +258,13 @@ def parse_runs_payload(
 async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
     payload = await conn.fetch(
         """
-        SELECT
+        SELECT DISTINCT ON (run_id)
             runs.id AS run_id, runs.map, runs.black_border, runs.no_geraldo, TRUE AS current_lcc, runs.format,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY runs.id) AS subm_proof_img,
             ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY runs.id) AS subm_proof_vid,
             runs.subm_notes,
 
-            lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+            lccs.id AS lcc_id, lccs.leftover,
 
             ARRAY_AGG(ply.user_id) OVER (PARTITION by runs.id) AS user_ids,
             ARRAY_AGG(u.name) OVER (PARTITION by runs.id) AS user_names
@@ -321,7 +321,7 @@ async def get_completions_for(
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.id) AS subm_proof_vid,
                 rwf.subm_notes,
                 
-                lccs.id AS lcc_id, lccs.proof, lccs.leftover,
+                lccs.id AS lcc_id, lccs.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids,
                 ARRAY_AGG(u.name) OVER (PARTITION by rwf.id) AS user_names
@@ -448,6 +448,8 @@ async def delete_map_relations(map_id: int, conn=None) -> None:
 async def add_map(map_data: dict, conn=None) -> None:
     async with conn.transaction():
         for field in ["placement_allver", "placement_curver"]:
+            if field not in map_data:
+                continue
             await update_list_placements(field, -1, map_data[field])
 
         map_id = await conn.fetchval(
@@ -459,8 +461,8 @@ async def add_map(map_data: dict, conn=None) -> None:
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
             """,
-            map_data["code"], map_data["name"], map_data["placement_allver"],
-            map_data["placement_curver"], map_data["difficulty"], map_data["map_data"],
+            map_data["code"], map_data["name"], map_data.get("placement_allver", -1),
+            map_data.get("placement_curver", -1), map_data["difficulty"], map_data["map_data"],
             map_data["r6_start"], ";".join(map_data["optimal_heros"]), map_data["map_preview_url"],
         )
 
@@ -617,7 +619,9 @@ async def get_legacy_maps(conn=None) -> list[PartialListMap]:
                 placement_curver > cvar.map_count
                 OR placement_curver = -1 AND difficulty = -1
             )
-        ORDER BY placement_curver ASC
+        ORDER BY
+            (placement_curver = -1),
+            placement_curver ASC
         """,
     )
     return [

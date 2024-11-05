@@ -28,44 +28,43 @@ async def get(_r: web.Request):
     ---
     description: Returns a list of config variables for the project.
     tags:
-    - Misc
+    - Config
     responses:
       "200":
-        description: Returns an array of `ConfigVar`.
+        description: Returns the project's config variables.
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/ConfigVar"
+              type: object
     """
-    return web.json_response([cfg.to_dict() for cfg in await get_config()])
+    return web.json_response(await get_config())
 
 
 async def put_validate(body: dict) -> dict:
     if "config" not in body:
-        return {"": "Missing config"}
+        return {"config": "Missing"}
+    if not isinstance(body["config"], dict):
+        return {"config": "Must be of type object"}
 
     for key in body["config"]:
         if key not in var_perms:
-            return {"": f"Found wrong key \"{key}\""}
+            return {key: "Invalid key"}
 
     errors = {}
     config = await get_config()
     for key in body["config"]:
-        idx = index_where(config, lambda x: x.name == key)
-        vtype = type(config[idx].value)
+        vtype = type(config[key])
         try:
             body["config"][key] = vtype(body["config"][key])
-        except ValueError:
+        except (ValueError, TypeError):
             errors[key] = f"Must be of type {vtype.__name__}"
     return errors
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.validate_json_body(put_validate)
 @src.utils.routedecos.with_maplist_profile
 @src.utils.routedecos.require_perms()
+@src.utils.routedecos.validate_json_body(put_validate)
 async def put(
         _r: web.Request,
         json_body: dict = None,
@@ -81,15 +80,14 @@ async def put(
       Change any number of the config variables. Certain roles have access to change different variables.
       Must be a Maplist or Expert List Moderator. Changes to variables you don't have access to will be ignored.
     tags:
-    - Misc
+    - Config
     requestBody:
       required: true
       content:
         application/json:
           schema:
-            type: array
-            items:
-              $ref: "#/components/schemas/ConfigVar"
+            description: The variables you want to change and the new values.
+            type: object
     responses:
       "200":
         description: |
@@ -103,9 +101,7 @@ async def put(
                 errors:
                   type: object
                 data:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/ConfigVar"
+                  type: object
       "400":
         description: |
           One of the fields is badly formatted.
@@ -126,6 +122,7 @@ async def put(
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
+
     if not is_admin:
         cvar_keys = list(json_body["config"].keys())
         for key in cvar_keys:

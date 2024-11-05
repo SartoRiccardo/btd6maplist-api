@@ -14,8 +14,7 @@ async def get(_r: web.Request, resource: "src.db.models.Map" = None):
     ---
     description: Returns an map's data.
     tags:
-    - Expert List
-    - The List
+    - Maps
     parameters:
     - in: path
       name: code
@@ -43,15 +42,15 @@ async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         maplist_profile: dict = None,
-        is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ):
     """
     ---
     description: Edit a map. Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Maps
     parameters:
     - in: path
       name: code
@@ -88,19 +87,19 @@ async def put(
       "404":
         description: No map with that ID was found.
     """
-    json_body = await get_map_form(request, check_dup_code=False)
+    json_body = await get_map_form(request, check_dup_code=False, editing=True)
     if isinstance(json_body, web.Response):
         return json_body
 
-    if not is_admin:
-        if MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
-            if "difficulty" in json_body:
-                del json_body["difficulty"]
-        if MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
-            if "placement_allver" in json_body:
-                del json_body["placement_allver"]
-            if "placement_curver" in json_body:
-                del json_body["placement_curver"]
+    json_body["code"] = resource.code
+    if not is_explist_mod:
+        if "difficulty" in json_body:
+            del json_body["difficulty"]
+    if not is_maplist_mod:
+        if "placement_allver" in json_body:
+            del json_body["placement_allver"]
+        if "placement_curver" in json_body:
+            del json_body["placement_curver"]
 
     await edit_map(json_body, resource)
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"]))
@@ -124,8 +123,7 @@ async def delete(
       Soft deletes a map. Must be a Maplist or Expert List Moderator.
       Deleted maps and all their data are kept in the database, but ignored.
     tags:
-    - The List
-    - Expert List
+    - Maps
     parameters:
     - in: path
       name: code

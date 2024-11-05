@@ -5,19 +5,19 @@ from src.utils.colors import red, purple
 from functools import wraps
 
 pool: asyncpg.Pool | None
-os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
 
 
-async def start():
+async def start(should_init_database: bool = True):
     global pool
     try:
+        os.makedirs(os.path.join(config.PERSISTENT_DATA_PATH, "data"), exist_ok=True)
         pool = await asyncpg.create_pool(
             user=config.DB_USER, password=config.DB_PSWD,
-            database=config.DB_NAME, host=config.DB_HOST
+            database=config.DB_NAME, host=config.DB_HOST,
         )
         print(f"{purple('[PSQL]')} Connected")
-        await update_schema()
-        await init_database()
+        if should_init_database:
+            await init_database()
     except:
         print(f"{purple('[PSQL]')} {red('Error connecting to Postgres database')}")
         exit(1)
@@ -37,7 +37,11 @@ def postgres(wrapped):
 
 
 @postgres
-async def init_database(conn=None):
+async def init_database(test: bool = False, conn=None):
+    await update_schema(conn=conn)
+    if test:
+        await dump_test_data(conn=conn)
+
     with open(os.path.join("database", "views.psql")) as fviews:
         await conn.execute(fviews.read())
         print(f"{purple('[PSQL/Init]')} Created views")
@@ -74,3 +78,38 @@ async def update_schema(conn=None):
     with open(dbinfo_path, "w") as fdb:
         fdb.write(str(last_update))
 
+
+@postgres
+async def dump_test_data(conn=None):
+    test_data_path = os.path.join("database", "data")
+    sequences = await conn.fetch(
+        """
+        SELECT sequence_name
+        FROM information_schema.sequences
+        WHERE sequence_schema = 'public'
+        """
+    )
+    sequences = [s["sequence_name"] for s in sequences]
+
+    tables = sorted(os.listdir(test_data_path))
+    for fname in tables:
+        if not fname.endswith(".csv"):
+            continue
+
+        table = fname.split("_", 1)[-1][:-4]
+        result = await conn.copy_to_table(
+            table_name=table,
+            source=os.path.join(test_data_path, fname),
+            delimiter="\t",
+            header=False,
+            format="csv",
+            null="\\N",
+        )
+        if f"{table}_id_seq" in sequences:
+            added_rows = int(result[len("COPY "):])
+            await conn.execute(
+                f"""
+                ALTER SEQUENCE {table}_id_seq
+                RESTART WITH {added_rows+1}
+                """
+            )

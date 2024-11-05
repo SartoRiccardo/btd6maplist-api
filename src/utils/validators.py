@@ -2,7 +2,7 @@ import asyncio
 import validators
 from aiohttp import web
 import http
-from typing import Type, Any
+from typing import Type, Any, get_args
 import re
 import src.utils.routedecos
 import src.http
@@ -18,10 +18,13 @@ MAX_ADD_CODES = 5
 MAX_PROOF_URL = 5
 
 
-async def validate_map_code(code: str) -> str | None:
+async def validate_map_code(
+        code: str,
+        validate_code_exists: bool = True,
+) -> str | None:
     if not isinstance(code, str) or not re.match("^[A-Z]{7}$", code):
         return "Must be a 7 uppercase letter code"
-    else:
+    elif validate_code_exists:
         nk_response = await src.http.http.get(f"https://data.ninjakiwi.com/btd6/maps/map/{code}")
         if not nk_response.ok or not (await nk_response.json())["success"]:
             return f"There is no map with code {code}"
@@ -38,6 +41,10 @@ def get_repeated_indexes(l: list) -> list[int]:
 
 def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str = "") -> dict:
     if isinstance(body, dict):
+        if dict in get_args(schema):
+            return {}
+        if not isinstance(schema, dict):
+            return {f"{path}"[1:]: "Item cannot be an object"}
         for key in schema:
             if key not in body:
                 return {f"{path}.{key}"[1:]: "Missing"}
@@ -49,7 +56,9 @@ def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str 
         for i, item in enumerate(body):
             if error := check_fields(item, schema[0], path=f"{path}[{i}]"):
                 return error
-    elif not isinstance(body, schema):
+    elif isinstance(schema, list) or \
+            isinstance(schema, dict) or \
+            not isinstance(body, schema):
         return {path[1:]: f"Wrong typing (must be `{schema}`)"}
     return {}
 
@@ -63,7 +72,7 @@ def typecheck_full_map(body: dict) -> dict:
         "difficulty": int,
         "r6_start": str | None,
         "map_data": str | None,
-        "additional_codes": [{"code": str, "description": str | None}],
+        "additional_codes": [{"code": str, "description": str}],
         "creators": [{"id": str, "role": str | None}],
         "verifiers": [{"id": str, "version": int | None}],
         "aliases": [str],
@@ -76,23 +85,32 @@ def typecheck_full_map(body: dict) -> dict:
         return check
 
 
-async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
+async def validate_full_map(
+        body: dict,
+        check_dup_code: bool = True,
+        validate_code_exists: bool = True,
+) -> dict:
     errors = {}
     if check_fail := typecheck_full_map(body):
         return check_fail
 
     if check_dup_code and await map_exists(body["code"]):
         return {"code": "Map already exists"}
-    if code_err := await validate_map_code(body["code"]):
+    if code_err := await validate_map_code(body["code"], validate_code_exists=validate_code_exists):
         errors["code"] = code_err
     for i, addcode in enumerate(body["additional_codes"][:MAX_ADD_CODES]):
         if code_err := await validate_map_code(addcode["code"]):
             errors[f"additional_codes[{i}].code"] = code_err
-        if addcode["description"] is not None and len(addcode["description"]) > MAX_TEXT_LEN:
-            errors[f"additional_codes[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+        if addcode["description"] is not None:
+            if len(addcode["description"]) > MAX_TEXT_LEN:
+                errors[f"additional_codes[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+            elif len(addcode["description"]) == 0:
+                errors[f"additional_codes[{i}].description"] = f"Cannot be an empty string"
 
     if len(body["name"]) > MAX_TEXT_LEN:
         errors["name"] = f"Must be under {MAX_TEXT_LEN} characters"
+    elif len(body["name"]) == 0:
+        errors["name"] = f"Must have a name"
 
     rep_alias_idx = get_repeated_indexes(body["aliases"])
     if len(rep_alias_idx):
@@ -101,18 +119,25 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
     else:
         map_res = await get_map(body["code"])
 
-        async def check_alias(a: str):
-            return not (map_res is None or a in map_res.aliases) and await alias_exists(a)
+        async def cannot_be_taken(a: str) -> bool:
+            """Returns True if the alias cannot be taken"""
+            exists = await alias_exists(a)
+            if map_res is None:
+                return exists
+            else:
+                return a not in map_res.aliases and exists
         dup_aliases = await asyncio.gather(*[
-            check_alias(alias) for alias in body["aliases"]
+            cannot_be_taken(alias) for alias in body["aliases"]
         ])
         for i, isdup in enumerate(dup_aliases):
             if isdup:
                 errors[f"aliases[{i}].alias"] = "Already assigned to another map"
 
-    if body["r6_start"] and not validators.url(body["r6_start"]):
+    if body["r6_start"] is not None and \
+            (len(body["r6_start"]) == 0 or not validators.url(body["r6_start"])):
         errors["r6_start"] = "Must be a URL"
-    if body["map_preview_url"] and not validators.url(body["map_preview_url"]):
+    if body["map_preview_url"] is not None and \
+            (len(body["map_preview_url"]) == 0 or not validators.url(body["map_preview_url"])):
         errors["map_preview_url"] = "Must be a URL"
 
     if len(body["creators"]) == 0:
@@ -130,8 +155,11 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
             else:
                 body["creators"][i]["id"] = str(usr.id)
         for i, crt in enumerate(body["creators"]):
-            if crt["role"] is not None and len(crt["role"]) > MAX_TEXT_LEN:
-                errors[f"creators[{i}].description"] = f"Must be under {MAX_TEXT_LEN} characters"
+            if crt["role"] is not None:
+                if len(crt["role"]) > MAX_TEXT_LEN:
+                    errors[f"creators[{i}].role"] = f"Must be under {MAX_TEXT_LEN} characters"
+                elif len(crt["role"]) == 0:
+                    errors[f"creators[{i}].role"] = "Cannot be an empty string"
 
     users = await asyncio.gather(*[
         get_user_min(verif["id"]) for verif in body["verifiers"]
@@ -151,8 +179,12 @@ async def validate_full_map(body: dict, check_dup_code: bool = True) -> dict:
     # FIMXE: Should take 50 from config
     if body["placement_curver"] > 50:
         del body["placement_curver"]
+    elif body["placement_curver"] < -1:
+        errors["placement_curver"] = "Must either be -1 or a between 1 and 50"
     if body["placement_allver"] > 50:
         del body["placement_allver"]
+    elif body["placement_allver"] < -1:
+        errors["placement_allver"] = "Must either be -1 or a between 1 and 50"
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
@@ -188,8 +220,11 @@ async def validate_submission(body: dict) -> dict:
     errors = {}
     if await map_exists(body["code"]):
         return {"code": "Map already exists"}
-    if body["notes"] and len(body["notes"]) > MAX_LONG_TEXT_LEN:
-        errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
+    if body["notes"]:
+        if len(body["notes"]) > MAX_LONG_TEXT_LEN:
+            errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
+        if len(body["notes"]) == 0:
+            body["notes"] = None
     if body["type"] not in ["list", "experts"]:
         errors["type"] = f"Must be either `list` or `experts`"
     return errors
@@ -213,6 +248,8 @@ async def validate_completion_submission(body: dict) -> dict:
         errors[f"video_proof_url"] = f"Can submit up to {MAX_PROOF_URL} URLs"
     else:
         for i, url in enumerate(body["video_proof_url"]):
+            if len(url) > MAX_TEXT_LEN:
+                errors[f"video_proof_url[{i}]"] = f"URLs must be long max. {MAX_TEXT_LEN} each"
             if not validators.url(url):
                 errors[f"video_proof_url[{i}]"] = "Invalid video URL"
     if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
@@ -225,6 +262,11 @@ async def validate_completion_submission(body: dict) -> dict:
             errors["leftover"] = "Must be greater than 0"
     if body["format"] not in [1, 2, 51]:
         errors["format"] = "Must be a valid format"
+    if body["notes"] is not None:
+        if len(body["notes"]) == 0:
+            errors["notes"] = "Notes cannot be an empty string"
+        elif len(body["notes"]) > MAX_LONG_TEXT_LEN:
+            errors["notes"] = f"Notes cannot be longer than {MAX_LONG_TEXT_LEN} characters"
     return errors
 
 
@@ -234,11 +276,10 @@ async def validate_completion(body: dict) -> dict[str, str]:
         "no_geraldo": bool,
         "format": int,
         "user_ids": [str],
+        "lcc": dict | None,
     }
     if len(check := check_fields(body, check_fields_exists)):
         return check
-    if "lcc" not in body:
-        return {"lcc": "Missing"}
 
     errors = {}
 
@@ -246,12 +287,10 @@ async def validate_completion(body: dict) -> dict[str, str]:
         check_lcc_exists = {
             "leftover": int,
         }
-        if len(check := check_fields(body["lcc"], check_lcc_exists)):
+        if len(check := check_fields(body["lcc"], check_lcc_exists, path=".lcc")):
             return check
 
-        if "proof_completion" in body["lcc"] and not validators.url(body["lcc"]["proof_completion"]):
-            errors["lcc.proof_url"] = "Must be a valid URL"
-        elif 0 > body["lcc"]["leftover"]:
+        if 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
 
     if body["format"] not in [1, 2, 51]:
@@ -289,7 +328,12 @@ async def validate_discord_user(body: dict) -> dict[str, str]:
         errors["discord_id"] = "Must be numeric"
     else:
         body["discord_id"] = int(body["discord_id"])
-    body["name"] = body["name"].lower()
+    if len(body["name"]) == 0:
+        errors["name"] = "Name cannot be blank"
+    elif len(body["name"]) > MAX_TEXT_LEN:
+        errors["name"] = f"Name cannot be more than {MAX_TEXT_LEN} characters long"
+    elif (match := re.search(r"[^\w _\.]", body["name"])) is not None:
+        errors["name"] = f"Name cannot contain the character: {match.group(0)}"
 
     return errors
 

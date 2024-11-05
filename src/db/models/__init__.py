@@ -1,6 +1,5 @@
 import re
 import yaml
-from .ConfigVar import ConfigVar
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .User import User, PartialUser, MaplistProfile, MaplistMedals
@@ -12,6 +11,10 @@ swagger_definitions_str = """
 DiscordID:
   type: string
   description: an user's Discord ID. Is numeric.
+  
+RequestUserID:
+  type: string
+  description: The username or Discord ID of the creator
 
 MaplistFormat:
   type: int
@@ -42,6 +45,26 @@ MapVersionCompatibility:
     * `1` - Only visual changes.\\n
     * `2` - Playable, but not recommended.\\n
     * `3` - Unplayable and/or has gameplay differences.
+
+Btd6Hero:
+  type: string
+  enum:
+    - quincy
+    - gwen
+    - obyn
+    - striker
+    - churchill
+    - ben
+    - ezili
+    - pat
+    - adora
+    - brickell
+    - etienne
+    - sauda
+    - psi
+    - geraldo
+    - corvus
+    - rosalia
 """
 
 
@@ -57,7 +80,6 @@ def remove_init_indent(docstring: str, init_padding: int) -> str:
 
 
 entities = [
-    ConfigVar,
     Map,
     PartialMap,
     PartialExpertMap,

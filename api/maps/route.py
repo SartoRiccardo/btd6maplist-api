@@ -22,7 +22,7 @@ async def get(request: web.Request):
     ---
     description: Returns a list of maps in The List.
     tags:
-    - The List
+    - Map Lists
     parameters:
     - in: query
       name: version
@@ -73,16 +73,25 @@ async def post(
     ---
     description: Add a map. Must be a Maplist or Expert List Moderator.
     tags:
-    - The List
-    - Expert List
+    - Maps
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            $ref: "#/components/schemas/Map"
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/MapPayload"
+              r6_start:
+                type: string
+                format: binary
+              map_preview_url:
+                type: string
+                format: binary
     responses:
-      "204":
+      "201":
         description: The resource was created correctly
       "400":
         description: |
@@ -135,4 +144,4 @@ async def post(
     await add_map(json_body)
     asyncio.create_task(update_submission_wh())
     asyncio.create_task(src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"]))
-    return web.Response(status=http.HTTPStatus.NO_CONTENT)
+    return web.Response(status=http.HTTPStatus.CREATED)

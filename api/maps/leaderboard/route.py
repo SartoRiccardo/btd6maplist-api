@@ -5,6 +5,7 @@ from src.db.queries.leaderboard import (
     get_maplist_leaderboard,
     get_maplist_lcc_leaderboard,
 )
+from src.utils.misc import MAPLIST_FORMATS
 
 
 PAGE_ENTRIES = 50
@@ -15,7 +16,7 @@ async def get(request: web.Request):
     ---
     description: Returns the Maplist leaderboard. People with 0 points are omitted.
     tags:
-    - The List
+    - Completions
     parameters:
     - in: query
       name: page
@@ -24,11 +25,10 @@ async def get(request: web.Request):
         type: integer
       description: Pagination. Defaults to `1`.
     - in: query
-      name: version
+      name: format
       required: false
       schema:
-        type: string
-        enum: [current, all, experts]
+        $ref: "#/components/schemas/MaplistFormat"
       description: The format of the leaderboard to get.
     - in: query
       name: value
@@ -56,14 +56,15 @@ async def get(request: web.Request):
                   items:
                     $ref: "#/components/schemas/LeaderboardEntry"
     """
-    version = "current"
-    if "version" in request.query:
-        version = request.query["version"].lower()
-        if version not in ["current", "all", "experts"]:
+    try:
+        ml_format = int(request.query.get("format", "1"))
+        if ml_format not in MAPLIST_FORMATS:
             return web.json_response(
-                {"error": 'Allowed values for "version": ["current", "all", "experts"]'},
+                {"errors": {"format": f'Allowed values: {", ".join(MAPLIST_FORMATS)}'}},
                 status=http.HTTPStatus.BAD_REQUEST,
             )
+    except ValueError:
+        ml_format = 1
 
     value = "points"
     if "value" in request.query:
@@ -84,13 +85,13 @@ async def get(request: web.Request):
     pages = 1
     if value == "points":
         lb, total = await get_maplist_leaderboard(
-            format=version,
+            format=ml_format,
             amount=PAGE_ENTRIES,
             idx_start=PAGE_ENTRIES * (page-1),
         )
         pages = math.ceil(total/PAGE_ENTRIES)
     else:
-        lb, total = await get_maplist_lcc_leaderboard(format=version)
+        lb, total = await get_maplist_lcc_leaderboard(format=ml_format)
 
     return web.json_response({
         "total": total,

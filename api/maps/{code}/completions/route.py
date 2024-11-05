@@ -7,19 +7,21 @@ import src.utils.routedecos
 from src.db.queries.maps import get_map
 from src.db.queries.maps import get_completions_for
 from src.db.queries.completions import add_completion
-from src.utils.forms import get_submission
-
+from src.utils.forms import get_completion_request
 
 PAGE_ENTRIES = 50
 
 
-async def get(request: web.Request):
+@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
+async def get(
+        request: web.Request,
+        **kwargs,
+) -> web.Response:
     """
     ---
     description: Returns a list of up to 50 maplist completions of this map.
     tags:
-    - Expert List
-    - The List
+    - Completions
     parameters:
     - in: path
       name: code
@@ -80,12 +82,15 @@ async def get(request: web.Request):
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.require_perms()
+@src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.model.PartialMap" = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -105,9 +110,19 @@ async def post(
     requestBody:
       required: true
       content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/ListCompletionPayload"
+              submission_proof:
+                type: string
+                format: binary
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "200":
         description: The resource was added.
@@ -136,11 +151,16 @@ async def post(
       "401":
         description: Your token is missing, invalid or you don't have the privileges for this.
     """
-    data = await get_submission(request, maplist_profile)
+    data = await get_completion_request(
+        request,
+        maplist_profile,
+        is_maplist_mod=is_maplist_mod,
+        is_explist_mod=is_explist_mod,
+    )
     if isinstance(data, web.Response):
         return data
 
-    await add_completion(
+    comp_id = await add_completion(
         resource.code,
         data["black_border"],
         data["no_geraldo"],
@@ -154,5 +174,6 @@ async def post(
 
     return web.json_response(
         data["user_ids"],
-        status=http.HTTPStatus.OK,
+        status=http.HTTPStatus.CREATED,
+        headers={"Location": f"/completions/{comp_id}"},
     )

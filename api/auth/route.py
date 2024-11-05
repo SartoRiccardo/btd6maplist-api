@@ -1,6 +1,8 @@
+import http
+import aiohttp
 from aiohttp import web
 from src.db.queries.users import create_user, get_user
-import src.http
+from src.requests import discord_api
 
 
 async def post(request: web.Request):
@@ -10,7 +12,7 @@ async def post(request: web.Request):
       Creates an user based on a Discord profile if it's not in the database, and
       returns its discord profile alongside its Maplist profile.
     tags:
-    - Users
+    - Authentication
     parameters:
     - in: query
       name: discord_token
@@ -30,32 +32,25 @@ async def post(request: web.Request):
                   type: object
                   description: Check out Discord's documentation for this field's schema.
                 maplist_profile:
-                  $ref: "#/components/schemas/Profile"
-      "400":
+                  $ref: "#/components/schemas/FullProfile"
+      "401":
         description: "`discord_token` is missing or invalid."
     """
     if "discord_token" not in request.query:
         return web.json_response(
-            {
-                "error": 'Missing discord_token',
-            },
-            status=400,
+            {"error": 'Missing discord_token'},
+            status=http.HTTPStatus.UNAUTHORIZED,
         )
 
     token = request.query["discord_token"]
-    disc_response = await src.http.http.get(
-        "https://discord.com/api/v10/users/@me",
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    if disc_response.status != 200:
+    try:
+        disc_profile = await discord_api().get_user_profile(token)
+    except aiohttp.ClientError:
         return web.json_response(
-            {
-                "error": 'Invalid discord_token',
-            },
-            status=400,
+            {"error": 'Invalid discord_token'},
+            status=http.HTTPStatus.UNAUTHORIZED,
         )
 
-    disc_profile = await disc_response.json()
     await create_user(disc_profile["id"], disc_profile["username"])
 
     return web.json_response({

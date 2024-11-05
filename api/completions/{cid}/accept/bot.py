@@ -10,7 +10,7 @@ from src.utils.embeds import update_run_webhook
 
 @src.utils.routedecos.check_bot_signature(path_params=["cid"])
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
-async def post(
+async def put(
         _r: web.Request,
         resource: "src.db.models.ListCompletion" = None,
         json_data: dict = None,

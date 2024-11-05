@@ -39,8 +39,8 @@ BEGIN
 
     -- Duplicate the leastcostchimps entry, if any
     IF completion.lcc IS NOT NULL THEN
-        INSERT INTO leastcostchimps (leftover, proof)
-        SELECT leftover, proof FROM leastcostchimps WHERE id = completion.lcc
+        INSERT INTO leastcostchimps (leftover)
+        SELECT leftover FROM leastcostchimps WHERE id = completion.lcc
         RETURNING id INTO dupe_lcc_id;
     ELSE
         dupe_lcc_id := NULL;  -- No lcc to duplicate

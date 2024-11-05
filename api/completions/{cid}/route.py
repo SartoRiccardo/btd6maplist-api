@@ -4,9 +4,8 @@ import http
 from src.db.queries.completions import get_completion, edit_completion, delete_completion
 from src.utils.validators import validate_completion
 import src.utils.routedecos
-from src.utils.forms import get_submission
+from src.utils.forms import get_completion_request
 from src.utils.embeds import update_run_webhook
-from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 import src.log
 
 
@@ -44,6 +43,8 @@ async def put(
         request: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -65,7 +66,7 @@ async def put(
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ListCompletion"
+            $ref: "#/components/schemas/ListCompletionPayload"
     responses:
       "204":
         description: The resource was modified correctly
@@ -89,7 +90,13 @@ async def put(
       "404":
         description: No completion with that ID was found.
     """
-    data = await get_submission(request, maplist_profile, resource)
+    data = await get_completion_request(
+        request,
+        maplist_profile,
+        is_maplist_mod=is_maplist_mod,
+        is_explist_mod=is_explist_mod,
+        resource=resource,
+    )
     if isinstance(data, web.Response):
         return data
 
@@ -113,7 +120,8 @@ async def delete(
         _r: web.Request,
         maplist_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
-        is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """
@@ -139,17 +147,16 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
-    if not is_admin:
-        if MAPLIST_LISTMOD_ID not in maplist_profile["roles"] and 1 <= resource.format <= 50:
-            return web.json_response(
-                {"errors": {"format": "You must be a Maplist Moderator"}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
-        if MAPLIST_EXPMOD_ID not in maplist_profile["roles"] and 51 <= resource.format <= 100:
-            return web.json_response(
-                {"errors": {"format": "You must be an Expert List Moderator"}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+    if not is_maplist_mod and 1 <= resource.format <= 50:
+        return web.json_response(
+            {"errors": {"format": "You must be a Maplist Moderator"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+    if not is_explist_mod and 51 <= resource.format <= 100:
+        return web.json_response(
+            {"errors": {"format": "You must be an Expert List Moderator"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
 
     if not resource.deleted_on:
         reject = resource.accepted_by is None
