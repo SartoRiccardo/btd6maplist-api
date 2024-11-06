@@ -2,7 +2,16 @@ import asyncio
 import src.db.connection
 from src.utils.misc import list_rm_dupe
 from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC, MaplistMedals
+from src.db.queries.subqueries import LeaderboardType, leaderboard_name
 postgres = src.db.connection.postgres
+
+FormatPlacement = tuple[float, int | None]
+UserPlacements = tuple[
+    FormatPlacement,
+    FormatPlacement,
+    FormatPlacement,
+    FormatPlacement,
+]
 
 
 @postgres
@@ -176,22 +185,23 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
 
 
 @postgres
-async def get_maplist_placement(uid: str, curver=True, type="points", conn=None) -> tuple[int | None, float]:
-    verstr = "cur" if curver else "all"
-    lbname = "leaderboard" if type == "points" else "lcclb"
-    lb_view = f"list_{verstr}ver_{lbname}"
-
-    payload = await conn.fetch(
+async def get_leaderboard_placement(
+        uid: str,
+        format: int,
+        type: LeaderboardType = "points",
+        conn=None
+) -> FormatPlacement:
+    payload = await conn.fetchrow(
         f"""
         SELECT user_id, score, placement
-        FROM {lb_view}
+        FROM {leaderboard_name(format, type)}
         WHERE user_id=$1
         """,
         int(uid)
     )
-    if not len(payload) or not len(payload[0]):
-        return None, 0.0
-    return int(payload[0][2]), float(payload[0][1])
+    if payload is None or payload["score"] == 0:
+        return 0.0, None
+    return float(payload["score"]), int(payload["placement"])
 
 
 @postgres
@@ -276,17 +286,24 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
 
 
 @postgres
+async def get_user_placements(uid: str, format: int, conn=None) -> MaplistProfile:
+    pos_points = await get_leaderboard_placement(uid, format, conn=conn, type="points")
+    pos_lccs = await get_leaderboard_placement(uid, format, conn=conn, type="lccs")
+    pos_nogerry = await get_leaderboard_placement(uid, format, conn=conn, type="no_geraldo")
+    pos_bb = await get_leaderboard_placement(uid, format, conn=conn, type="black_border")
+    return MaplistProfile(
+        *pos_points,
+        *pos_lccs,
+        *pos_nogerry,
+        *pos_bb,
+    )
+
+
+@postgres
 async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:
     puser = await get_user_min(id, conn=conn)
     if not puser:
         return None
-
-    curpt_pos = await get_maplist_placement(id, conn=conn)
-    allpt_pos = await get_maplist_placement(id, curver=False, conn=conn)
-    curlcc_pos = await get_maplist_placement(id, type="lcc", conn=conn)
-    alllcc_pos = await get_maplist_placement(id, curver=False, type="lcc", conn=conn)
-    maps = await get_maps_created_by(id, conn=conn)
-    medals = await get_user_medals(id, conn=conn)
 
     comps = []
     if with_completions:
@@ -297,21 +314,12 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         puser.name,
         puser.oak,
         puser.has_seen_popup,
-        MaplistProfile(
-            curpt_pos[1],
-            curpt_pos[0],
-            curlcc_pos[1],
-            curlcc_pos[0],
-        ),
-        MaplistProfile(
-            allpt_pos[1],
-            allpt_pos[0],
-            alllcc_pos[1],
-            alllcc_pos[0],
-        ),
-        maps,
+        await get_user_placements(id, 1),
+        await get_user_placements(id, 2),
+        await get_user_placements(id, 51),
+        await get_maps_created_by(id, conn=conn),
         comps,
-        medals,
+        await get_user_medals(id, conn=conn),
     )
 
 

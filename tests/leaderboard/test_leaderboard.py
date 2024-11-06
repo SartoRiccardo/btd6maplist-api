@@ -82,30 +82,31 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     return points
 
 
-async def calc_lcc_count(
+async def calc_completion_count(
         user_id: int,
         formats: list[int],
         btd6ml_test_client,
         req_field: str = "placement_cur",
+        count_key: str = "current_lcc",
 ) -> int:
     async with btd6ml_test_client.get(
             f"/users/{user_id}/completions?formats={','.join(str(x) for x in formats)}"
     ) as resp:
         user_comps = sorted(
             (await resp.json())["completions"],
-            key=lambda x: (x["map"]["code"], x["current_lcc"]),
+            key=lambda x: (x["map"]["code"], x[count_key]),
             reverse=True,
         )
-    lcc_count = 0
+    comp_count = 0
     for i, comp in enumerate(user_comps):
         if req_field == "placement_cur" and comp["map"]["placement_cur"] not in range(1, 50):
             continue
         elif req_field == "difficulty" and comp["map"]["difficulty"] == -1:
             continue
 
-        if comp["current_lcc"] and (i == 0 or user_comps[i - 1]["map"]["code"] != comp["map"]["code"]):
-            lcc_count += 1
-    return lcc_count
+        if comp[count_key] and (i == 0 or user_comps[i - 1]["map"]["code"] != comp["map"]["code"]):
+            comp_count += 1
+    return comp_count
 
 
 async def get_lb_score(user_id: int, lb_format: int, value: str, btd6ml_test_client) -> int:
@@ -137,16 +138,58 @@ class TestLeaderboard:
     async def test_ml_lcc_leaderboard(self, btd6ml_test_client):
         """Test the maplist lcc leaderboard is correctly calculated"""
         USER_ID = 39
-        lcc_count = await calc_lcc_count(USER_ID, [1], btd6ml_test_client)
+        lcc_count = await calc_completion_count(USER_ID, [1], btd6ml_test_client)
         assert await get_lb_score(USER_ID, 1, "lccs", btd6ml_test_client) == lcc_count, \
             "User LCC count differs from expected"
 
     async def test_exp_lcc_leaderboard(self, btd6ml_test_client):
         """Test the expert lcc leaderboard is correctly calculated"""
         USER_ID = 46
-        lcc_count = await calc_lcc_count(USER_ID, [1, 51], btd6ml_test_client, req_field="difficulty")
+        lcc_count = await calc_completion_count(USER_ID, [1, 51], btd6ml_test_client, req_field="difficulty")
         assert await get_lb_score(USER_ID, 51, "lccs", btd6ml_test_client) == lcc_count, \
             "User LCC count differs from expected"
+
+    async def test_ml_no_geraldo_leaderboard(self, btd6ml_test_client):
+        """Test the maplist No Geraldo leaderboard is correctly calculated"""
+        USER_ID = 13
+        lcc_count = await calc_completion_count(USER_ID, [1], btd6ml_test_client, count_key="no_geraldo")
+        assert await get_lb_score(USER_ID, 1, "no_geraldo", btd6ml_test_client) == lcc_count, \
+            "User No Geraldo count differs from expected"
+
+    async def test_exp_no_geraldo_leaderboard(self, btd6ml_test_client):
+        """Test the expert No Geraldo leaderboard is correctly calculated"""
+        USER_ID = 41
+        lcc_count = await calc_completion_count(
+            USER_ID,
+            [1, 51],
+            btd6ml_test_client,
+            count_key="no_geraldo",
+            req_field="difficulty",
+        )
+
+        assert await get_lb_score(USER_ID, 51, "no_geraldo", btd6ml_test_client) == lcc_count, \
+            "User No Geraldo count differs from expected"
+
+    async def test_ml_black_border_leaderboard(self, btd6ml_test_client):
+        """Test the maplist Black Border leaderboard is correctly calculated"""
+        USER_ID = 11
+        lcc_count = await calc_completion_count(USER_ID, [1], btd6ml_test_client, count_key="black_border")
+        assert await get_lb_score(USER_ID, 1, "black_border", btd6ml_test_client) == lcc_count, \
+            "User Black Border count differs from expected"
+
+    async def test_exp_black_border_leaderboard(self, btd6ml_test_client):
+        """Test the expert Black Border leaderboard is correctly calculated"""
+        USER_ID = 39
+        lcc_count = await calc_completion_count(
+            USER_ID,
+            [1, 51],
+            btd6ml_test_client,
+            count_key="black_border",
+            req_field="difficulty",
+        )
+
+        assert await get_lb_score(USER_ID, 51, "black_border", btd6ml_test_client) == lcc_count, \
+            "User Black Border count differs from expected"
 
 
 @pytest.mark.completions

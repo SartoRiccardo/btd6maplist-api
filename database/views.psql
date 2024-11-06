@@ -40,7 +40,7 @@ ORDER BY r.map, r.format, lcc.leftover DESC, r.created_on ASC;
 -- Points LB --
 ---------------
 
-CREATE OR REPLACE VIEW list_curver_leaderboard AS
+CREATE OR REPLACE VIEW leaderboard_maplist_points AS
 WITH config_values AS (
     SELECT
         (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
@@ -103,7 +103,7 @@ FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
 
 
-CREATE OR REPLACE VIEW list_allver_leaderboard AS
+CREATE OR REPLACE VIEW leaderboard_maplist_all_points AS
 WITH config_values AS (
     SELECT
         (SELECT value::float FROM config WHERE name='points_multi_bb') AS points_multi_bb,
@@ -167,7 +167,7 @@ ORDER BY placement ASC, user_id DESC;
 -- LCC LB --
 ------------
 
-CREATE OR REPLACE VIEW list_curver_lcclb AS
+CREATE OR REPLACE VIEW leaderboard_maplist_lccs AS
 WITH config_values AS (
     SELECT
         (SELECT value::int FROM config WHERE name='map_count') AS map_count
@@ -194,7 +194,7 @@ FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
 
 
-CREATE OR REPLACE VIEW list_allver_lcclb AS
+CREATE OR REPLACE VIEW leaderboard_maplist_all_lccs AS
 WITH config_values AS (
     SELECT
         (SELECT value::int FROM config WHERE name='map_count') AS map_count
@@ -225,7 +225,7 @@ ORDER BY placement ASC, user_id DESC;
 -- Expert List LBs --
 ---------------------
 
-CREATE OR REPLACE VIEW experts_leaderboard AS
+CREATE OR REPLACE VIEW leaderboard_experts_points AS
 WITH diff_points AS (
     SELECT *
     FROM (
@@ -269,7 +269,7 @@ FROM leaderboard
 ORDER BY placement ASC, user_id DESC;
 
 
-CREATE OR REPLACE VIEW experts_lcc_leaderboard AS
+CREATE OR REPLACE VIEW leaderboard_experts_lccs AS
 WITH valid_lccs AS (
     SELECT DISTINCT ON (map) *
     FROM lccs_by_map
@@ -290,6 +290,159 @@ leaderboard AS (
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
     GROUP BY lcp.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+
+--------------------
+-- No Geraldo LBs --
+--------------------
+
+CREATE OR REPLACE VIEW leaderboard_maplist_no_geraldo AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.no_geraldo
+        AND r.format = 1
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.placement_curver BETWEEN 1 AND (SELECT value::int FROM config WHERE name='map_count')
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+CREATE OR REPLACE VIEW leaderboard_maplist_all_no_geraldo AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.no_geraldo
+        AND (r.format = 1 OR r.format = 2)
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.placement_allver BETWEEN 1 AND (SELECT value::int FROM config WHERE name='map_count')
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+CREATE OR REPLACE VIEW leaderboard_experts_no_geraldo AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.no_geraldo
+        AND (r.format BETWEEN 51 AND 100 OR r.format = 1)
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.difficulty >= 0
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+----------------------
+-- Black Border LBs --
+----------------------
+
+CREATE OR REPLACE VIEW leaderboard_maplist_black_border AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.black_border
+        AND r.format = 1
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.placement_curver BETWEEN 1 AND (SELECT value::int FROM config WHERE name='map_count')
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+CREATE OR REPLACE VIEW leaderboard_maplist_all_black_border AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.black_border
+        AND (r.format = 1 OR r.format = 2)
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.placement_allver BETWEEN 1 AND (SELECT value::int FROM config WHERE name='map_count')
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
+)
+SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
+FROM leaderboard
+ORDER BY placement ASC, user_id DESC;
+
+CREATE OR REPLACE VIEW leaderboard_experts_black_border AS
+WITH no_geraldo_completions AS (
+    SELECT DISTINCT r.map, lcp.user_id
+    FROM list_completions r
+    JOIN listcomp_players lcp
+        ON r.id = lcp.run
+    WHERE r.black_border
+        AND (r.format BETWEEN 51 AND 100 OR r.format = 1)
+        AND r.accepted_by IS NOT NULL
+        AND r.deleted_on IS NULL
+),
+leaderboard AS (
+    SELECT r.user_id, COUNT(*) AS score
+    FROM no_geraldo_completions r
+    JOIN maps m
+        ON r.map = m.code
+    WHERE m.difficulty >= 0
+        AND m.deleted_on IS NULL
+    GROUP BY r.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
 FROM leaderboard
