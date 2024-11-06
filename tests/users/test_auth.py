@@ -57,7 +57,7 @@ class TestAuth:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
-    async def test_new_user(self, btd6ml_test_client, mock_discord_api):
+    async def test_new_user(self, btd6ml_test_client, mock_discord_api, calc_usr_placements):
         """Test logging in as a new user creates a new Maplist account"""
         USER_ID = 2000000
         USERNAME = "test_new_usr"
@@ -74,10 +74,7 @@ class TestAuth:
         expected_maplist_profile = {
             "id": str(USER_ID),
             "name": USERNAME,
-            "maplist": {
-                "all": {"lccs": 0.0, "lccs_placement": None, "points": 0.0, "pts_placement": None},
-                "current": {"lccs": 0.0, "lccs_placement": None, "points": 0.0, "pts_placement": None},
-            },
+            "maplist": await calc_usr_placements(None),
             "medals": {"black_border": 0, "no_geraldo": 0, "lccs": 0, "wins": 0},
             "created_maps": [],
             "avatarURL": None,

@@ -1,10 +1,9 @@
 from aiohttp import web
 import math
 import http
-from src.db.queries.leaderboard import (
-    get_maplist_leaderboard,
-    get_maplist_lcc_leaderboard,
-)
+from src.db.queries.leaderboard import get_leaderboard
+from src.db.queries.subqueries import LeaderboardType
+from typing import get_args
 from src.utils.misc import MAPLIST_FORMATS
 
 
@@ -69,9 +68,10 @@ async def get(request: web.Request):
     value = "points"
     if "value" in request.query:
         value = request.query["value"].lower()
-        if value not in ["points", "lccs"]:
+        valid_args = get_args(LeaderboardType)
+        if value not in valid_args:
             return web.json_response(
-                {"error": 'Allowed values for "value": ["points", "lccs"]'},
+                {"error": f"Allowed values for value: {valid_args}"},
                 status=http.HTTPStatus.BAD_REQUEST,
             )
 
@@ -82,16 +82,13 @@ async def get(request: web.Request):
         )
     page = max(1, int(request.query.get("page", "1")))
 
-    pages = 1
-    if value == "points":
-        lb, total = await get_maplist_leaderboard(
-            format=ml_format,
-            amount=PAGE_ENTRIES,
-            idx_start=PAGE_ENTRIES * (page-1),
-        )
-        pages = math.ceil(total/PAGE_ENTRIES)
-    else:
-        lb, total = await get_maplist_lcc_leaderboard(format=ml_format)
+    lb, total = await get_leaderboard(
+        format=ml_format,
+        amount=PAGE_ENTRIES,
+        idx_start=PAGE_ENTRIES * (page-1),
+        type=value,
+    )
+    pages = math.ceil(total/PAGE_ENTRIES)
 
     return web.json_response({
         "total": total,

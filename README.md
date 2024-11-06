@@ -3,6 +3,7 @@
 This is the branch for testing the website. This branch holds the special `/reset-test` route that resets the database with the test data.
 
 In case for some reason this branch is not up-to-date with `main`, just merge it.
+
 ```bash
 git checkout main-test
 git merge main
@@ -13,5 +14,10 @@ Note that the `/database/data` is not meant to seed data the API's tests, but th
 
 ## Usage
 
-Compile `config.py` like you would normally in the `main` branch, and start it. `config.test.py` can also be compiled to override some variables in `config.py`, should you want to.
+Simply create the route you wanna make in the `api` folder, and at the endpoint create the file `route.py`. There, you can define functions `get`, `post`, `put` or `delete`, which will be automatically added as routes. To create bot routes, the filename must be `bot.py` instead, and the suffix `/bot` will be appended to the route.
+
+## Testing
+
+To test the application, you must make a `config.test.py` where you override values in `config.py`. You don't have to put every config there, just the ones you want to override.
 - You need an empty PostgreSQL database. The testing suit will automatically wipe and initialize it and use it.
+- You need to create `tests/btd6maplist-bot.test.pem` with the method described above, for Bot Route tests.

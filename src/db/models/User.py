@@ -86,11 +86,29 @@ class MaplistProfile:
         type: integer
         nullable: true
         description: Placement on the LCC leaderboard.
+      no_geraldo:
+        type: integer
+        description: Number of No Optimal Hero completions.
+      no_geraldo_placement:
+        type: integer
+        nullable: true
+        description: Placement on the No Optimal Hero leaderboard.
+      black_border:
+        type: integer
+        description: Number of Black Border runs.
+      black_border_placement:
+        type: integer
+        nullable: true
+        description: Placement on the Black Border leaderboard.
     """
     points: int
-    pts_placement: int
+    pts_placement: int | None
     lccs: int
-    lccs_placement: int
+    lccs_placement: int | None
+    no_geraldo: int
+    no_geraldo_placement: int | None
+    black_border: int
+    black_border_placement: int | None
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +116,10 @@ class MaplistProfile:
             "pts_placement": self.pts_placement,
             "lccs": self.lccs,
             "lccs_placement": self.lccs_placement,
+            "no_geraldo": self.no_geraldo,
+            "no_geraldo_placement": self.no_geraldo_placement,
+            "black_border": self.black_border,
+            "black_border_placement": self.black_border_placement,
         }
 
 
@@ -140,9 +162,11 @@ class User(PartialUser):
     - $ref: "#/components/schemas/PartialUser"
     - type: object
       properties:
-        maplist_cur:
+        current:
           $ref: "#/components/schemas/MaplistProfile"
-        maplist_all:
+        all:
+          $ref: "#/components/schemas/MaplistProfile"
+        experts:
           $ref: "#/components/schemas/MaplistProfile"
         created_maps:
           type: array
@@ -158,6 +182,7 @@ class User(PartialUser):
     """
     maplist_cur: MaplistProfile
     maplist_all: MaplistProfile
+    expert_plc: MaplistProfile
     created_maps: list["src.db.models.maps.PartialMap"]
     completions: list[ListCompletion]
     medals: MaplistMedals
@@ -172,6 +197,7 @@ class User(PartialUser):
             "maplist": {
                 "current": self.maplist_cur.to_dict(),
                 "all": self.maplist_all.to_dict(),
+                "experts": self.expert_plc.to_dict(),
             },
             "created_maps": [m.to_dict() for m in self.created_maps],
             "medals": self.medals.to_dict(),
