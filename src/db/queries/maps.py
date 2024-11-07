@@ -24,7 +24,7 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
                 ({get_int_config("map_count")}) AS map_count
         ),
         verified_current AS (
-            SELECT map, (COUNT(map) > 0) AS is_verified
+            SELECT DISTINCT map
             FROM verifications
             CROSS JOIN config_vars
             WHERE version=current_btd6_ver
@@ -33,7 +33,7 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
         SELECT
             name,
             m.code,
-            is_verified IS NOT NULL,
+            vc.map IS NOT NULL,
             placement_allver,
             placement_curver,
             map_preview_url
@@ -53,14 +53,36 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
 
 @postgres
 async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
-    payload = await conn.fetch("""
-        SELECT name, code, difficulty, map_preview_url
-        FROM maps
+    payload = await conn.fetch(
+        f"""
+        WITH verified_current AS (
+            SELECT DISTINCT map
+            FROM verifications
+            WHERE version = ({get_int_config("current_btd6_ver")})
+            GROUP BY map
+        )
+        SELECT
+            m.name,
+            m.code,
+            m.difficulty,
+            m.map_preview_url,
+            vc.map IS NOT NULL AS verified
+        FROM maps m
+        LEFT JOIN verified_current vc
+            ON m.id = vc.map
         WHERE difficulty > -1
             AND deleted_on IS NULL
-    """)
+        """
+    )
+
     return [
-        PartialExpertMap(row[0], row[1], row[2], row[3])
+        PartialExpertMap(
+            row["name"],
+            row["code"],
+            row["difficulty"],
+            row["map_preview_url"],
+            row["verified"],
+        )
         for row in payload
     ]
 

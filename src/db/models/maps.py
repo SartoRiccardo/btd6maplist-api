@@ -15,6 +15,9 @@ class PartialExpertMap:
         description: The code of the map.
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
+      verified:
+        type: boolean
+        description: "`true` if the map was verified in the current update."
       map_preview_url:
         type: string
         nullable: true
@@ -24,6 +27,7 @@ class PartialExpertMap:
     code: str
     difficulty: int
     map_preview_url: str | None
+    verified: bool
 
     def to_dict(self) -> dict:
         return {
@@ -32,6 +36,7 @@ class PartialExpertMap:
             "difficulty": self.difficulty,
             "map_preview_url": self.map_preview_url if self.map_preview_url else
                 f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
+            "verified": self.verified,
         }
 
 
