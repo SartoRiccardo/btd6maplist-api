@@ -6,7 +6,7 @@ from src.db.queries.search import search
 from src.db.models import PartialMap, PartialUser
 
 LIMIT_DEFAULT = 5
-MIN_Q_LENGTH = 3
+MIN_Q_LENGTH = 1
 
 
 async def get(

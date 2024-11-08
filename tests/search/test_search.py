@@ -59,7 +59,7 @@ class TestSearch:
             assert "errors" in resp_data and "q" in resp_data["errors"], \
                 "query not in response.errors when not providing a query"
 
-        async with btd6ml_test_client.get("/search?q=32&limit=10") as resp:
+        async with btd6ml_test_client.get("/search?q=&limit=10") as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                 f"Searching returned {resp.status} when providing a query too short"
             resp_data = await resp.json()
