@@ -30,7 +30,7 @@ async def get(
             req_entities.pop(i)
 
     try:
-        limit = int(request.query.get("limit", str(LIMIT_DEFAULT)))
+        limit = min(50, int(request.query.get("limit", str(LIMIT_DEFAULT))))
     except ValueError:
         limit = LIMIT_DEFAULT
 
@@ -42,5 +42,5 @@ async def get(
     results = await search(request.query["q"], req_entities, limit)
     return web.json_response([
         {"type": types_str[type(res)], "data": res.to_dict()}
-        for res in results
+        for similarity, res in results
     ])
