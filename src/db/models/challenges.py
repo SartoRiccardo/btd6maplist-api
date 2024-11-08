@@ -109,7 +109,7 @@ class ListCompletion:
     subm_notes: str | None
 
     def to_dict(self) -> dict:
-        user_list = self.user_ids
+        user_list = [u for u in self.user_ids if u is not None]
         if len(user_list):
             if isinstance(user_list[0], int):
                 user_list = sorted(str(usr) for usr in user_list)
