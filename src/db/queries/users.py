@@ -154,7 +154,11 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
                 AND r.new_version IS NULL
         )
         SELECT
-            rwf.id AS run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc, rwf.format
+            rwf.map,
+            rwf.format,
+            BOOL_OR(rwf.black_border) AS black_border,
+            BOOL_OR(rwf.no_geraldo) AS no_geraldo,
+            BOOL_OR(rwf.current_lcc) AS current_lcc
         FROM runs_with_flags rwf
         JOIN listcomp_players ply
             ON ply.run = rwf.id
@@ -162,13 +166,14 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
             ON m.code = rwf.map
         WHERE ply.user_id = $1
             AND m.deleted_on IS NULL
+        GROUP BY (rwf.map, rwf.format)
         """,
         uid
     )
 
     return [
         ListCompletion(
-            run["run_id"],
+            0,
             run["map"],
             [uid],
             run["black_border"],

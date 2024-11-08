@@ -13,7 +13,7 @@ exp_map_schema = {
     "name": str,
     "code": str,
     "map_preview_url": str,
-    # "verified": bool,
+    "verified": bool,
     "difficulty": int,
 }
 

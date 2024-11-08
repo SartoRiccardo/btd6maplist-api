@@ -29,7 +29,7 @@ class DiscordRequests:
     @staticmethod
     async def patch_webhook(hook_url: str, message_id: str, data: dict) -> bool:
         hook_url = f"{hook_url}/messages/{message_id}"
-        async with src.http.http.post(hook_url, json=data) as resp:
+        async with src.http.http.patch(hook_url, json=data) as resp:
             return resp.ok
 
     @staticmethod

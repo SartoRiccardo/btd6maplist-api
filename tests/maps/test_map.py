@@ -1,6 +1,5 @@
 import http
 import pytest
-import requests
 from ..mocks import DiscordPermRoles
 from ..testutils import to_formdata, fuzz_data, invalidate_field
 
