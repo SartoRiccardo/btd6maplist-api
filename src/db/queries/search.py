@@ -77,4 +77,4 @@ async def search(
             for row in payload
         ]
 
-    return sorted(results, key=lambda x: x[0], reverse=True)
+    return sorted(results, key=lambda x: x[0], reverse=True)[:limit]

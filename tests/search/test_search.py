@@ -14,9 +14,9 @@ map_schema = {
     "placement_cur": int,
     "difficulty": int,
     "r6_start": str | None,
-    "map_data": None,
+    "map_data": str | None,
     "optimal_heros": [str],
-    "deleted_on": None,
+    "deleted_on": int | None,
     "created_on": int,
     "map_preview_url": str
 }
@@ -49,6 +49,22 @@ class TestSearch:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Searching returned {resp.status}"
             self.assert_results(await resp.json(), ["user", "map"])
+
+        limit = 3
+        async with btd6ml_test_client.get(f"/search?q=usr&limit={limit}&type=user") as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Searching returned {resp.status}"
+            results = await resp.json()
+            self.assert_results(results, ["user"])
+            assert len(results) == limit, "Length of results differs from expected"
+
+        limit = 1000
+        async with btd6ml_test_client.get(f"/search?q=usr&limit={limit}&type=user") as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Searching returned {resp.status}"
+            results = await resp.json()
+            self.assert_results(results, ["user"])
+            assert len(results) == 50, "Length of results differs from expected"
 
     async def test_invalid_query(self, btd6ml_test_client):
         """Tests the search not working for missing or invalid queries"""
