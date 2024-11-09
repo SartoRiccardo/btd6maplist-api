@@ -146,7 +146,6 @@ def require_perms(
                 cannot_submit = cannot_submit or role.cannot_submit
                 requires_recording = requires_recording or role.requires_recording
 
-            print(roles)
             if not (is_admin or is_explist_mod or is_list_mod) and throw_on_permless:
                 return web.json_response(
                     {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
