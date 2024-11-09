@@ -1,6 +1,8 @@
 import pytest
 import http
 
+HEADERS = {"Authorization": "Bearer test_token"}
+
 
 @pytest.mark.users
 class TestAuth:
@@ -34,17 +36,16 @@ class TestAuth:
             "created_maps": expected_created_maps,
         }
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Trying to log in returns {resp.status}"
             resp_data = await resp.json()
-            resp_data["maplist_profile"]["completions"] = sorted(
-                resp_data["maplist_profile"]["completions"],
+            resp_data["completions"] = sorted(
+                resp_data["completions"],
                 key=lambda x: (x["map"], x["black_border"], x["no_geraldo"], x["current_lcc"], x["format"]),
             )
 
-            assert resp_data["maplist_profile"] == expected_maplist_profile, \
-                "Maplist profile differs from expected"
+            assert resp_data == expected_maplist_profile, "Maplist profile differs from expected"
 
     async def test_invalid_token(self, btd6ml_test_client, mock_auth):
         """Test using an invalid Discord Token to log in"""
@@ -53,7 +54,7 @@ class TestAuth:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
@@ -67,7 +68,7 @@ class TestAuth:
             assert resp.status == http.HTTPStatus.NOT_FOUND, \
                 f"Getting unknown user returns {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Authenticating as a new user returns {resp.status}"
 

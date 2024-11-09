@@ -170,7 +170,7 @@ def require_perms(
 def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
     Must be used with `with_maplist_profile`, `check_bot_signature`, or `with_discord_profile` beforehand.
-    Adds an user to the dabatase if it's not there already.
+    Adds a user to the dabatase if it's not there already.
     """
     @wraps(handler)
     async def wrapper(request: web.Request, *args, **kwargs_caller):

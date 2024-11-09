@@ -117,11 +117,11 @@ async def post(
 
     errors = {}
     if not is_admin:
-        if json_body["difficulty"] != -1 and not is_explist_mod:
+        if "difficulty" in json_body and json_body["difficulty"] != -1 and not is_explist_mod:
             errors["difficulty"] = "You are not an Expert List moderator"
-        if json_body["placement_allver"] != -1 and not is_maplist_mod:
+        if "placement_allver" in json_body and json_body["placement_allver"] != -1 and not is_maplist_mod:
             errors["placement_allver"] = "You are not a List moderator"
-        if json_body["placement_curver"] != -1 and not is_maplist_mod:
+        if "placement_curver" in json_body and json_body["placement_curver"] != -1 and not is_maplist_mod:
             errors["placement_curver"] = "You are not a List moderator"
     if len(errors):
         return web.json_response(
