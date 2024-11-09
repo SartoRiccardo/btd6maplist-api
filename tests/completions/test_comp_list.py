@@ -176,7 +176,7 @@ class TestCompletionList:
 
         await self.assert_empty_pages(btd6ml_test_client, f"/users/42/completions?formats=1,51,2&page={expected_pages+1}")
 
-    async def test_own_completions_on(self, btd6ml_test_client, mock_discord_api):
+    async def test_own_completions_on(self, btd6ml_test_client, mock_auth):
         """Test getting a user's own completions on a map"""
         TEST_UID = 8
         TEST_CODE = "MLXXXBA"
@@ -185,7 +185,7 @@ class TestCompletionList:
         fmt2 = 1
         expected_total = 5 - (1+1+fmt2)
 
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with btd6ml_test_client.get(f"/maps/{TEST_CODE}/completions/@me") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Getting own completions when not authed returns {resp.status}"
@@ -194,7 +194,7 @@ class TestCompletionList:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Getting own completions with an invalid token returns {resp.status}"
 
-        mock_discord_api(user_id=TEST_UID)
+        await mock_auth(user_id=TEST_UID)
         async with btd6ml_test_client.get(f"/maps/{TEST_CODE}/completions/@me", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Getting own completions authenticated returns {resp.status}"

@@ -11,11 +11,11 @@ import src.log
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def put(
         request: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
         is_maplist_mod: bool = False,
         is_explist_mod: bool = False,
@@ -72,7 +72,7 @@ async def put(
 
     data = await get_completion_request(
         request,
-        maplist_profile,
+        discord_profile["id"],
         is_maplist_mod=is_maplist_mod,
         is_explist_mod=is_explist_mod,
         resource=resource,
@@ -87,8 +87,8 @@ async def put(
         data["format"],
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
-        accept=int(maplist_profile["user"]["id"]),
+        accept=int(discord_profile["id"]),
     )
     asyncio.create_task(update_run_webhook(resource))
-    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"]))
+    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

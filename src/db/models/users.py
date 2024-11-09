@@ -3,6 +3,26 @@ from .challenges import ListCompletion
 
 
 @dataclass
+class Role:
+    """
+    type: object
+    properties:
+      id:
+        type: integer
+        description: The ID of the role.
+      name:
+        type: string
+        description: The name of the role.
+    """
+    id: int
+    name: str
+    edit_maplist: bool
+    edit_experts: bool
+    requires_recording: bool
+    cannot_submit: bool
+
+
+@dataclass
 class PartialUser:
     """
     type: object

@@ -194,9 +194,9 @@ class TestLeaderboard:
 
 @pytest.mark.completions
 class TestRecalc:
-    async def test_config_recalc(self, btd6ml_test_client, mock_discord_api):
+    async def test_config_recalc(self, btd6ml_test_client, mock_auth):
         """Test the point leaderboards are updated on config var changes"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_config = {
             "exp_points_casual": 10,
@@ -228,10 +228,10 @@ class TestRecalc:
         assert await get_lb_score(user_id, 51, "points", btd6ml_test_client) == points, \
             "Experts user points differ from expected"
 
-    async def test_submission_recalc(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_submission_recalc(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                      assert_state_unchanged):
         """Test the point leaderboards are NOT updated on unaccepted submissions"""
-        mock_discord_api()
+        await mock_auth()
 
         subm_image = save_image(1)
         req_subm = {
@@ -256,10 +256,10 @@ class TestRecalc:
             async with btd6ml_test_client.post("/maps/MLXXXEB/completions/submit", headers=HEADERS, data=req_form) as resp:
                 assert resp.status == http.HTTPStatus.CREATED, f"Submitting a completion returned {resp.status}"
 
-    async def test_placement_change_recalc(self, btd6ml_test_client, mock_discord_api, map_payload):
+    async def test_placement_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the maplist point leaderboard is updated on placement changes"""
         USER_ID = 47
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         async with btd6ml_test_client.get("/maps/1") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Getting a map returned {resp.status}"
@@ -274,10 +274,10 @@ class TestRecalc:
         assert await get_lb_score(USER_ID, 1, "points", btd6ml_test_client) == points, \
             "User points differ from expected"
 
-    async def test_diff_change_recalc(self, btd6ml_test_client, mock_discord_api, map_payload):
+    async def test_diff_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the experts point leaderboard is updated on placement changes"""
         USER_ID = 1
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         async with btd6ml_test_client.get(f"/users/{USER_ID}/completions") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Get a user's completions returned {resp.status}"

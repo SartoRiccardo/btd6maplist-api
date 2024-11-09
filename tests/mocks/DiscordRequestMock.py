@@ -8,7 +8,7 @@ class DiscordPermRoles:
     ADMIN = 0b00001
     MAPLIST_MOD = 0b00010
     EXPLIST_MOD = 0b00100
-    BANNED = 0b0100
+    BANNED = 0b01000
     NEEDS_RECORDING = 0b10000
 
 

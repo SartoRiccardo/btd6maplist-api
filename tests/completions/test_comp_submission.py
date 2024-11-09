@@ -10,7 +10,7 @@ HEADERS = {"Authorization": "Bearer test_token"}
 
 @pytest.mark.post
 @pytest.mark.submissions
-async def test_submit_completion(btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image):
+async def test_submit_completion(btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
     """Test a valid completion submission"""
     SUBMITTER_ID = 30
 
@@ -40,7 +40,7 @@ async def test_submit_completion(btd6ml_test_client, mock_discord_api, comp_subm
         "subm_notes": None,
     }
 
-    mock_discord_api(user_id=SUBMITTER_ID)
+    await mock_auth(user_id=SUBMITTER_ID)
     req_submission = comp_subm_payload()
     req_submission["video_proof_url"] = proof_urls
     req_form = to_formdata(req_submission)
@@ -59,7 +59,7 @@ async def test_submit_completion(btd6ml_test_client, mock_discord_api, comp_subm
 
 @pytest.mark.post
 @pytest.mark.submissions
-async def test_multi_images_urls(btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image):
+async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
     """Test a submission including multiple images and/or video urls"""
     SUBMITTER_ID = 28
 
@@ -89,7 +89,7 @@ async def test_multi_images_urls(btd6ml_test_client, mock_discord_api, comp_subm
         "subm_notes": "Test Submission Notes",
     }
 
-    mock_discord_api(user_id=SUBMITTER_ID)
+    await mock_auth(user_id=SUBMITTER_ID)
     req_submission = {
         **comp_subm_payload(),
         "notes": "Test Submission Notes",
@@ -116,10 +116,10 @@ async def test_multi_images_urls(btd6ml_test_client, mock_discord_api, comp_subm
 @pytest.mark.submissions
 class TestValidateCompletion:
     @pytest.mark.users
-    async def test_new_user(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image):
+    async def test_new_user(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
         """Test submitting as a new user"""
         SUBMITTING_UID = 2000000
-        mock_discord_api(user_id=SUBMITTING_UID, username="test_comp_submitter")
+        await mock_auth(user_id=SUBMITTING_UID, username="test_comp_submitter")
 
         req_form = to_formdata(comp_subm_payload())
         req_form.add_field("proof_completion", save_image(1).open("rb"))
@@ -136,10 +136,10 @@ class TestValidateCompletion:
                 assert user_data["id"] == str(SUBMITTING_UID), "User ID differs from submitter's"
                 assert user_data["name"] == "test_comp_submitter", "Username differs from submitter's"
 
-    async def test_required_proof(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_required_proof(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                   assert_state_unchanged):
         """Test submitting a map without the required optional fields"""
-        mock_discord_api()
+        await mock_auth()
 
         proof_file = save_image(5, filename="pc1.png")
 
@@ -198,7 +198,7 @@ class TestValidateCompletion:
                 assert "leftover" in error_info["errors"], \
                     "leftover is not in errors"
 
-            mock_discord_api(perms=DiscordPermRoles.NEEDS_RECORDING)
+            await mock_auth(perms=DiscordPermRoles.NEEDS_RECORDING)
             req_submission = comp_subm_payload()
             req_form = to_formdata(req_submission)
             req_form.add_field("proof_completion", proof_file.open("rb"))
@@ -213,7 +213,7 @@ class TestValidateCompletion:
                 assert "errors" in error_info and "video_proof_url" in error_info["errors"], \
                     "video_proof_url is not in errors"
 
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_missing_fields(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                   assert_state_unchanged):
         """Test a submission without the required fields"""
         req_form = to_formdata(comp_subm_payload())
@@ -232,10 +232,10 @@ class TestValidateCompletion:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" was not in response.errors"
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_unauthorized(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test a submission from an unauthorized user, or one not in the Maplist Discord"""
         async with assert_state_unchanged("/completions/unapproved"):
-            mock_discord_api(unauthorized=True)
+            await mock_auth(unauthorized=True)
             async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit") as resp:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                     f"Submitting a completion with no Authorization header returns {resp.status}"
@@ -243,12 +243,7 @@ class TestValidateCompletion:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                     f"Submitting a completion with an invalid token returns {resp.status}"
 
-            mock_discord_api(in_maplist=False)
-            async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit", headers=HEADERS) as resp:
-                assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
-                    f"Submitting a completion with an invalid token returns {resp.status}"
-
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                         assert_state_unchanged):
         """Sets all properties to every possible value, one by one"""
         subm_img = save_image(2)
@@ -262,7 +257,7 @@ class TestValidateCompletion:
             "notes": [str],
         }
 
-        mock_discord_api()
+        await mock_auth()
         for req_data, path, sub_value in fuzz_data(full_comp_data, extra_expected):
             async with assert_state_unchanged("/completions/unapproved"):
                 req_form = to_formdata(req_data)
@@ -278,18 +273,18 @@ class TestValidateCompletion:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" was not in response.errors"
 
-    async def test_forbidden(self, assert_state_unchanged, mock_discord_api, btd6ml_test_client):
+    async def test_forbidden(self, assert_state_unchanged, mock_auth, btd6ml_test_client):
         """Test a submission from a user banned from submitting"""
         async with assert_state_unchanged("/completions/unapproved"):
-            mock_discord_api(perms=DiscordPermRoles.BANNED)
+            await mock_auth(perms=DiscordPermRoles.BANNED)
             async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit") as resp:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                     f"Submitting a completion with no Authorization header returns {resp.status}"
 
-    async def test_submit_invalid(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_submit_invalid(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                   assert_state_unchanged):
         """Test setting fields to invalid values"""
-        mock_discord_api()
+        await mock_auth()
         proof_img = save_image(2)
         req_submission_data = {
             **comp_subm_payload(),
@@ -328,10 +323,10 @@ class TestValidateCompletion:
         for req_data, edited_path, error_msg in invalidate_field(req_submission_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_submit_invalid_formats(self, btd6ml_test_client, mock_discord_api, comp_subm_payload, save_image,
+    async def test_submit_invalid_formats(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                           assert_state_unchanged):
         """Test submitting to a deleted or pushed off the list map, or to an expert map"""
-        mock_discord_api()
+        await mock_auth()
         proof_img = save_image(2)
         req_submission_data = comp_subm_payload()
         req_submission_data["format"] = 3
@@ -378,10 +373,10 @@ class TestValidateCompletion:
 @pytest.mark.submissions
 class TestHandleSubmissions(CompletionTest):
     @pytest.mark.post
-    async def test_accept_submission(self, btd6ml_test_client, mock_discord_api, completion_payload,
+    async def test_accept_submission(self, btd6ml_test_client, mock_auth, completion_payload,
                                      assert_state_unchanged):
         """Test accepting (and editing) a submission"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         expected_value = {
             "id": 16,
@@ -421,10 +416,10 @@ class TestHandleSubmissions(CompletionTest):
                     f"Trying to accept an already accepted submission returns {resp.status}"
 
     @pytest.mark.post
-    async def test_invalid_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+    async def test_invalid_fields(self, btd6ml_test_client, mock_auth, completion_payload,
                                   assert_state_unchanged):
         """Test adding and editing a completion with invalid fields in the payload"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         req_completion_data = completion_payload()
 
         async def call_endpoints(
@@ -443,11 +438,11 @@ class TestHandleSubmissions(CompletionTest):
         await self._test_invalid_fields(req_completion_data, call_endpoints)
 
     @pytest.mark.post
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, completion_payload, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, completion_payload, assert_state_unchanged):
         """Sets all properties to every possible value, one by one"""
         await self._test_fuzz(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             completion_payload,
             assert_state_unchanged,
             endpoint_put="/completions/29/accept",
@@ -455,12 +450,12 @@ class TestHandleSubmissions(CompletionTest):
         )
 
     @pytest.mark.post
-    async def test_missing_fields(self, btd6ml_test_client, mock_discord_api, completion_payload,
+    async def test_missing_fields(self, btd6ml_test_client, mock_auth, completion_payload,
                                   assert_state_unchanged):
         """Test accepting and editing a completion with missing fields in the payload"""
         await self._test_missing_fields(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             completion_payload,
             assert_state_unchanged,
             endpoint_put="/completions/29/accept",
@@ -468,23 +463,23 @@ class TestHandleSubmissions(CompletionTest):
         )
 
     @pytest.mark.post
-    async def test_forbidden(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_forbidden(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test a user accepting a completion if they don't have perms"""
         await self._test_forbidden(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             endpoint_put="/completions/29/accept",
             endpoint_get_put="/completions/29",
         )
 
     @pytest.mark.post
-    async def test_accept_own(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+    async def test_accept_own(self, btd6ml_test_client, mock_auth, assert_state_unchanged,
                                   completion_payload):
         """Test accepting and editing one's own completion, or adding themselves to a completion"""
         await self._test_own_completion(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             completion_payload,
             endpoint_put_own="/completions/29/accept",
@@ -494,11 +489,11 @@ class TestHandleSubmissions(CompletionTest):
         )
 
     @pytest.mark.put
-    async def test_scoped_edit_perms(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+    async def test_scoped_edit_perms(self, btd6ml_test_client, mock_auth, assert_state_unchanged,
                                      completion_payload):
         """Test Maplist Mods accepting Expert List completions, and vice versa"""
         await self._test_scoped_edit_perms(
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             btd6ml_test_client,
             completion_payload,
@@ -507,19 +502,19 @@ class TestHandleSubmissions(CompletionTest):
             endpoint_get="/completions/11",
         )
         await self._test_scoped_edit_perms(
-                mock_discord_api,
-                assert_state_unchanged,
-                btd6ml_test_client,
-                completion_payload,
-                DiscordPermRoles.EXPLIST_MOD,
-                endpoint_put="/completions/4/accept",
-                endpoint_get="/completions/4",
+            mock_auth,
+            assert_state_unchanged,
+            btd6ml_test_client,
+            completion_payload,
+            DiscordPermRoles.EXPLIST_MOD,
+            endpoint_put="/completions/4/accept",
+            endpoint_get="/completions/4",
         )
 
     @pytest.mark.delete
-    async def test_reject_submission(self, btd6ml_test_client, mock_discord_api):
+    async def test_reject_submission(self, btd6ml_test_client, mock_auth):
         """Test rejecting a completion submission hard deletes it"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         async with btd6ml_test_client.delete("/completions/29", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a completion returns {resp.status}"

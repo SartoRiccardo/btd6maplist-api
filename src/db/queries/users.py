@@ -1,7 +1,7 @@
 import asyncio
 import src.db.connection
 from src.utils.misc import list_rm_dupe
-from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC, MaplistMedals
+from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC, MaplistMedals, Role
 from src.db.queries.subqueries import LeaderboardType, leaderboard_name
 postgres = src.db.connection.postgres
 
@@ -428,3 +428,32 @@ async def read_rules(uid: int, conn=None) -> None:
         """,
         uid
     )
+
+
+@postgres
+async def get_user_roles(uid: str | int, conn=None) -> list[Role]:
+    if isinstance(uid, str):
+        uid = int(uid)
+    payload = await conn.fetch(
+        """
+        SELECT
+            r.id, r.name, r.edit_maplist, r.edit_experts, r.requires_recording, r.cannot_submit
+        FROM roles r
+        JOIN user_roles ur
+            ON r.id = ur.role_id
+        WHERE ur.user_id = $1
+        """,
+        uid
+    )
+
+    return [
+        Role(
+            row["id"],
+            row["name"],
+            row["edit_maplist"],
+            row["edit_experts"],
+            row["requires_recording"],
+            row["cannot_submit"],
+        )
+        for row in payload
+    ]

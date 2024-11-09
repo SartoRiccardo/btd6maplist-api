@@ -26,13 +26,13 @@ async def validate_map_is_valid(json_body: dict) -> dict:
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_json_body(validate_map_is_valid)
 async def put(
         _r: web.Request,
         resource: "src.db.models.PartialMap" = None,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         is_explist_mod: bool = False,
         is_list_mod: bool = False,
         json_body: dict = None,
@@ -87,6 +87,6 @@ async def put(
         transfer_explist_comps=is_explist_mod,
     )
     asyncio.create_task(
-        src.log.log_action("completion", "put", resource.code, json_body["code"], maplist_profile["user"]["id"])
+        src.log.log_action("completion", "put", resource.code, json_body["code"], discord_profile["id"])
     )
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

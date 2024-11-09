@@ -13,9 +13,9 @@ HEADERS = {"Authorization": "Bearer test_token"}
 class TestBotReadRules:
     user_id = 8888
 
-    async def test_read_rules(self, btd6ml_test_client, mock_discord_api, sign_message, bot_user_payload):
+    async def test_read_rules(self, btd6ml_test_client, mock_auth, sign_message, bot_user_payload):
         """Test reding the rules"""
-        mock_discord_api(user_id=self.user_id)
+        await mock_auth(user_id=self.user_id)
         async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
             assert not (await resp.json())["maplist_profile"]["has_seen_popup"], "New user has seen popup"
 

@@ -7,8 +7,6 @@ import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
 from config import (
-    MAPLIST_LISTMOD_ID,
-    MAPLIST_EXPMOD_ID,
     WEBHOOK_EXPLIST_SUBM,
     WEBHOOK_LIST_SUBM,
 )
@@ -61,12 +59,14 @@ async def get(request: web.Request):
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs
 ) -> web.Response:
     """
@@ -109,7 +109,7 @@ async def post(
                   type: object
                   example: {}
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
     """
     json_body = await get_map_form(request, check_dup_code=True)
     if isinstance(json_body, web.Response):
@@ -117,11 +117,11 @@ async def post(
 
     errors = {}
     if not is_admin:
-        if json_body["difficulty"] != -1 and MAPLIST_EXPMOD_ID not in maplist_profile["roles"]:
+        if json_body["difficulty"] != -1 and not is_explist_mod:
             errors["difficulty"] = "You are not an Expert List moderator"
-        if json_body["placement_allver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
+        if json_body["placement_allver"] != -1 and not is_maplist_mod:
             errors["placement_allver"] = "You are not a List moderator"
-        if json_body["placement_curver"] != -1 and MAPLIST_LISTMOD_ID not in maplist_profile["roles"]:
+        if json_body["placement_curver"] != -1 and not is_maplist_mod:
             errors["placement_curver"] = "You are not a List moderator"
     if len(errors):
         return web.json_response(
@@ -143,5 +143,5 @@ async def post(
 
     await add_map(json_body)
     asyncio.create_task(update_submission_wh())
-    asyncio.create_task(src.log.log_action("map", "post", None, json_body, maplist_profile["user"]["id"]))
+    asyncio.create_task(src.log.log_action("map", "post", None, json_body, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.CREATED)

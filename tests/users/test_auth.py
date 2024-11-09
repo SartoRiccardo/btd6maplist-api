@@ -4,11 +4,11 @@ import http
 
 @pytest.mark.users
 class TestAuth:
-    async def test_get_self(self, btd6ml_test_client, mock_discord_api, calc_user_profile_medals,
+    async def test_get_self(self, btd6ml_test_client, mock_auth, calc_user_profile_medals,
                             calc_usr_placements):
         """Test getting one's own profile"""
         USER_ID = 37
-        mock_discord_api(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID)
 
         expected_created_map_ids = ["MLXXXAG", "MLXXXCJ"]
         expected_created_maps = []
@@ -46,9 +46,9 @@ class TestAuth:
             assert resp_data["maplist_profile"] == expected_maplist_profile, \
                 "Maplist profile differs from expected"
 
-    async def test_invalid_token(self, btd6ml_test_client, mock_discord_api):
+    async def test_invalid_token(self, btd6ml_test_client, mock_auth):
         """Test using an invalid Discord Token to log in"""
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with btd6ml_test_client.post("/auth") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
@@ -57,11 +57,11 @@ class TestAuth:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
-    async def test_new_user(self, btd6ml_test_client, mock_discord_api, calc_usr_placements):
+    async def test_new_user(self, btd6ml_test_client, mock_auth, calc_usr_placements):
         """Test logging in as a new user creates a new Maplist account"""
         USER_ID = 2000000
         USERNAME = "test_new_usr"
-        mock_discord_api(user_id=USER_ID, username=USERNAME)
+        await mock_auth(user_id=USER_ID, username=USERNAME)
 
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.NOT_FOUND, \

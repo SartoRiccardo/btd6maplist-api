@@ -26,11 +26,11 @@ def submission_payload():
 
 
 @pytest_asyncio.fixture
-async def assert_submit_map(btd6ml_test_client, mock_discord_api, valid_codes, save_image,
+async def assert_submit_map(btd6ml_test_client, mock_auth, valid_codes, save_image,
                             submission_payload, submission_formdata):
     """Submits a map and checks if it's there"""
     async def submit(code_idx: int):
-        mock_discord_api()
+        await mock_auth()
         data_str = json.dumps(submission_payload(valid_codes[code_idx]))
         proof_comp = save_image(2)
         req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
@@ -56,10 +56,10 @@ class TestSubmit:
         await assert_submit_map(self.CODE_IDX)
 
     @pytest.mark.post
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, valid_codes, save_image,
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, valid_codes, save_image,
                         submission_payload, submission_formdata):
         """Replaces every field with another datatype, one by one"""
-        mock_discord_api()
+        await mock_auth()
         CODE = valid_codes[3]
         proof_comp = save_image(2)
         req_map_data = submission_payload(CODE)
@@ -80,9 +80,9 @@ class TestSubmit:
 
     @pytest.mark.post
     async def test_submit_signature(self, btd6ml_test_client, save_image, partial_sign,
-                                    finish_sign, submission_payload, mock_discord_api):
+                                    finish_sign, submission_payload, mock_auth):
         """Test submitting a map with an invalid or missing signature"""
-        mock_discord_api()
+        await mock_auth()
         CODE = "INVALID"
 
         data_str = json.dumps(submission_payload(CODE))
@@ -107,10 +107,10 @@ class TestSubmit:
                 f"Submitting a map with an invalid signature returns {resp.status}"
 
     @pytest.mark.delete
-    async def test_reject_submission(self, btd6ml_test_client, mock_discord_api, bot_user_payload, sign_message,
+    async def test_reject_submission(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message,
                                      valid_codes):
         """Test rejecting a map submission"""
-        mock_discord_api()
+        await mock_auth()
         req_data = bot_user_payload(20)
         signature = sign_message(valid_codes[self.CODE_IDX] + json.dumps(req_data))
         req_data = {
@@ -126,10 +126,10 @@ class TestSubmit:
                     "Deleted map is still the most recently submitted"
 
     @pytest.mark.delete
-    async def test_reject_signature(self, mock_discord_api, btd6ml_test_client, bot_user_payload, sign_message,
+    async def test_reject_signature(self, mock_auth, btd6ml_test_client, bot_user_payload, sign_message,
                                     valid_codes):
         """Test rejecting a map submission with an invalid or missing signature"""
-        mock_discord_api()
+        await mock_auth()
         req_data = bot_user_payload(20)
         req_data = {"data": json.dumps(req_data)}
         async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/bot", json=req_data) as resp:

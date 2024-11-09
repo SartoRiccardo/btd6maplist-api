@@ -5,11 +5,11 @@ HEADERS = {"Authorization": "Bearer test_token"}
 
 
 @pytest.mark.users
-async def test_read_rules(btd6ml_test_client, mock_discord_api):
+async def test_read_rules(btd6ml_test_client, mock_auth):
     """Test reading the rules one or more times"""
     USER_ID = 2000000
     USERNAME = "test_new_usr"
-    mock_discord_api(user_id=USER_ID, username=USERNAME)
+    await mock_auth(user_id=USER_ID, username=USERNAME)
 
     async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
         assert resp.status == http.HTTPStatus.OK, \
