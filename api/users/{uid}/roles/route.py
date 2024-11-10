@@ -27,7 +27,9 @@ async def patch(
 ) -> web.Response:
     """
     ---
-    description: Modify a user's data.
+    description: |
+      Add or remove a user's roles. If a role is mentioned more than once, the DELETE command
+      will take priority.
     tags:
     - Users
     - Roles
