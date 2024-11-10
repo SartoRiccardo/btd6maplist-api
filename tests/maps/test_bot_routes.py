@@ -12,7 +12,7 @@ HEADERS = {"Authorization": "Bearer test_token"}
 def submission_payload():
     def generate(code: str):
         return {
-            "submitter": {
+            "user": {
                 "id": "20",
                 "username": "usr20",
                 "avatar_url": "https://image.com/1.png",
@@ -66,7 +66,7 @@ class TestSubmit:
         extra_expected = {"notes": [None]}
 
         for req_data, path, sub_value in fuzz_data(req_map_data, extra_expected):
-            if "submitter" in path:
+            if "user" in path:
                 continue
 
             data_str = json.dumps(req_data)

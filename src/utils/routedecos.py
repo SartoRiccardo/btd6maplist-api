@@ -123,16 +123,21 @@ def require_perms(
         throw_on_permless: bool = True,
 ):
     """
-    Must be used with `with_discord_profile` beforehand.
+    Must be used with `with_discord_profile` or `check_bot_signature` beforehand.
     Returns 403 if they don't have any perms.
     Adds `is_admin`, `is_maplist_mod`, `is_explist_mod`, `cannot_submit`, and `requires_recording` to kwargs.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs_caller):
-            if "discord_profile" not in kwargs_caller:
+            discord_profile = None
+            if "discord_profile" in kwargs_caller:
+                discord_profile = kwargs_caller["discord_profile"]
+            elif "json_data" in kwargs_caller:
+                discord_profile = kwargs_caller["json_data"]["user"]
+            if discord_profile is None:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-            roles = await get_user_roles(kwargs_caller["discord_profile"]["id"])
+            roles = await get_user_roles(discord_profile["id"])
 
             is_admin = False
             is_list_mod = False

@@ -6,14 +6,18 @@ import src.utils.routedecos
 from src.db.queries.completions import delete_completion
 import src.log
 from src.utils.embeds import update_run_webhook
+from src.utils.validators import validate_completion_perms
 
 
 @src.utils.routedecos.check_bot_signature(path_params=["cid"])
+@src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_resource_exists(get_completion, "cid")
 async def delete(
         _r: web.Request,
         resource: "src.db.models.ListCompletionWithMeta" = None,
         json_data: dict = None,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs,
 ) -> web.Response:
     """Only deletes if not `accepted_by`"""
@@ -22,6 +26,14 @@ async def delete(
             {"errors": {"": "This run was already accepted!"}},
             status=http.HTTPStatus.BAD_REQUEST,
         )
+
+    err_resp = validate_completion_perms(
+        is_maplist_mod,
+        is_explist_mod,
+        resource.format,
+    )
+    if isinstance(err_resp, web.Response):
+        return err_resp
 
     profile = json_data["user"]
     await delete_completion(resource.id, hard_delete=True)

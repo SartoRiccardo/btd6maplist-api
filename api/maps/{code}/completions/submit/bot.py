@@ -47,7 +47,7 @@ async def post(
             status=http.HTTPStatus.BAD_REQUEST,
         )
 
-    discord_profile = json_data["submitter"]
+    discord_profile = json_data["user"]
     proofs_finfo = await asyncio.gather(*[
         save_media(file[1], file[0].split(".")[-1])
         for file in files

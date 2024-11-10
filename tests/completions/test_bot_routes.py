@@ -4,13 +4,14 @@ import json
 import config
 import aiohttp
 from ..testutils import fuzz_data, invalidate_field
+from ..mocks import DiscordPermRoles
 
 
 @pytest.fixture
 def comp_subm_payload():
     def generate(user_id: int):
         return {
-            "submitter": {
+            "user": {
                 "id": str(user_id),
                 "username": f"usr{user_id}",
                 "avatar_url": "https://image.com",
@@ -32,8 +33,9 @@ class TestHandleSubmissions:
     async def test_reject_signature(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message):
         """Test rejecting a submission with an invalid or missing signature"""
         RUN_ID = 16
-        await mock_auth()
-        data = bot_user_payload(40)
+        USER_ID = 40
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
+        data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
 
         payload = {"data": data_str}
@@ -53,7 +55,7 @@ class TestHandleSubmissions:
         """Test rejecting a submission"""
         RUN_ID = 16
         USER_ID = 40
-        await mock_auth()
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -72,7 +74,7 @@ class TestHandleSubmissions:
         """Test rejecting a submission"""
         RUN_ID = 15
         USER_ID = 40
-        await mock_auth()
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -108,7 +110,7 @@ class TestHandleSubmissions:
         """Test accepting a submission, more than once"""
         RUN_ID = 11
         USER_ID = 40
-        await mock_auth()
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -130,6 +132,76 @@ class TestHandleSubmissions:
             async with btd6ml_test_client.put(f"/completions/{RUN_ID}/accept/bot", json=payload) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                     f"Accepting a completion more than once returns {resp.status}"
+
+    @pytest.mark.put
+    async def test_accept_perms(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message):
+        """Test accepting a completion without the proper authorization"""
+        USER_ID = 40
+        data = bot_user_payload(USER_ID)
+        data_str = json.dumps(data)
+
+        run_id = 89
+        signature = sign_message(f"{run_id}{data_str}".encode())
+        payload = {"data": data_str, "signature": signature}
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Accepting a Maplist completion as an Expert mod returns {resp.status}"
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Accepting a Maplist completion as a Maplist mod returns {resp.status}"
+
+        run_id = 104
+        signature = sign_message(f"{run_id}{data_str}".encode())
+        payload = {"data": data_str, "signature": signature}
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Accepting an Expert completion as a Maplist mod returns {resp.status}"
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Accepting an Expert completion as an Expert mod returns {resp.status}"
+
+    @pytest.mark.put
+    async def test_reject_perms(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message):
+        """Test rejecting a completion without the proper authorization"""
+        USER_ID = 40
+        data = bot_user_payload(USER_ID)
+        data_str = json.dumps(data)
+
+        run_id = 153
+        signature = sign_message(f"{run_id}{data_str}".encode())
+        payload = {"data": data_str, "signature": signature}
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Rejecting a Maplist completion as an Expert mod returns {resp.status}"
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Rejecting a Maplist completion as a Maplist mod returns {resp.status}"
+
+        run_id = 137
+        signature = sign_message(f"{run_id}{data_str}".encode())
+        payload = {"data": data_str, "signature": signature}
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Rejecting an Expert completion as a Maplist mod returns {resp.status}"
+
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Rejecting an Expert completion as an Expert mod returns {resp.status}"
 
 
 @pytest.mark.bot
@@ -241,7 +313,7 @@ class TestSubmission:
         extra_expected = {"notes": [str], "leftover": [int]}
 
         for req_data, path, sub_value in fuzz_data(req_subm_data, extra_expected):
-            if "submitter" in path:
+            if "user" in path:
                 continue
             if "leftover" in path:
                 req_data["current_lcc"] = True
