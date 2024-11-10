@@ -1,18 +1,17 @@
 CREATE TABLE roles(
     id SERIAL,
     name VARCHAR(255) NOT NULL,
-
     edit_maplist BOOLEAN DEFAULT FALSE,
     edit_experts BOOLEAN DEFAULT FALSE,
     requires_recording BOOLEAN DEFAULT FALSE,
     cannot_submit BOOLEAN DEFAULT FALSE,
-
     PRIMARY KEY(id)
 );
 
 CREATE TABLE role_grants(
     role_required BIGINT NOT NULL,
-    role_can_grant BIGINT NOT NULL
+    role_can_grant BIGINT NOT NULL,
+    PRIMARY KEY (role_required, role_can_grant)
 );
 ALTER TABLE role_grants ADD CONSTRAINT fk_roles_1
     FOREIGN KEY (role_required) REFERENCES roles(id) ON DELETE CASCADE;
@@ -21,7 +20,8 @@ ALTER TABLE role_grants ADD CONSTRAINT fk_roles_2
 
 CREATE TABLE user_roles(
     user_id BIGINT REFERENCES users(discord_id) ON DELETE CASCADE,
-    role_id BIGINT REFERENCES roles(id) ON DELETE CASCADE
+    role_id BIGINT REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
 );
 ALTER TABLE user_roles ADD CONSTRAINT fk_users_1
     FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;

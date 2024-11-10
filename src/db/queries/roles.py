@@ -30,3 +30,33 @@ async def get_roles(conn=None):
         )
         for row in payload
     ]
+
+
+@postgres
+async def add_roles(uid: str | int, role_ids: list[int], conn=None) -> None:
+    if isinstance(uid, str):
+        uid = int(uid)
+    await conn.executemany(
+        """
+        INSERT INTO user_roles
+            (user_id, role_id)
+        VALUES
+            ($1, $2)
+        ON CONFLICT DO NOTHING
+        """,
+        [(uid, rid) for rid in role_ids],
+    )
+
+
+@postgres
+async def remove_roles(uid: str | int, role_ids: list[int], conn=None) -> None:
+    if isinstance(uid, str):
+        uid = int(uid)
+    await conn.execute(
+        """
+        DELETE FROM user_roles
+        WHERE user_id = $1
+            AND role_id = ANY($2::int)
+        """,
+        uid, role_ids,
+    )
