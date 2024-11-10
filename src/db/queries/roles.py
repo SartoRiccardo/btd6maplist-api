@@ -56,7 +56,7 @@ async def remove_roles(uid: str | int, role_ids: list[int], conn=None) -> None:
         """
         DELETE FROM user_roles
         WHERE user_id = $1
-            AND role_id = ANY($2::int)
+            AND role_id = ANY($2::int[])
         """,
         uid, role_ids,
     )

@@ -71,10 +71,10 @@ def mock_discord_api():
     return set_mock
 
 
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def mock_auth(mock_discord_api):
+@pytest_asyncio.fixture(scope="function")
+async def set_roles():
     @src.db.connection.postgres
-    async def add_roles(uid: int | str, roles: list[int], conn=None) -> None:
+    async def fixture(uid: int | str, roles: list[int], conn=None) -> None:
         if isinstance(uid, str):
             uid = int(uid)
 
@@ -89,6 +89,11 @@ async def mock_auth(mock_discord_api):
             [(uid, role) for role in roles],
         )
 
+    return fixture
+
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def mock_auth(mock_discord_api, set_roles):
     @src.db.connection.postgres
     async def reset_roles(conn=None) -> None:
         await conn.execute("DELETE FROM user_roles")
@@ -103,13 +108,15 @@ async def mock_auth(mock_discord_api):
             DiscordPermRoles.EXPLIST_MOD: [5],
             DiscordPermRoles.NEEDS_RECORDING: [6],
             DiscordPermRoles.BANNED: [7],
+            DiscordPermRoles.MAPLIST_OWNER: [2],
+            DiscordPermRoles.EXPLIST_OWNER: [3],
         }
 
         roles = []
         for perm in perms:
             if perm & kwargs["perms"]:
                 roles += perms[perm]
-        await add_roles(mocker.user_id, list(set(roles)))
+        await set_roles(mocker.user_id, list(set(roles)))
 
     await reset_roles()
     return set_mock

@@ -5,11 +5,13 @@ import random
 
 
 class DiscordPermRoles:
-    ADMIN = 0b00001
-    MAPLIST_MOD = 0b00010
-    EXPLIST_MOD = 0b00100
-    BANNED = 0b01000
-    NEEDS_RECORDING = 0b10000
+    ADMIN = 2 ** 0
+    MAPLIST_MOD = 2 ** 1
+    EXPLIST_MOD = 2 ** 2
+    BANNED = 2 ** 3
+    NEEDS_RECORDING = 2 ** 4
+    MAPLIST_OWNER = 2 ** 5
+    EXPLIST_OWNER = 2 ** 6
 
 
 class DiscordRequestMock:

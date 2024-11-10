@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 class Role:
     """
     allOf:
-    - $ref: "#/components/schemas/PartialUser"
+    - $ref: "#/components/schemas/PartialRole"
     - type: object
       properties:
         can_grant:

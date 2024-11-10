@@ -21,4 +21,4 @@ async def get(
                 $ref: "#/components/schemas/Role"
     """
     roles = await get_roles()
-    return web.json_response([r.to_dict() for r in roles])
+    return web.json_response([r.to_dict(full=True) for r in roles])

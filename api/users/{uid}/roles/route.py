@@ -7,7 +7,7 @@ from src.db.queries.roles import add_roles, remove_roles
 from src.utils.validators import check_fields
 
 
-def validate_roles(body: dict) -> dict:
+async def validate_roles(body: dict) -> dict:
     schema = {
         "roles": [{"id": int, "action": str}],
     }
