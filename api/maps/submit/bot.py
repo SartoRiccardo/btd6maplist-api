@@ -13,11 +13,20 @@ from src.utils.files import save_media
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
+@src.utils.routedecos.require_perms(throw_on_permless=False)
 async def post(
         _r: web.Request,
         json_data: dict = None,
+        cannot_submit: bool = False,
         files: list[tuple[str, bytes] | None] = None,
+        **_kwargs,
 ) -> web.Response:
+    if cannot_submit:
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting..."}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
     if len(errors := await validate_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 

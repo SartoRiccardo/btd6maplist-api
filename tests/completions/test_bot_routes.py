@@ -352,3 +352,29 @@ class TestSubmission:
         async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Submitting a completion from a bot with an invalid signature returns {resp.status}"
+
+    async def test_submit_banned(self, btd6ml_test_client, mock_auth, comp_subm_payload,
+                                     save_image, submission_formdata):
+        """Test submitting a completion as a banned & requires recording user"""
+        SUBMITTER_ID = 30
+        req_subm_data = comp_subm_payload(SUBMITTER_ID)
+        images = [(f"proof_completion[{i}]", save_image(i, f"img{i}.png")) for i in range(2)]
+        
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
+        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.BANNED)
+        async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Submitting a completion as a banned user returns {resp.status}"
+
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
+        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a completion as a requires recording user with no video proof returns {resp.status}"
+
+        req_subm_data["video_proof_url"].append("https://youtu.be/something")
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
+        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Submitting a completion as a requires recording user video proof returns {resp.status}"

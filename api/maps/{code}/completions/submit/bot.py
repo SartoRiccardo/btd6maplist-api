@@ -18,14 +18,23 @@ compl_files = [f"proof_completion[{n}]" for n in range(MAX_FILES)]
 
 
 @src.utils.routedecos.check_bot_signature(files=compl_files, path_params=["code"])
+@src.utils.routedecos.require_perms(throw_on_permless=False)
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         _r: web.Request,
         files: list[tuple[str, bytes] | None] = None,
         json_data: dict = None,
         resource: "src.db.models.PartialMap" = None,
+        cannot_submit: bool = False,
+        requires_recording: bool = False,
         **_kwargs
 ) -> web.Response:
+    if cannot_submit:
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting..."}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
     if len(errors := await validate_completion_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
     if resource.difficulty == -1 and json_data["format"] in range(50, 100):
@@ -38,6 +47,12 @@ async def post(
     #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
     #         status=HTTPStatus.BAD_REQUEST,
     #     )
+
+    if requires_recording and len(json_data["video_proof_url"]) == 0:
+        return web.json_response(
+            {"errors": {"video_proof_url": "You must submit a recording"}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
 
     maplist_cfg = await get_config()
     if resource.difficulty == -1 and \
