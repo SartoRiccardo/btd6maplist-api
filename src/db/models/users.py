@@ -3,26 +3,6 @@ from .challenges import ListCompletion
 
 
 @dataclass
-class Role:
-    """
-    type: object
-    properties:
-      id:
-        type: integer
-        description: The ID of the role.
-      name:
-        type: string
-        description: The name of the role.
-    """
-    id: int
-    name: str
-    edit_maplist: bool
-    edit_experts: bool
-    requires_recording: bool
-    cannot_submit: bool
-
-
-@dataclass
 class PartialUser:
     """
     type: object
@@ -194,6 +174,9 @@ class User(PartialUser):
             $ref: "#/components/schemas/PartialMap"
         medals:
           $ref: "#/components/schemas/MaplistMedals"
+        roles:
+          type: array
+          $ref: "#/components/schemas/PartialRole"
     ---
     FullProfile:
       allOf:
@@ -206,6 +189,7 @@ class User(PartialUser):
     created_maps: list["src.db.models.maps.PartialMap"]
     completions: list[ListCompletion]
     medals: MaplistMedals
+    roles: list["src.db.models.Role.Role"]
 
     def to_dict(
             self,
@@ -221,6 +205,7 @@ class User(PartialUser):
             },
             "created_maps": [m.to_dict() for m in self.created_maps],
             "medals": self.medals.to_dict(),
+            "roles": [r.to_dict() for r in self.roles],
         }
         if with_completions:
             data["completions"] = [c.to_profile_dict() for c in self.completions]

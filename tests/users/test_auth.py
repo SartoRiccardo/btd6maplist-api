@@ -1,5 +1,6 @@
 import pytest
 import http
+from ..mocks import DiscordPermRoles
 
 HEADERS = {"Authorization": "Bearer test_token"}
 
@@ -10,7 +11,7 @@ class TestAuth:
                             calc_usr_placements):
         """Test getting one's own profile"""
         USER_ID = 37
-        await mock_auth(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
 
         expected_created_map_ids = ["MLXXXAG", "MLXXXCJ"]
         expected_created_maps = []
@@ -34,6 +35,16 @@ class TestAuth:
             "completions": comps,
             "medals": expected_medals,
             "created_maps": expected_created_maps,
+            "roles": [
+                {
+                    "id": 4,
+                    "name": "Maplist Moderator",
+                    "edit_maplist": True,
+                    "edit_experts": False,
+                    "requires_recording": False,
+                    "cannot_submit": False,
+                }
+            ],
         }
 
         async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
@@ -80,6 +91,7 @@ class TestAuth:
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
+            "roles": [],
         }
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.OK, \

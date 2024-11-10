@@ -325,6 +325,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         await get_maps_created_by(id, conn=conn),
         comps,
         await get_user_medals(id, conn=conn),
+        await get_user_roles(puser.id),
     )
 
 

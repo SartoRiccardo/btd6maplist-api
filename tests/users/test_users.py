@@ -24,6 +24,7 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
+            "roles": [],
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
@@ -35,10 +36,21 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
 @pytest.mark.get
 @pytest.mark.users
 class TestGetUsers:
-    async def test_get_user(self, validate_user):
+    async def test_get_user(self, validate_user, mock_auth):
         """Test getting a user by ID"""
         USER_ID = 33
-        await validate_user(USER_ID)
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        roles = [
+            {
+                "id": 6,
+                "name": "Requires Recordings",
+                "edit_maplist": False,
+                "edit_experts": False,
+                "requires_recording": True,
+                "cannot_submit": False,
+            },
+        ]
+        await validate_user(USER_ID, profile_overrides={"roles": roles})
 
     async def test_invalid_user(self, btd6ml_test_client):
         """Test getting a nonexistent user by ID, or an invalid string as an ID"""

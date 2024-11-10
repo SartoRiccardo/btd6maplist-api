@@ -2,7 +2,8 @@ import re
 import yaml
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
-from .users import User, PartialUser, MaplistProfile, MaplistMedals, Role
+from .users import User, PartialUser, MaplistProfile, MaplistMedals
+from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
 
