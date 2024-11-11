@@ -82,12 +82,12 @@ class TestGetMaps:
 
 @pytest.mark.maps
 @pytest.mark.post
-async def test_add(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """
     Test that adding a correct map payload works, and pushes off a map off
     the list correctly and only sets the perms it can.
     """
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     cur_code = valid_codes[0]
     req_map_data = {
@@ -155,9 +155,9 @@ async def test_add(btd6ml_test_client, mock_discord_api, map_payload, valid_code
 
 @pytest.mark.maps
 @pytest.mark.post
-async def test_add_aggr_fields(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_add_aggr_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding a map with all fields provided"""
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     cur_code = valid_codes[0]
     req_map_data = {
@@ -228,9 +228,9 @@ async def test_add_aggr_fields(btd6ml_test_client, mock_discord_api, map_payload
 @pytest.mark.put
 @pytest.mark.post
 @pytest.mark.maps
-async def test_fuzz(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_fuzz(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Sets every field to another datatype, one by one"""
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
     req_map_data = {
         **map_payload(valid_codes[0]),
         "placement_curver": 1,
@@ -261,9 +261,9 @@ async def test_fuzz(btd6ml_test_client, mock_discord_api, map_payload, valid_cod
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
-async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_invalid_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding and editing map with invalid fields in the payload"""
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     req_map_data = {
         **map_payload(valid_codes[3]),
@@ -355,7 +355,7 @@ async def test_invalid_fields(btd6ml_test_client, mock_discord_api, map_payload,
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
-async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload, valid_codes, save_image):
+async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid_codes, save_image):
     """Test adding and editing map with images in the payload works"""
     async def assert_images(code: str, expected: tuple[str, str], full: bool = False):
         async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
@@ -365,7 +365,7 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
             check_url = resp_data["map_preview_url"] if full else resp_data["map_preview_url"].split("/")[-1]
             assert check_url == expected[1], "Map.map_preview_url differs from expected"
 
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     r6_start_path = save_image(1, filename="r6start.png")
     preview_path = save_image(2, filename="preview.png")
@@ -430,9 +430,9 @@ async def test_req_with_images(btd6ml_test_client, mock_discord_api, map_payload
 @pytest.mark.maps
 @pytest.mark.post
 @pytest.mark.put
-async def test_missing_fields(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_missing_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test a request with some missing fields"""
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     correct_map_data = {
         **map_payload("MLXXXCJ"),
@@ -496,7 +496,7 @@ async def test_missing_fields(btd6ml_test_client, mock_discord_api, map_payload,
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
-async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """
     Test Maplist Mods adding and editing Expert List attributes, and vice versa.
     """
@@ -520,7 +520,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload
     }
 
     # Maplist Mods
-    mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+    await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
             f"POST /maps/{test_code} returned {resp.status}"
@@ -530,7 +530,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload
         await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
 
     # Expert Mods
-    mock_discord_api(perms=DiscordPermRoles.EXPLIST_MOD)
+    await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
             f"POST /maps/{test_code} returned {resp.status}"
@@ -540,7 +540,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload
         await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
 
     @pytest.mark.delete
-    async def test_forbidden(self, btd6ml_test_client, mock_discord_api):
+    async def test_forbidden(self, btd6ml_test_client, mock_auth):
         """Test a user adding, editing or deleting maps if unauthorized"""
         async def make_admin_requests(test_label: str, expected_status: int) -> None:
             TEST_CODE = "MLXXXAA"
@@ -557,22 +557,22 @@ async def test_moderator_perms(btd6ml_test_client, mock_discord_api, map_payload
                 assert resp.status == expected_status, \
                     f"DELETE /maps/:code ({test_label}) returned {resp.status}"
 
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         await make_admin_requests("unauthorized", http.HTTPStatus.UNAUTHORIZED)
 
-        mock_discord_api()
+        await mock_auth()
         await make_admin_requests("missing permissions", http.HTTPStatus.FORBIDDEN)
 
 
 @pytest.mark.maps
 class TestEditMaps:
     @pytest.mark.put
-    async def test_edit(self, btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+    async def test_edit(self, btd6ml_test_client, mock_auth, map_payload, valid_codes):
         """
         Test editing a map with a correct payload works, and rearranging maps on
         the list correctly.
         """
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_map_data = {
             **map_payload("MLXXXCJ"),  # 30th map
@@ -637,9 +637,9 @@ class TestEditMaps:
                     f"PUT /maps/MLXXXAA Map.{key} differs from expected"
 
     @pytest.mark.delete
-    async def test_delete(self, btd6ml_test_client, mock_discord_api):
+    async def test_delete(self, btd6ml_test_client, mock_auth):
         """Test deleting a map, and all other maps rearranging"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         last_map = "MLXXXEJ"
         async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp:
@@ -664,10 +664,10 @@ class TestEditMaps:
                 assert resp_map_data["code"] == "MLXXXFA", "Last map is not the expected one"
 
     @pytest.mark.delete
-    async def test_delete_missing_perms(self, btd6ml_test_client, mock_discord_api):
+    async def test_delete_missing_perms(self, btd6ml_test_client, mock_auth):
         """Test deleting a map without having the perms to delete it completely"""
         async def delete_gradually(code: str, prev_values: tuple[int, int, int], maplist_first: bool):
-            mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD if maplist_first else DiscordPermRoles.EXPLIST_MOD)
+            await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD if maplist_first else DiscordPermRoles.EXPLIST_MOD)
             async with btd6ml_test_client.delete(f"/maps/{code}", headers=HEADERS) as resp:
                 assert resp.ok, f"Deleting a map with correct perms returned {resp.status}"
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
@@ -680,7 +680,7 @@ class TestEditMaps:
                     assert resp_map_data["difficulty"] == (prev_values[2] if maplist_first else -1), \
                         "Map.difficulty changed after deletion by Maplist Mod"
 
-            mock_discord_api(perms=DiscordPermRoles.EXPLIST_MOD if maplist_first else DiscordPermRoles.MAPLIST_MOD)
+            await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD if maplist_first else DiscordPermRoles.MAPLIST_MOD)
             async with btd6ml_test_client.delete(f"/maps/{code}", headers=HEADERS) as resp:
                 assert resp.ok, f"Deleting a map with correct perms returned {resp.status}"
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
@@ -694,7 +694,7 @@ class TestEditMaps:
         await delete_gradually("MLXXXEA", (40, 35, 0), False)
 
     @pytest.mark.put
-    async def test_edit_legacy_map(self, btd6ml_test_client, mock_discord_api, map_payload):
+    async def test_edit_legacy_map(self, btd6ml_test_client, mock_auth, map_payload):
         """Test editing a legacy map fails. It only succeeds if leaving the placements untouched"""
         """Test adding aliases to a map reclaimed them from a deleted one"""
         async def assert_legacy_role(code, uid, placement):
@@ -705,7 +705,7 @@ class TestEditMaps:
                 assert resp_map_data["placement_cur"] == placement, \
                     "Legacy placement was changed"
 
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         async with btd6ml_test_client.get("/maps/55") as resp:
             code = (await resp.json())["code"]
@@ -734,9 +734,9 @@ class TestEditMaps:
 
     @pytest.mark.put
     @pytest.mark.post
-    async def test_reassign_aliases(self, btd6ml_test_client, mock_discord_api, map_payload):
+    async def test_reassign_aliases(self, btd6ml_test_client, mock_auth, map_payload):
         """Test adding aliases to a map reclaimed them from a deleted one"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_map_data = {
             **map_payload("MLXXXDF"),
@@ -761,9 +761,9 @@ class TestEditMaps:
 @pytest.mark.put
 @pytest.mark.post
 @pytest.mark.maps
-async def test_large_placements(btd6ml_test_client, mock_discord_api, map_payload, valid_codes):
+async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding/editing a map with a really large placement"""
-    mock_discord_api(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
 
     req_map_data = {
         **map_payload(valid_codes[0]),
@@ -793,7 +793,7 @@ async def test_large_placements(btd6ml_test_client, mock_discord_api, map_payloa
             assert resp_map_data["placement_all"] == prev_map_data["placement_all"], \
                 "Map.placement_all != -1 when added with a large payload"
 
-    mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+    await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
             f"Adding map with large placements as a list moderator returns {resp.status}"

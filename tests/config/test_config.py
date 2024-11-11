@@ -50,11 +50,11 @@ async def test_get_config(btd6ml_test_client):
 
 
 @pytest.mark.put
-async def test_edit_config(btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+async def test_edit_config(btd6ml_test_client, mock_auth, assert_state_unchanged):
     """Test successfully editing config variable"""
     async def assert_edit_success(perms: int, config: dict):
         mod_name = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
-        mock_discord_api(perms=perms)
+        await mock_auth(perms=perms)
         req_data = {"config": {**START_CONFIG, **config}}
         async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Editing config returned {resp.status}"
@@ -70,12 +70,12 @@ async def test_edit_config(btd6ml_test_client, mock_discord_api, assert_state_un
 
 @pytest.mark.put
 class TestValidate:
-    async def test_edit_config_fail(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_edit_config_fail(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test config variables are correctly gated by their perms"""
         async def assert_edit_fail(perms: int, config: dict):
             mod_name = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
             vars_name = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
-            mock_discord_api(perms=perms)
+            await mock_auth(perms=perms)
             req_data = {"config": config}
             async with assert_state_unchanged("/config"):
                 async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
@@ -99,10 +99,10 @@ class TestValidate:
         await assert_edit_fail(DiscordPermRoles.MAPLIST_MOD, explist_only)
         await assert_edit_fail(DiscordPermRoles.EXPLIST_MOD, maplist_only)
 
-    async def test_extra_fields(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_extra_fields(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test adding random config var names in the payload"""
         req_data = {"config": {"nonexistent": 3}}
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         async with assert_state_unchanged("/config"):
             async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
@@ -113,18 +113,18 @@ class TestValidate:
                 assert "data" in resp_data and len(resp_data["data"]) == 0, \
                     "Some config vars were returned while editing nonexistent config vars"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test setting fields to a different datatype, one by one"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         for req_data, path, dtype in fuzz_data({"config": START_CONFIG}, int_as_float=True):
             async with assert_state_unchanged("/config"):
                 async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
                     assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                         f"Setting {path} to {dtype} returns {resp.status}"
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged):
+    async def test_unauthorized(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test editing config vars as an unauthorized user"""
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with assert_state_unchanged("/config"):
             async with btd6ml_test_client.put("/config") as resp:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
@@ -135,7 +135,7 @@ class TestValidate:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                     f"Editing config with an invalid token returned {resp.status}"
 
-        mock_discord_api()
+        await mock_auth()
         async with assert_state_unchanged("/config"):
             async with btd6ml_test_client.put("/config", headers=HEADERS) as resp:
                 assert resp.status == http.HTTPStatus.FORBIDDEN, \

@@ -1,14 +1,17 @@
 import pytest
 import http
+from ..mocks import DiscordPermRoles
+
+HEADERS = {"Authorization": "Bearer test_token"}
 
 
 @pytest.mark.users
 class TestAuth:
-    async def test_get_self(self, btd6ml_test_client, mock_discord_api, calc_user_profile_medals,
+    async def test_get_self(self, btd6ml_test_client, mock_auth, calc_user_profile_medals,
                             calc_usr_placements):
         """Test getting one's own profile"""
         USER_ID = 37
-        mock_discord_api(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
 
         expected_created_map_ids = ["MLXXXAG", "MLXXXCJ"]
         expected_created_maps = []
@@ -32,42 +35,51 @@ class TestAuth:
             "completions": comps,
             "medals": expected_medals,
             "created_maps": expected_created_maps,
+            "roles": [
+                {
+                    "id": 4,
+                    "name": "Maplist Moderator",
+                    "edit_maplist": True,
+                    "edit_experts": False,
+                    "requires_recording": False,
+                    "cannot_submit": False,
+                }
+            ],
         }
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Trying to log in returns {resp.status}"
             resp_data = await resp.json()
-            resp_data["maplist_profile"]["completions"] = sorted(
-                resp_data["maplist_profile"]["completions"],
+            resp_data["completions"] = sorted(
+                resp_data["completions"],
                 key=lambda x: (x["map"], x["black_border"], x["no_geraldo"], x["current_lcc"], x["format"]),
             )
 
-            assert resp_data["maplist_profile"] == expected_maplist_profile, \
-                "Maplist profile differs from expected"
+            assert resp_data == expected_maplist_profile, "Maplist profile differs from expected"
 
-    async def test_invalid_token(self, btd6ml_test_client, mock_discord_api):
+    async def test_invalid_token(self, btd6ml_test_client, mock_auth):
         """Test using an invalid Discord Token to log in"""
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with btd6ml_test_client.post("/auth") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Omitting discord_token returns {resp.status}"
 
-    async def test_new_user(self, btd6ml_test_client, mock_discord_api, calc_usr_placements):
+    async def test_new_user(self, btd6ml_test_client, mock_auth, calc_usr_placements):
         """Test logging in as a new user creates a new Maplist account"""
         USER_ID = 2000000
         USERNAME = "test_new_usr"
-        mock_discord_api(user_id=USER_ID, username=USERNAME)
+        await mock_auth(user_id=USER_ID, username=USERNAME)
 
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.NOT_FOUND, \
                 f"Getting unknown user returns {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Authenticating as a new user returns {resp.status}"
 
@@ -79,6 +91,7 @@ class TestAuth:
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
+            "roles": [],
         }
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.OK, \

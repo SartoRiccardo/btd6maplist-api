@@ -6,7 +6,7 @@ import src.utils.routedecos
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_json_body(validate_discord_user)
 async def post(

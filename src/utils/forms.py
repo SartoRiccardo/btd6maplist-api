@@ -1,25 +1,19 @@
 from aiohttp import web
 import aiohttp
 import http
-from src.utils.validators import validate_completion, validate_full_map
+from src.utils.validators import validate_completion, validate_full_map, validate_completion_perms
 from src.utils.files import save_media
-from config import (
-    MEDIA_BASE_URL,
-    MAPLIST_LISTMOD_ID,
-    MAPLIST_EXPMOD_ID,
-    MAPLIST_ADMIN_IDS,
-)
+from config import MEDIA_BASE_URL
 
 
 async def get_completion_request(
         request: web.Request,
-        maplist_profile: dict,
+        user_id: str,
         is_maplist_mod: bool = False,
         is_explist_mod: bool = False,
         resource: "src.db.models.ListCompletion" = None,
 ) -> dict | web.Response:
-    if resource and \
-            int(maplist_profile["user"]["id"]) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
+    if resource and int(user_id) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
         return web.json_response(
             {"errors": {"": "Cannot edit or accept your own completion"}},
             status=http.HTTPStatus.FORBIDDEN
@@ -29,23 +23,16 @@ async def get_completion_request(
         if len(errors := await validate_completion(data)):
             return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
-        if not is_maplist_mod and (
-                1 <= data["format"] <= 50 or
-                resource and 1 <= resource.format <= 50):
-            return web.json_response(
-                {"errors": {"format": "You must be a Maplist Moderator"}},
-                status=http.HTTPStatus.FORBIDDEN,
-            )
+        err_resp = validate_completion_perms(
+            is_maplist_mod,
+            is_explist_mod,
+            data["format"],
+            resource.format if resource else None,
+        )
+        if isinstance(err_resp, web.Response):
+            return err_resp
 
-        if not is_explist_mod and (
-                50 <= data["format"] <= 100 or
-                resource and 51 <= resource.format <= 100):
-            return web.json_response(
-                {"errors": {"format": "You must be an Expert List Moderator"}},
-                status=http.HTTPStatus.FORBIDDEN,
-            )
-
-        if maplist_profile["user"]["id"] in data["user_ids"]:
+        if user_id in data["user_ids"]:
             return web.json_response(
                 {"errors": {"": "Cannot edit or accept your own completion"}},
                 status=http.HTTPStatus.FORBIDDEN,

@@ -13,19 +13,39 @@ async def calc_user_profile_medals(btd6ml_test_client):
         }
         async with btd6ml_test_client.get(f"/users/{user_id}/completions?formats=1,2,51") as resp:
             comps = (await resp.json())["completions"]
-            comps = [
-                {
-                    "map": cmp["map"]["code"],
-                    "black_border": cmp["black_border"],
-                    "no_geraldo": cmp["no_geraldo"],
-                    "current_lcc": cmp["current_lcc"],
-                    "format": cmp["format"]
-                }
-                for cmp in comps
-            ]
             comps = sorted(
-                comps, key=lambda x: (x["map"], x["black_border"], x["no_geraldo"], x["current_lcc"], x["format"])
+                [
+                    {
+                        "map": cmp["map"]["code"],
+                        "black_border": cmp["black_border"],
+                        "no_geraldo": cmp["no_geraldo"],
+                        "current_lcc": cmp["current_lcc"],
+                        "format": cmp["format"]
+                    }
+                    for cmp in comps
+                ],
+                key=lambda x: (x["map"], x["format"], x["black_border"], x["no_geraldo"], x["current_lcc"]),
             )
+
+            comps_compressed = []
+            current_comp = None
+
+            for i, comp in enumerate(comps):
+                if i == 0 or comp["map"] != comps[i-1]["map"] or comp["format"] != comps[i-1]["format"]:
+                    if current_comp is not None:
+                        comps_compressed.append(current_comp)
+                    current_comp = {
+                        "map": comp["map"],
+                        "black_border": comp["black_border"],
+                        "no_geraldo": comp["no_geraldo"],
+                        "current_lcc": comp["current_lcc"],
+                        "format": comp["format"]
+                    }
+                current_comp["black_border"] = current_comp["black_border"] or comp["black_border"]
+                current_comp["no_geraldo"] = current_comp["no_geraldo"] or comp["no_geraldo"]
+                current_comp["current_lcc"] = current_comp["current_lcc"] or comp["current_lcc"]
+            if current_comp is not None:
+                comps_compressed.append(current_comp)
 
             added_medals = 0b0000  # In order of the keys declared in expected_medals
             for i, comp in enumerate(comps):
@@ -44,7 +64,8 @@ async def calc_user_profile_medals(btd6ml_test_client):
                 if comp["current_lcc"] and not added_medals & 0b0010:
                     added_medals |= 0b0010
                     expected_medals["lccs"] += 1
-        return expected_medals, comps
+
+        return expected_medals, comps_compressed
 
     return calculate
 

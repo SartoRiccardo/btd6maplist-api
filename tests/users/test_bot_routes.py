@@ -13,11 +13,11 @@ HEADERS = {"Authorization": "Bearer test_token"}
 class TestBotReadRules:
     user_id = 8888
 
-    async def test_read_rules(self, btd6ml_test_client, mock_discord_api, sign_message, bot_user_payload):
+    async def test_read_rules(self, btd6ml_test_client, mock_auth, sign_message, bot_user_payload):
         """Test reding the rules"""
-        mock_discord_api(user_id=self.user_id)
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
-            assert not (await resp.json())["maplist_profile"]["has_seen_popup"], "New user has seen popup"
+        await mock_auth(user_id=self.user_id)
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
+            assert not (await resp.json())["has_seen_popup"], "New user has seen popup"
 
         req_data = bot_user_payload(self.user_id)
         signature = sign_message(req_data)
@@ -28,15 +28,15 @@ class TestBotReadRules:
         async with btd6ml_test_client.put(f"/read-rules/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Reading the rules returned {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             old_resp_data = await resp.json()
-            assert old_resp_data["maplist_profile"]["has_seen_popup"], \
+            assert old_resp_data["has_seen_popup"], \
                 "New user has not seen popup after reading the rules"
 
         async with btd6ml_test_client.put(f"/read-rules/bot?signature={signature}", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Reading the rules returned {resp.status}"
 
-        async with btd6ml_test_client.post("/auth?discord_token=test_token") as resp:
+        async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
             assert await resp.json() == old_resp_data, "State changed when reading the rules again"
 
     async def test_invalid_signature(self, btd6ml_test_client, sign_message, bot_user_payload):

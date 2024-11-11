@@ -15,7 +15,7 @@ import src.http
 import src.log
 import src.db.connection
 import src.db.models
-from src.utils.colors import green, yellow, blue, red
+from src.utils.colors import green, yellow, blue, red, cyan
 
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
@@ -113,6 +113,7 @@ allowed_methods = {
     "get": (web.get, green),
     "post": (web.post, yellow),
     "put": (web.put, blue),
+    "patch": (web.patch, cyan),
     "delete": (web.delete, red),
 }
 route_files = {
