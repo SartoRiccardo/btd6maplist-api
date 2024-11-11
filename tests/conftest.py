@@ -11,6 +11,7 @@ import src.db.connection
 import src.requests
 from .mocks.DiscordRequestMock import DiscordRequestMock
 from .mocks.NinjaKiwiMock import NinjaKiwiMock
+from .mocks import DiscordPermRoles
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
 from cryptography.hazmat.primitives import hashes, serialization
@@ -63,8 +64,61 @@ async def reset_database():
 def mock_discord_api():
     src.requests.set_discord_api(src.requests.DiscordRequests)
 
-    def set_mock(**kwargs):
-        src.requests.set_discord_api(DiscordRequestMock(**kwargs))
+    def set_mock(**kwargs) -> DiscordRequestMock:
+        mocker = DiscordRequestMock(**kwargs)
+        src.requests.set_discord_api(mocker)
+        return mocker
+    return set_mock
+
+
+@pytest_asyncio.fixture(scope="function")
+async def set_roles():
+    @src.db.connection.postgres
+    async def fixture(uid: int | str, roles: list[int], conn=None) -> None:
+        if isinstance(uid, str):
+            uid = int(uid)
+
+        await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
+        await conn.executemany(
+            """
+            INSERT INTO user_roles
+                (user_id, role_id)
+            VALUES
+                ($1, $2)
+            """,
+            [(uid, role) for role in roles],
+        )
+
+    return fixture
+
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def mock_auth(mock_discord_api, set_roles):
+    @src.db.connection.postgres
+    async def reset_roles(conn=None) -> None:
+        await conn.execute("DELETE FROM user_roles")
+
+    async def set_mock(**kwargs) -> None:
+        mocker = mock_discord_api(**kwargs)
+        if "perms" not in kwargs:
+            return
+        perms = {
+            DiscordPermRoles.ADMIN: [4, 5],
+            DiscordPermRoles.MAPLIST_MOD: [4],
+            DiscordPermRoles.EXPLIST_MOD: [5],
+            DiscordPermRoles.NEEDS_RECORDING: [6],
+            DiscordPermRoles.BANNED: [7],
+            DiscordPermRoles.MAPLIST_OWNER: [2],
+            DiscordPermRoles.EXPLIST_OWNER: [3],
+        }
+
+        roles = []
+        for perm in perms:
+            if perm & kwargs["perms"]:
+                roles += perms[perm]
+        await set_roles(mocker.user_id, list(set(roles)))
+
+    await reset_roles()
     return set_mock
 
 

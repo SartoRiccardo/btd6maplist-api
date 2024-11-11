@@ -15,8 +15,6 @@ from config import (
     WEBHOOK_LIST_RUN,
     WEBHOOK_EXPLIST_RUN,
     MEDIA_BASE_URL,
-    MAPLIST_BANNED_ID,
-    MAPLIST_NEEDSREC_ID,
     WEB_BASE_URL,
 )
 from src.utils.embeds import get_runsubm_embed, send_run_webhook
@@ -26,12 +24,15 @@ MAX_FILES = 4
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.register_user
+@src.utils.routedecos.require_perms(throw_on_permless=False)
 async def post(
         request: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
+        cannot_submit: bool = False,
+        requires_recording: bool = False,
         **_kwargs
 ) -> web.Response:
     """
@@ -99,7 +100,7 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    if MAPLIST_BANNED_ID in maplist_profile["roles"]:
+    if cannot_submit:
         return web.json_response(
             {"errors": {"": "You are banned from submitting..."}},
             status=http.HTTPStatus.FORBIDDEN,
@@ -112,8 +113,6 @@ async def post(
             {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
             status=http.HTTPStatus.BAD_REQUEST,
         )
-
-    discord_profile = maplist_profile["user"]
 
     embeds = []
     hook_url = ""
@@ -139,7 +138,7 @@ async def post(
             if len(errors := await validate_completion_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
-            if MAPLIST_NEEDSREC_ID in maplist_profile["roles"] and len(data["video_proof_url"]) == 0:
+            if requires_recording and len(data["video_proof_url"]) == 0:
                 return web.json_response(
                     {"errors": {"video_proof_url": "You must submit a recording"}},
                     status=http.HTTPStatus.BAD_REQUEST,

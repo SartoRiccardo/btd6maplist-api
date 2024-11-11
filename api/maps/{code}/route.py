@@ -5,7 +5,6 @@ import src.log
 from src.db.queries.maps import get_map, edit_map, delete_map
 from src.utils.forms import get_map_form
 import src.utils.routedecos
-from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID
 
 
 @src.utils.routedecos.validate_resource_exists(get_map, "code")
@@ -36,12 +35,12 @@ async def get(_r: web.Request, resource: "src.db.models.Map" = None):
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         is_maplist_mod: bool = False,
         is_explist_mod: bool = False,
         **_kwargs,
@@ -102,19 +101,20 @@ async def put(
             del json_body["placement_curver"]
 
     await edit_map(json_body, resource)
-    asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, maplist_profile["user"]["id"]))
+    asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def delete(
         _r: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        is_admin: bool = False,
+        is_maplist_mod: bool = False,
+        is_explist_mod: bool = False,
         **_kwargs
 ):
     """
@@ -135,18 +135,15 @@ async def delete(
       "204":
         description: The resource was deleted correctly
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
       "404":
         description: No map with that ID was found.
     """
     if resource.deleted_on:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
-    modify_diff = is_admin or MAPLIST_EXPMOD_ID in maplist_profile["roles"]
-    modify_pos = is_admin or MAPLIST_LISTMOD_ID in maplist_profile["roles"]
-
     if not resource.deleted_on:
-        await delete_map(resource.code, map_current=resource, modify_diff=modify_diff, modify_pos=modify_pos)
-        asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, maplist_profile["user"]["id"]))
+        await delete_map(resource.code, map_current=resource, modify_diff=is_explist_mod, modify_pos=is_maplist_mod)
+        asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

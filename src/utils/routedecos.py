@@ -8,9 +8,8 @@ import cryptography.exceptions
 from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
-from config import MAPLIST_EXPMOD_ID, MAPLIST_LISTMOD_ID, MAPLIST_ADMIN_IDS
 import src.http
-from src.db.queries.users import create_user, get_user_min
+from src.db.queries.users import create_user, get_user_min, get_user_roles
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from ..requests import discord_api
@@ -121,26 +120,38 @@ def validate_resource_exists(
 
 
 def require_perms(
-        list_admin: bool = True,
-        explist_admin: bool = True,
+        throw_on_permless: bool = True,
 ):
     """
-    Must be used with `with_maplist_profile` beforehand.
-    Returns 403 if they don't have the required perms.
-    Adds `is_admin`, `is_maplist_mod` and `is_explist_mod` to kwargs.
+    Must be used with `with_discord_profile` or `check_bot_signature` beforehand.
+    Returns 403 if they don't have any perms.
+    Adds `is_admin`, `is_maplist_mod`, `is_explist_mod`, `cannot_submit`, and `requires_recording` to kwargs.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs_caller):
-            if "maplist_profile" not in kwargs_caller:
+            discord_profile = None
+            if "discord_profile" in kwargs_caller:
+                discord_profile = kwargs_caller["discord_profile"]
+            elif "json_data" in kwargs_caller:
+                discord_profile = kwargs_caller["json_data"]["user"]
+            if discord_profile is None:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-            mp = kwargs_caller["maplist_profile"]
+            roles = await get_user_roles(discord_profile["id"])
 
-            is_admin = any([role in MAPLIST_ADMIN_IDS for role in mp["roles"]])
-            is_explist_mod = is_admin or MAPLIST_EXPMOD_ID in mp["roles"]
-            is_list_mod = is_admin or MAPLIST_LISTMOD_ID in mp["roles"]
+            is_admin = False
+            is_list_mod = False
+            is_explist_mod = False
+            cannot_submit = False
+            requires_recording = False
+            for role in roles:
+                # is_admin no longer used
+                is_list_mod = is_list_mod or role.edit_maplist
+                is_explist_mod = is_explist_mod or role.edit_experts
+                cannot_submit = cannot_submit or role.cannot_submit
+                requires_recording = requires_recording or role.requires_recording
 
-            if not (is_admin or is_explist_mod or is_list_mod):
+            if not (is_admin or is_explist_mod or is_list_mod) and throw_on_permless:
                 return web.json_response(
                     {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
                     status=http.HTTPStatus.FORBIDDEN,
@@ -154,6 +165,8 @@ def require_perms(
                 is_explist_mod=is_explist_mod,
                 is_list_mod=is_list_mod,
                 is_maplist_mod=is_list_mod,  # Alias cause I keep mixing them up
+                cannot_submit=cannot_submit,
+                requires_recording=requires_recording,
             )
         return wrapper
     return deco
@@ -162,7 +175,7 @@ def require_perms(
 def register_user(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
     Must be used with `with_maplist_profile`, `check_bot_signature`, or `with_discord_profile` beforehand.
-    Adds an user to the dabatase if it's not there already.
+    Adds a user to the dabatase if it's not there already.
     """
     @wraps(handler)
     async def wrapper(request: web.Request, *args, **kwargs_caller):

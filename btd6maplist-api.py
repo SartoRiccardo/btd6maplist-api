@@ -15,7 +15,7 @@ import src.http
 import src.log
 import src.db.connection
 import src.db.models
-from src.utils.colors import green, yellow, blue, red, underline
+from src.utils.colors import green, yellow, blue, red, cyan, underline
 from tests.testutils import override_config, clear_db_patch_data
 
 
@@ -114,6 +114,7 @@ allowed_methods = {
     "get": (web.get, green),
     "post": (web.post, yellow),
     "put": (web.put, blue),
+    "patch": (web.patch, cyan),
     "delete": (web.delete, red),
 }
 route_files = {

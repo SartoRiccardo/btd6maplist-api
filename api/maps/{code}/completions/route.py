@@ -82,12 +82,12 @@ async def get(
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         request: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         resource: "src.db.model.PartialMap" = None,
         is_maplist_mod: bool = False,
         is_explist_mod: bool = False,
@@ -149,11 +149,11 @@ async def post(
                   type: object
                   example: {}
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
     """
     data = await get_completion_request(
         request,
-        maplist_profile,
+        discord_profile["id"],
         is_maplist_mod=is_maplist_mod,
         is_explist_mod=is_explist_mod,
     )
@@ -167,10 +167,10 @@ async def post(
         data["format"],
         data["lcc"],
         [int(uid) for uid in data["user_ids"]],
-        int(maplist_profile["user"]["id"]),
+        int(discord_profile["id"]),
         subm_proof=data["subm_proof"],
     )
-    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, maplist_profile["user"]["id"]))
+    asyncio.create_task(src.log.log_action("completion", "post", resource.id, data, discord_profile["id"]))
 
     return web.json_response(
         data["user_ids"],

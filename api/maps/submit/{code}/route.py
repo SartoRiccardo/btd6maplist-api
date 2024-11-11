@@ -11,12 +11,12 @@ import src.utils.routedecos
 
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.validate_resource_exists(get_map_submission, "code")
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def delete(
         request: web.Request,
         resource: "src.db.model.MapSubmission" = None,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         is_maplist_mod: bool = False,
         is_explist_mod: bool = False,
         **_kwargs,
@@ -59,6 +59,6 @@ async def delete(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    await reject_submission(code, maplist_profile["user"]["id"])
+    await reject_submission(code, discord_profile["id"])
     asyncio.create_task(update_map_submission_wh(resource, fail=True))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

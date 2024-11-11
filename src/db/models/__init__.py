@@ -2,7 +2,8 @@ import re
 import yaml
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
-from .User import User, PartialUser, MaplistProfile, MaplistMedals
+from .users import User, PartialUser, MaplistProfile, MaplistMedals
+from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
 
@@ -93,6 +94,7 @@ entities = [
     LeaderboardEntry,
     MaplistMedals,
     MapSubmission,
+    Role,
 ]
 for entity in entities:
     if not entity.__doc__:

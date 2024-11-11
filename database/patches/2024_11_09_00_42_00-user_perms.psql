@@ -1,0 +1,52 @@
+CREATE TABLE roles(
+    id SERIAL,
+    name VARCHAR(255) NOT NULL,
+    edit_maplist BOOLEAN DEFAULT FALSE,
+    edit_experts BOOLEAN DEFAULT FALSE,
+    requires_recording BOOLEAN DEFAULT FALSE,
+    cannot_submit BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY(id)
+);
+
+CREATE TABLE role_grants(
+    role_required BIGINT NOT NULL,
+    role_can_grant BIGINT NOT NULL,
+    PRIMARY KEY (role_required, role_can_grant)
+);
+ALTER TABLE role_grants ADD CONSTRAINT fk_roles_1
+    FOREIGN KEY (role_required) REFERENCES roles(id) ON DELETE CASCADE;
+ALTER TABLE role_grants ADD CONSTRAINT fk_roles_2
+    FOREIGN KEY (role_can_grant) REFERENCES roles(id) ON DELETE CASCADE;
+
+CREATE TABLE user_roles(
+    user_id BIGINT REFERENCES users(discord_id) ON DELETE CASCADE,
+    role_id BIGINT REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
+);
+ALTER TABLE user_roles ADD CONSTRAINT fk_users_1
+    FOREIGN KEY (user_id) REFERENCES users(discord_id) ON DELETE CASCADE;
+ALTER TABLE user_roles ADD CONSTRAINT fk_roles_1
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE;
+
+INSERT INTO roles
+    (id, name, edit_maplist, edit_experts, requires_recording, cannot_submit)
+VALUES
+    (1, 'Technician', TRUE, TRUE, TRUE, TRUE),
+    (2, 'Maplist Owner', TRUE, FALSE, FALSE, FALSE),
+    (3, 'Expert List Owner', FALSE, TRUE, FALSE, FALSE),
+    (4, 'Maplist Moderator', TRUE, FALSE, FALSE, FALSE),
+    (5, 'Expert List Moderator', FALSE, TRUE, FALSE, FALSE),
+    (6, 'Requires Recordings', FALSE, FALSE, TRUE, FALSE),
+    (7, 'Cannot Submit', FALSE, FALSE, FALSE, TRUE)
+;
+ALTER SEQUENCE roles_id_seq RESTART WITH 8;
+
+INSERT INTO role_grants
+    (role_required, role_can_grant)
+VALUES
+    (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
+    (2, 4), (2, 6), (2, 7),
+    (3, 5), (3, 6), (3, 7),
+    (4, 6), (4, 7),
+    (5, 6), (5, 7)
+;

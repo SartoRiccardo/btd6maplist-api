@@ -47,12 +47,12 @@ class TestAddLCC:
     """Test adding an LCC correctly reevaluates the lcc flag."""
 
     @pytest.mark.post
-    async def test_add(self, btd6ml_test_client, mock_discord_api, completion_payload, save_image):
+    async def test_add(self, btd6ml_test_client, mock_auth, completion_payload, save_image):
         """
         Test adding an LCC with the correct payload, once with a suboptimal LCC and once with an optimal one
         """
         proof_completion = save_image(1)
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_comp_data = completion_payload()
         req_form = to_formdata(req_comp_data)
@@ -77,9 +77,9 @@ class TestAddLCC:
                     "Current LCC is false even if the leftover is the highest"
 
     @pytest.mark.put
-    async def test_edit(self, btd6ml_test_client, mock_discord_api, completion_payload):
+    async def test_edit(self, btd6ml_test_client, mock_auth, completion_payload):
         """Test editing an LCC with a correct payload and seeing the flag update"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_comp_data = completion_payload()
         async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_comp_data) as resp:
@@ -100,11 +100,11 @@ class TestAddLCC:
                     "Current LCC is false even if the leftover is the highest"
 
     @pytest.mark.put
-    async def test_unset(self, btd6ml_test_client, mock_discord_api, completion_payload):
+    async def test_unset(self, btd6ml_test_client, mock_auth, completion_payload):
         """
         Test setting a completion's LCC to null
         """
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         async with btd6ml_test_client.get("/maps/MLXXXCD") as resp:
             lcc_id = (await resp.json())["lccs"][0]["id"]
@@ -119,7 +119,7 @@ class TestAddLCC:
                 assert lcc_id not in lcc_ids, "Old LCC is still in the map's LCCs"
 
     @pytest.mark.put
-    async def test_set(self, btd6ml_test_client, mock_discord_api, completion_payload, assert_state_unchanged):
+    async def test_set(self, btd6ml_test_client, mock_auth, completion_payload, assert_state_unchanged):
         """
         Test setting a completion's LCC from null to an LCC, once with a suboptimal LCC and once with an optimal one
         """
@@ -127,7 +127,7 @@ class TestAddLCC:
         LCC_SUBOPT = 374
         LCC_OPT = 372
 
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         async with assert_state_unchanged("/maps/MLXXXEE"):
             req_comp_data = completion_payload()

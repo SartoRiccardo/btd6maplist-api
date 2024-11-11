@@ -355,3 +355,27 @@ async def check_prev_map_submission(
                 status=http.HTTPStatus.FORBIDDEN,
             )
     return prev_submission
+
+
+def validate_completion_perms(
+        is_maplist_mod: bool,
+        is_explist_mod: bool,
+        new_format: int,
+        old_format: int | None = None,
+) -> web.Response | None:
+    if not is_maplist_mod and (
+            1 <= new_format <= 50 or
+            old_format and 1 <= old_format <= 50):
+        return web.json_response(
+            {"errors": {"format": "You must be a Maplist Moderator"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
+    if not is_explist_mod and (
+            50 <= new_format <= 100 or
+            old_format and 51 <= old_format <= 100
+    ):
+        return web.json_response(
+            {"errors": {"format": "You must be an Expert List Moderator"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )

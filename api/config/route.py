@@ -62,13 +62,13 @@ async def put_validate(body: dict) -> dict:
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_json_body(put_validate)
 async def put(
         _r: web.Request,
         json_body: dict = None,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
         is_admin: bool = False,
         is_list_mod: bool = False,
         is_explist_mod: bool = False,
@@ -131,5 +131,5 @@ async def put(
                 del json_body["config"][key]
 
     await update_config(json_body["config"])
-    asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], maplist_profile["user"]["id"]))
+    asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], discord_profile["id"]))
     return web.json_response({"errors": {}, "data": json_body["config"]})

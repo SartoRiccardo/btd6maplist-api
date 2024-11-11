@@ -34,7 +34,7 @@ class CompletionTest:
     @staticmethod
     async def _test_fuzz(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             completion_payload,
             assert_state_unchanged,
             endpoint_post: str = None,
@@ -44,7 +44,7 @@ class CompletionTest:
         if endpoint_get_put is None:
             endpoint_get_put = endpoint_put
 
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         req_comp_data = completion_payload()
         extra_expected = {
             "lcc": [None],
@@ -72,7 +72,7 @@ class CompletionTest:
     @staticmethod
     async def _test_missing_fields(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             completion_payload,
             assert_state_unchanged,
             endpoint_post: str = None,
@@ -82,7 +82,7 @@ class CompletionTest:
         if endpoint_get_put is None:
             endpoint_get_put = endpoint_put
 
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         req_comp_data = completion_payload()
 
         for req_data, path in remove_fields(req_comp_data):
@@ -107,7 +107,7 @@ class CompletionTest:
     @staticmethod
     async def _test_forbidden(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             endpoint_post: str = None,
             endpoint_put: str = None,
@@ -120,7 +120,7 @@ class CompletionTest:
 
         if endpoint_post:
             async with assert_state_unchanged(endpoint_post):
-                mock_discord_api(unauthorized=True)
+                await mock_auth(unauthorized=True)
                 async with btd6ml_test_client.post(endpoint_post) as resp:
                     assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                         f"Adding a completion without providing authorization returns {resp.status}"
@@ -128,14 +128,14 @@ class CompletionTest:
                     assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                         f"Adding a completion with and invalid token returns {resp.status}"
 
-                mock_discord_api()
+                await mock_auth()
                 async with btd6ml_test_client.post(endpoint_post, headers=HEADERS) as resp:
                     assert resp.status == http.HTTPStatus.FORBIDDEN, \
                         f"Adding a completion without permissions returns {resp.status}"
 
         if endpoint_put:
             async with assert_state_unchanged(endpoint_get_put):
-                mock_discord_api(unauthorized=True)
+                await mock_auth(unauthorized=True)
                 async with btd6ml_test_client.put(endpoint_put) as resp:
                     assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                         f"Editing a completion without providing authorization returns {resp.status}"
@@ -151,7 +151,7 @@ class CompletionTest:
                         assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                             f"Deleting a completion with and invalid token returns {resp.status}"
 
-                mock_discord_api()
+                await mock_auth()
                 async with btd6ml_test_client.put(endpoint_put, headers=HEADERS) as resp:
                     assert resp.status == http.HTTPStatus.FORBIDDEN, \
                         f"Editing a completion without permissions returns {resp.status}"
@@ -163,7 +163,7 @@ class CompletionTest:
     @staticmethod
     async def _test_own_completion(
             btd6ml_test_client,
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             completion_payload,
             endpoint_post: str = None,
@@ -180,7 +180,7 @@ class CompletionTest:
         if endpoint_put_own:
             async with assert_state_unchanged(endpoint_get_own) as completion_og:
                 completed_by = completion_og["users"][0]["id"]
-                mock_discord_api(perms=DiscordPermRoles.ADMIN, user_id=completed_by)
+                await mock_auth(perms=DiscordPermRoles.ADMIN, user_id=completed_by)
 
                 req_data = completion_payload()
                 req_data["user_ids"] = ["1"]
@@ -211,7 +211,7 @@ class CompletionTest:
 
     @staticmethod
     async def _test_scoped_edit_perms(
-            mock_discord_api,
+            mock_auth,
             assert_state_unchanged,
             btd6ml_test_client,
             completion_payload,
@@ -223,7 +223,7 @@ class CompletionTest:
         mod_name_str = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
         comp_name_str = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
 
-        mock_discord_api(perms=perms)
+        await mock_auth(perms=perms)
         async with assert_state_unchanged(endpoint_get) as completion:
             if endpoint_del:
                 async with btd6ml_test_client.delete(endpoint_del, headers=HEADERS) as resp:

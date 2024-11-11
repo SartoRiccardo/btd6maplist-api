@@ -13,11 +13,20 @@ from src.utils.files import save_media
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
+@src.utils.routedecos.require_perms(throw_on_permless=False)
 async def post(
         _r: web.Request,
         json_data: dict = None,
+        cannot_submit: bool = False,
         files: list[tuple[str, bytes] | None] = None,
+        **_kwargs,
 ) -> web.Response:
+    if cannot_submit:
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting..."}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
     if len(errors := await validate_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
@@ -26,18 +35,18 @@ async def post(
 
     proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
     hook_url = WEBHOOK_LIST_SUBM if json_data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
-    embeds = get_mapsubm_embed(json_data, json_data["submitter"], btd6_map)
+    embeds = get_mapsubm_embed(json_data, json_data["user"], btd6_map)
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
 
-    prev_submission = await check_prev_map_submission(json_data["code"], json_data["submitter"]["id"])
+    prev_submission = await check_prev_map_submission(json_data["code"], json_data["user"]["id"])
     if isinstance(prev_submission, web.Response):
         return prev_submission
 
     await add_map_submission(
         json_data["code"],
-        json_data["submitter"]["id"],
+        json_data["user"]["id"],
         json_data["notes"],
         list_to_int.index(json_data["type"]),
         json_data["proposed"],

@@ -8,7 +8,7 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission, check_prev_map_submission
 from src.requests import ninja_kiwi_api
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MAPLIST_BANNED_ID, MEDIA_BASE_URL
+from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
 from src.utils.embeds import (
     get_mapsubm_embed,
     propositions,
@@ -25,11 +25,13 @@ PAGE_ENTRIES = 50
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.with_maplist_profile
+@src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.register_user
+@src.utils.routedecos.require_perms(throw_on_permless=False)
 async def post(
         request: web.Request,
-        maplist_profile: dict = None,
+        discord_profile: dict = None,
+        cannot_submit: bool = False,
         **_kwargs
 ) -> web.Response:
     """
@@ -86,7 +88,7 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    if MAPLIST_BANNED_ID in maplist_profile["roles"]:
+    if cannot_submit:
         return web.json_response(
             {"errors": {"": "You are banned from submitting..."}},
             status=http.HTTPStatus.FORBIDDEN,
@@ -97,8 +99,6 @@ async def post(
             {"errors": {"": "multipart/* Content-Type expected"}},
             status=http.HTTPStatus.BAD_REQUEST,
         )
-
-    discord_profile = maplist_profile["user"]
 
     embeds = []
     data = None
@@ -133,13 +133,13 @@ async def post(
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
 
-    prev_submission = await check_prev_map_submission(data["code"], maplist_profile["user"]["id"])
+    prev_submission = await check_prev_map_submission(data["code"], discord_profile["id"])
     if isinstance(prev_submission, web.Response):
         return prev_submission
 
     await add_map_submission(
         data["code"],
-        maplist_profile["user"]["id"],
+        discord_profile["id"],
         data["notes"],
         list_to_int.index(data["type"]),
         data["proposed"],

@@ -24,6 +24,7 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
+            "roles": [],
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
@@ -35,10 +36,21 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
 @pytest.mark.get
 @pytest.mark.users
 class TestGetUsers:
-    async def test_get_user(self, validate_user):
+    async def test_get_user(self, validate_user, mock_auth):
         """Test getting a user by ID"""
         USER_ID = 33
-        await validate_user(USER_ID)
+        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        roles = [
+            {
+                "id": 6,
+                "name": "Requires Recordings",
+                "edit_maplist": False,
+                "edit_experts": False,
+                "requires_recording": True,
+                "cannot_submit": False,
+            },
+        ]
+        await validate_user(USER_ID, profile_overrides={"roles": roles})
 
     async def test_invalid_user(self, btd6ml_test_client):
         """Test getting a nonexistent user by ID, or an invalid string as an ID"""
@@ -50,11 +62,11 @@ class TestGetUsers:
 @pytest.mark.post
 @pytest.mark.users
 class TestAddUser:
-    async def test_add_user(self, btd6ml_test_client, mock_discord_api, new_user_payload, validate_user):
+    async def test_add_user(self, btd6ml_test_client, mock_auth, new_user_payload, validate_user):
         """Test adding a user with a valid payload"""
         USER_ID = 2000000
         USERNAME = "Test User 2M"
-        mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
 
         req_data = new_user_payload(USER_ID, USERNAME)
         async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_data) as resp:
@@ -62,9 +74,9 @@ class TestAddUser:
                 f"Creating a user with a correct payload returns {resp.status}"
         await validate_user(USER_ID, USERNAME)
 
-    async def test_add_invalid_user(self, btd6ml_test_client, mock_discord_api, new_user_payload):
+    async def test_add_invalid_user(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test adding an invalid user, with duplicate or invalid properties"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_user_data = new_user_payload(8888)
 
@@ -94,12 +106,12 @@ class TestAddUser:
         for req_data, edited_path, error_msg in invalidate_field(req_user_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_add_missing_fields(self, btd6ml_test_client, mock_discord_api, assert_state_unchanged,
+    async def test_add_missing_fields(self, btd6ml_test_client, mock_auth, assert_state_unchanged,
                                       new_user_payload):
         """Test adding a user with missing properties"""
         USER_ID = 2000001
         USERNAME = "Test User 2M1"
-        mock_discord_api(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
 
         req_usr_data = new_user_payload(USER_ID, USERNAME)
         for req_data, path in remove_fields(req_usr_data):
@@ -111,9 +123,9 @@ class TestAddUser:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" is not in the returned errors"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, new_user_payload, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, new_user_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
         req_usr_data = new_user_payload(2000001, "Test User 2M1")
 
         for req_data, path, sub_value in fuzz_data(req_usr_data):
@@ -124,9 +136,9 @@ class TestAddUser:
                 assert "errors" in resp_data and path in resp_data["errors"], \
                     f"\"{path}\" was not in response.errors"
 
-    async def test_add_unauthorized(self, btd6ml_test_client, mock_discord_api):
+    async def test_add_unauthorized(self, btd6ml_test_client, mock_auth):
         """Test adding a user without having the perms to do so"""
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with btd6ml_test_client.post("/users") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user without an Authorization header returns {resp.status}"
@@ -135,7 +147,7 @@ class TestAddUser:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user with an invalid token returns {resp.status}"
 
-        mock_discord_api()
+        await mock_auth()
         async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Creating a user without the necessary permissions returns {resp.status}"
@@ -144,12 +156,12 @@ class TestAddUser:
 @pytest.mark.put
 @pytest.mark.users
 class TestEditSelf:
-    async def test_edit(self, btd6ml_test_client, mock_discord_api, profile_payload, validate_user,
+    async def test_edit(self, btd6ml_test_client, mock_auth, profile_payload, validate_user,
                         mock_ninja_kiwi_api):
         """Test editing one's own profile"""
         USER_ID = 33
         USERNAME = "New Name 33"
-        mock_discord_api(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID)
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(USERNAME, oak="oak_test123")
 
@@ -164,21 +176,21 @@ class TestEditSelf:
             }
             await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
-    async def test_edit_leave_name(self, btd6ml_test_client, mock_discord_api, profile_payload, mock_ninja_kiwi_api,
+    async def test_edit_leave_name(self, btd6ml_test_client, mock_auth, profile_payload, mock_ninja_kiwi_api,
                                    assert_state_unchanged):
         """Test editing one's own profile while leaving the name unchanged"""
         USER_ID = 29
-        mock_discord_api(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID)
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(f"usr{USER_ID}", oak="oak_test123")
 
         async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.OK
 
-    async def test_edit_missing_fields(self, btd6ml_test_client, mock_discord_api, profile_payload,
+    async def test_edit_missing_fields(self, btd6ml_test_client, mock_auth, profile_payload,
                                        assert_state_unchanged):
         """Test editing one's own profile with missing fields"""
-        mock_discord_api(user_id=33)
+        await mock_auth(user_id=33)
         req_usr_data = profile_payload("Newer Name 33")
 
         for req_data, path in remove_fields(req_usr_data):
@@ -190,9 +202,9 @@ class TestEditSelf:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" is not in the returned errors"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_discord_api, profile_payload, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        mock_discord_api(user_id=33)
+        await mock_auth(user_id=33)
         req_usr_data = profile_payload("Newer Name 33")
         extra_expected = {"oak": [str]}
 
@@ -205,10 +217,10 @@ class TestEditSelf:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" was not in response.errors"
 
-    async def test_edit_invalid(self, btd6ml_test_client, mock_discord_api, profile_payload, assert_state_unchanged,
+    async def test_edit_invalid(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged,
                                 mock_ninja_kiwi_api):
         """Test editing one's own profile with missing or invalid fields"""
-        mock_discord_api(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         req_usr_data = profile_payload("Cool Username")
 
@@ -240,9 +252,9 @@ class TestEditSelf:
         for req_data, edited_path, error_msg in invalidate_field(req_usr_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_edit_unauthorized(self, mock_discord_api, btd6ml_test_client):
+    async def test_edit_unauthorized(self, mock_auth, btd6ml_test_client):
         """Test calling the endpoint without proper authorization"""
-        mock_discord_api(unauthorized=True)
+        await mock_auth(unauthorized=True)
         async with btd6ml_test_client.post("/users") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Editing oneself without an Authorization header returns {resp.status}"
