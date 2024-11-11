@@ -153,7 +153,7 @@ def require_perms(
 
             if not (is_admin or is_explist_mod or is_list_mod) and throw_on_permless:
                 return web.json_response(
-                    {"errors": {"": "You need certain roles in the Maplist Discord for this"}, "data": {}},
+                    {"errors": {"": "You don't have the necessary permissions to do this"}, "data": {}},
                     status=http.HTTPStatus.FORBIDDEN,
                 )
 
