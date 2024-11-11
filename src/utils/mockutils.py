@@ -26,14 +26,17 @@ async def set_user_roles(token: str, conn=None) -> None:
     for perm in perms:
         if perm & roles_int:
             roles += perms[perm]
+    roles = list(set(roles))
 
-    await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
-    await conn.executemany(
-        """
-        INSERT INTO user_roles
-            (user_id, role_id)
-        VALUES
-            ($1, $2)
-        """,
-        [(uid, role) for role in roles],
-    )
+    async with conn.transaction():
+        await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
+        await conn.executemany(
+            """
+            INSERT INTO user_roles
+                (user_id, role_id)
+            VALUES
+                ($1, $2)
+            ON CONFLICT DO NOTHING
+            """,
+            [(uid, role) for role in roles],
+        )

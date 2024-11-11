@@ -45,7 +45,7 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
                 status=http.HTTPStatus.UNAUTHORIZED,
             )
         token = request.headers["Authorization"][len("Bearer "):]
-        # await set_user_roles(token)
+        await set_user_roles(token)
         return await handler(request, *args, **kwargs, token=token)
     return wrapper
 
