@@ -31,7 +31,7 @@ ALTER TABLE user_roles ADD CONSTRAINT fk_roles_1
 INSERT INTO roles
     (id, name, edit_maplist, edit_experts, requires_recording, cannot_submit)
 VALUES
-    (1, 'Technician', TRUE, TRUE, TRUE, TRUE),
+    (1, 'Technician', TRUE, TRUE, FALSE, FALSE),
     (2, 'Maplist Owner', TRUE, FALSE, FALSE, FALSE),
     (3, 'Expert List Owner', FALSE, TRUE, FALSE, FALSE),
     (4, 'Maplist Moderator', TRUE, FALSE, FALSE, FALSE),
