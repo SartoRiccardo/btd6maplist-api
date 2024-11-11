@@ -13,6 +13,7 @@ from src.db.queries.users import create_user, get_user_min, get_user_roles
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from ..requests import discord_api
+from .mockutils import set_user_roles
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -44,6 +45,7 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
                 status=http.HTTPStatus.UNAUTHORIZED,
             )
         token = request.headers["Authorization"][len("Bearer "):]
+        # await set_user_roles(token)
         return await handler(request, *args, **kwargs, token=token)
     return wrapper
 

@@ -13,13 +13,15 @@ def get_token_meta(access_token: str) -> tuple[int, int]:
 
 
 class DiscordRequestsMock(DiscordRequests):
-    UNAUTHORIZED =    0b0000001
-    NOT_IN_MAPLIST =  0b0000010
-    NEEDS_RECORDING = 0b0000100
-    BANNED =          0b0001000
-    MAPLIST_MOD =     0b0010000
-    EXPLIST_MOD =     0b0100000
-    ADMIN =           0b1000000
+    UNAUTHORIZED = 2 ** 0
+    NOT_IN_MAPLIST = 2 ** 1
+    NEEDS_RECORDING = 2 ** 2
+    BANNED = 2 ** 3
+    MAPLIST_MOD = 2 ** 4
+    EXPLIST_MOD = 2 ** 5
+    ADMIN = 2 ** 6
+    MAPLIST_OWNER = 2 ** 7
+    EXPLIST_OWNER = 2 ** 8
 
     @staticmethod
     async def get_user_profile(access_token: str) -> dict:
