@@ -226,39 +226,44 @@ ORDER BY placement ASC, user_id DESC;
 ---------------------
 
 CREATE OR REPLACE VIEW leaderboard_experts_points AS
-WITH diff_points AS (
-    SELECT *
-    FROM (
-        VALUES
-            (0, (SELECT value::int FROM config WHERE name='exp_points_casual')),
-            (1, (SELECT value::int FROM config WHERE name='exp_points_medium')),
-            (2, (SELECT value::int FROM config WHERE name='exp_points_high')),
-            (3, (SELECT value::int FROM config WHERE name='exp_points_true')),
-            (4, (SELECT value::int FROM config WHERE name='exp_points_extreme'))
-    ) AS points_values (difficulty, points)
-),
-expert_maps AS (
-    SELECT m.code, p.points
+-- TODO put the difficulty value in the config table and join that
+WITH expert_maps AS (
+    SELECT m.code,
+        c1.value::int AS points,
+        c2.value::int AS extra_nogerry
     FROM maps m
-    JOIN diff_points p
-        ON m.difficulty = p.difficulty
-        AND m.deleted_on IS NULL
+    JOIN config c1
+        ON m.difficulty = c1.difficulty
+        AND c1.name LIKE 'exp_points_%'
+    JOIN config c2
+        ON m.difficulty = c2.difficulty
+        AND c2.name LIKE 'exp_nogerry_points_%'
+    WHERE m.deleted_on IS NULL
         AND m.new_version IS NULL
 ),
 completion_points AS (
-    SELECT DISTINCT lc.map, ply.user_id
+    SELECT
+        lc.map,
+        ply.user_id,
+        BOOL_OR(lc.no_geraldo) AS no_geraldo
     FROM list_completions lc
     JOIN listcomp_players ply
         ON lc.id = ply.run
     WHERE (
             lc.format BETWEEN 51 AND 100
-            OR lc.format = 1  -- Explist completions are a subset of Maplist Completions
+            OR lc.format = 1  -- Explist completions are a superset of Maplist Completions
         )
         AND lc.accepted_by IS NOT NULL
         AND lc.deleted_on IS NULL
+    GROUP BY (lc.map, ply.user_id)
 ),
 leaderboard AS (
-    SELECT cp.user_id, SUM(m.points) AS score
+    SELECT 
+        cp.user_id, 
+        SUM(
+            m.points 
+            + CASE WHEN cp.no_geraldo THEN m.nogerry ELSE 0 END
+        ) AS score
     FROM completion_points cp
     JOIN expert_maps m
         ON m.code = cp.map
