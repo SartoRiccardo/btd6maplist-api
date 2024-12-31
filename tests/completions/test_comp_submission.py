@@ -369,6 +369,28 @@ class TestValidateCompletion:
                         assert "errors" in resp_data and "format" in resp_data["errors"], \
                             "\"format\" is not in errors"
 
+    async def test_submit_nogerry_proof(self, btd6ml_test_client, comp_subm_payload, assert_state_unchanged, save_image):
+        """Test submitting no geraldo runs on different expert difficulties"""
+        subm_img = save_image(6)
+        comp_data = {
+            **comp_subm_payload(),
+            "format": 51,
+            "no_geraldo": True,
+        }
+
+        req_form = to_formdata(comp_data)
+        req_form.add_field("proof_completion", subm_img.open("rb"))
+        async with assert_state_unchanged("/completions/unapproved"), \
+                btd6ml_test_client.post("/maps/MLXXXEC/completions/submit", headers=HEADERS, data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Submitting expert completion without opt hero and no proof returns {resp.status}"
+
+        req_form = to_formdata(comp_data)
+        req_form.add_field("proof_completion", subm_img.open("rb"))
+        async with btd6ml_test_client.post("/maps/MLXXXEA/completions/submit", headers=HEADERS, data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                    f"Submitting a no geraldo run on a medium expert or below with no video proof returns {resp.status}"
+
 
 @pytest.mark.submissions
 class TestHandleSubmissions(CompletionTest):
