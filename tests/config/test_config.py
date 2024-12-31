@@ -38,6 +38,11 @@ EXPLIST_CONFIG = {
     "exp_points_high": 30,
     "exp_points_true": 30,
     "exp_points_extreme": 30,
+    "exp_nogerry_points_casual": 1,
+    "exp_nogerry_points_medium": 3,
+    "exp_nogerry_points_high": 6,
+    "exp_nogerry_points_true": 9,
+    "exp_nogerry_points_extreme": 41,
 }
 
 
