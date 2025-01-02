@@ -135,7 +135,7 @@ async def post(
 
         elif part.name == "data":
             data = await part.json()
-            if len(errors := await validate_completion_submission(data)):
+            if len(errors := await validate_completion_submission(data, resource)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
             if requires_recording and len(data["video_proof_url"]) == 0:

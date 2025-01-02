@@ -1,0 +1,17 @@
+ALTER TABLE config
+    ADD COLUMN difficulty INT DEFAULT NULL;
+
+INSERT INTO config
+    (name, value, type, difficulty)
+VALUES
+    ('exp_nogerry_points_casual', '0', 'int', 0),
+    ('exp_nogerry_points_medium', '0', 'int', 1),
+    ('exp_nogerry_points_high', '0', 'int', 2),
+    ('exp_nogerry_points_true', '0', 'int', 3),
+    ('exp_nogerry_points_extreme', '0', 'int', 4);
+
+UPDATE config SET difficulty=0 WHERE name LIKE '%_casual';
+UPDATE config SET difficulty=1 WHERE name LIKE '%_medium';
+UPDATE config SET difficulty=2 WHERE name LIKE '%_high';
+UPDATE config SET difficulty=3 WHERE name LIKE '%_true';
+UPDATE config SET difficulty=4 WHERE name LIKE '%_extreme';

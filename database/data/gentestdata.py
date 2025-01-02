@@ -86,6 +86,11 @@ def User(user_id: int) -> str:
 
 
 @dataclass
+class MapKey:
+    code: str
+
+
+@dataclass
 class Map:
     id: int
     code: str
@@ -193,7 +198,7 @@ class LCC:
 @dataclass
 class Completion:
     id: int
-    map: Map
+    map: Map | MapKey
     black_border: bool
     no_geraldo: bool
     created_on: int
@@ -625,6 +630,13 @@ def gen_lb_completions(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[i
     return comp_uid, lcc_uid, comps
 
 
+def gen_misc_completions(comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int, list[Completion]]:
+    comps = [
+        Completion(comp_uid+1, MapKey("MLXXXEJ"), False, True, start_timestamp, None, None, 2, 51, None, None, None, [1], [], [])
+    ]
+    return comp_uid+len(comps), lcc_uid, comps
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -637,7 +649,8 @@ if __name__ == '__main__':
     comp_uid, lcc_uid, completions_rec = completions_recent(maps[10], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lccs = gen_extra_lccs(maps[0], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lb = gen_lb_completions(maps[37], comp_uid=comp_uid, lcc_uid=lcc_uid)
-    completions += completions_rec + completions_pro + completions_lccs + completions_lb
+    comp_uid, lcc_uid, completions_misc = gen_misc_completions(comp_uid=comp_uid, lcc_uid=lcc_uid)
+    completions += completions_rec + completions_pro + completions_lccs + completions_lb + completions_misc
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps

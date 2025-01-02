@@ -68,17 +68,21 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     async with btd6ml_test_client.get(f"/users/{user_id}/completions?formats=1,51") as resp:
         user_comps = sorted(
             (await resp.json())["completions"],
-            key=lambda x: x["map"]["code"],
+            key=lambda x: (x["map"]["code"], x["no_geraldo"]),
             reverse=True,
         )
 
     config_keys = ["exp_points_casual", "exp_points_medium", "exp_points_high", "exp_points_true", "exp_points_extreme"]
+    config_keys_nogerry = ["exp_nogerry_points_casual", "exp_nogerry_points_medium", "exp_nogerry_points_high",
+           "exp_nogerry_points_true", "exp_nogerry_points_extreme"]
     points = 0
     for i, comp in enumerate(user_comps):
         if comp["map"]["difficulty"] == -1:
             continue
         if i == 0 or comp["map"]["code"] != user_comps[i - 1]["map"]["code"]:
             points += config[config_keys[comp["map"]["difficulty"]]]
+            if comp["no_geraldo"]:
+                points += config[config_keys_nogerry[comp["map"]["difficulty"]]]
     return points
 
 

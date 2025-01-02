@@ -35,7 +35,7 @@ async def post(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    if len(errors := await validate_completion_submission(json_data)):
+    if len(errors := await validate_completion_submission(json_data, resource)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
     if resource.difficulty == -1 and json_data["format"] in range(50, 100):
         return web.json_response(
