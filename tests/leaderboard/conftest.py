@@ -12,5 +12,9 @@ async def init_nogerry_experts_config(btd6ml_test_client, mock_auth):
         "exp_nogerry_points_extreme": 3,
     }
     await mock_auth(perms=DiscordPermRoles.ADMIN)
-    async with btd6ml_test_client.put("/config", headers={"Authorization": "Bearer test_client"}, json=config_init):
+    async with btd6ml_test_client.put(
+            "/config",
+            headers={"Authorization": "Bearer test_client"},
+            json={"config": config_init}
+    ):
         pass
