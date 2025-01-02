@@ -369,8 +369,10 @@ class TestValidateCompletion:
                         assert "errors" in resp_data and "format" in resp_data["errors"], \
                             "\"format\" is not in errors"
 
-    async def test_submit_nogerry_proof(self, btd6ml_test_client, comp_subm_payload, assert_state_unchanged, save_image):
+    async def test_submit_nogerry_proof(self, btd6ml_test_client, comp_subm_payload, assert_state_unchanged,
+                                        save_image, mock_auth):
         """Test submitting no geraldo runs on different expert difficulties"""
+        await mock_auth()
         subm_img = save_image(6)
         comp_data = {
             **comp_subm_payload(),

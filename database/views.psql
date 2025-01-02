@@ -226,7 +226,6 @@ ORDER BY placement ASC, user_id DESC;
 ---------------------
 
 CREATE OR REPLACE VIEW leaderboard_experts_points AS
--- TODO put the difficulty value in the config table and join that
 WITH expert_maps AS (
     SELECT m.code,
         c1.value::int AS points,
@@ -262,7 +261,7 @@ leaderboard AS (
         cp.user_id, 
         SUM(
             m.points 
-            + CASE WHEN cp.no_geraldo THEN m.nogerry ELSE 0 END
+            + CASE WHEN cp.no_geraldo THEN m.extra_nogerry ELSE 0 END
         ) AS score
     FROM completion_points cp
     JOIN expert_maps m
