@@ -55,11 +55,8 @@ async def put(
         ],
         "lcc": None if resource.lcc is None else {
             "leftover": resource.lcc.leftover,
-            "proof_completion": resource.lcc.proof,
         },
         "format": resource.format,
     }
-    if resource.lcc is not None:
-        dict_res["proof"] = resource.lcc.proof
     asyncio.create_task(src.log.log_action("completion", "post", resource.id, dict_res, profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

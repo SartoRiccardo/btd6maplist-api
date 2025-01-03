@@ -230,7 +230,10 @@ async def validate_submission(body: dict) -> dict:
     return errors
 
 
-async def validate_completion_submission(body: dict) -> dict:
+async def validate_completion_submission(
+    body: dict,
+    on_map: "src.db.models.PartialMap",
+) -> dict:
     check_fields_exists = {
         "format": int,
         "notes": str | None,
@@ -252,8 +255,12 @@ async def validate_completion_submission(body: dict) -> dict:
                 errors[f"video_proof_url[{i}]"] = f"URLs must be long max. {MAX_TEXT_LEN} each"
             if not validators.url(url):
                 errors[f"video_proof_url[{i}]"] = "Invalid video URL"
-    if (body["black_border"] or body["no_geraldo"] or body["current_lcc"]) and \
-            len(body["video_proof_url"]) == 0:
+    requires_recording = body["black_border"] or body["current_lcc"] or \
+            body["no_geraldo"] and (
+                not (50 <= body["format"] < 100) or
+                50 <= body["format"] <= 100 and not (0 <= on_map.difficulty <= 1)
+            )
+    if requires_recording and len(body["video_proof_url"]) == 0:
         errors["video_proof_url"] = "Missing proof URL"
     if body["current_lcc"]:
         if "leftover" not in body or not isinstance(body["leftover"], int):
