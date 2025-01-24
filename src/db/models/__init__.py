@@ -6,6 +6,7 @@ from .users import User, PartialUser, MaplistProfile, MaplistMedals
 from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
+from .AchievementRole import DiscordRole, AchievementRole
 
 
 swagger_definitions_str = """
@@ -95,6 +96,8 @@ entities = [
     MaplistMedals,
     MapSubmission,
     Role,
+    DiscordRole,
+    AchievementRole,
 ]
 for entity in entities:
     if not entity.__doc__:
