@@ -15,6 +15,7 @@ DB_HOST = "127.0.0.1"
 DB_NAME = "database"
 
 BOT_PUBKEY = "btd6maplist-bot.pub.pem"
+BOT_TOKEN = "bot-token.jwt"
 
 CORS_ORIGINS = ["*"]
 
