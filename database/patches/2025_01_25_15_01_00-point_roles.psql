@@ -1,5 +1,4 @@
 CREATE TABLE IF NOT EXISTS achievement_roles(
-    id SERIAL PRIMARY KEY,
     lb_format INT NOT NULL,
     lb_type VARCHAR(16) NOT NULL,
     threshold INT NOT NULL DEFAULT 0,
@@ -7,16 +6,20 @@ CREATE TABLE IF NOT EXISTS achievement_roles(
     tooltip_description VARCHAR(128),
     name VARCHAR(32) NOT NULL,
     clr_border INT NOT NULL DEFAULT 0,
-    clr_inner INT NOT NULL DEFAULT 0
+    clr_inner INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (lb_format, lb_type, threshold)
 );
 ALTER TABLE achievement_roles
     ADD CONSTRAINT achievement_roles_uq_1 UNIQUE(lb_format, lb_type, threshold);
 
-CREATE TABLE IF NOT EXISTS discord_role(
-    achievement_role_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS discord_roles(
+    ar_lb_format INT NOT NULL,
+    ar_lb_type VARCHAR(16) NOT NULL,
+    ar_threshold INT NOT NULL DEFAULT 0,
     guild_id BIGINT NOT NULL,
-    role_id BIGINT NOT NULL
+    role_id BIGINT NOT NULL PRIMARY KEY
 );
-ALTER TABLE discord_role
+ALTER TABLE discord_roles
     ADD CONSTRAINT achievement_roles_fk_1
-    FOREIGN KEY(achievement_role_id) REFERENCES achievement_roles(id);
+    FOREIGN KEY (ar_lb_format, ar_lb_type, ar_threshold)
+        REFERENCES achievement_roles(lb_format, lb_type, threshold);

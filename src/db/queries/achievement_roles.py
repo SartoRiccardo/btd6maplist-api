@@ -11,7 +11,6 @@ async def get_roles(
     payload = await conn.fetch(
         """
         SELECT 
-            ar.id,
             ar.lb_format,
             ar.lb_type,
             ar.threshold,
@@ -21,16 +20,17 @@ async def get_roles(
             ar.clr_border,
             ar.clr_inner,
             ARRAY_AGG((dr.guild_id, dr.role_id))
-                OVER (PARTITION by ar.id) AS linked_roles
+                OVER (PARTITION by (dr.ar_lb_format, dr.ar_lb_type, dr.ar_threshold)) AS linked_roles
         FROM achievement_roles ar
-        JOIN discord_role dr
-            ON ar.id = dr.achievement_role_id
+        LEFT JOIN discord_roles dr
+            ON ar.lb_format = dr.ar_lb_format
+            AND ar.lb_type = dr.ar_lb_type
+            AND ar.threshold = dr.ar_threshold
         """
     )
 
     return [
         AchievementRole(
-            row["id"],
             row["lb_format"],
             row["lb_type"],
             row["threshold"],
@@ -39,10 +39,100 @@ async def get_roles(
             row["name"],
             row["clr_border"],
             row["clr_inner"],
-            [DiscordRole(
-                row["linked_roles"][0],
-                row["linked_roles"][1],
-            )]
+            [
+                DiscordRole(gid, rid)
+                for gid, rid in row["linked_roles"]
+                if gid is not None and rid is not None
+            ],
         )
         for row in payload
     ]
+
+
+@postgres
+async def get_duplicate_ds_roles(
+        lb_format: int,
+        lb_type: str,
+        role_list: list[int],
+        conn: asyncpg.pool.PoolConnectionProxy = None,
+) -> list[int]:
+    payload = await conn.fetch(
+        """
+        SELECT
+            role_id
+        FROM discord_roles
+        WHERE ar_lb_format != $1
+            AND ar_lb_type != $2
+            AND NOT role_id = ANY($3::bigint[])
+        """,
+        lb_format, lb_type, role_list,
+    )
+    return [r["role_id"] for r in payload]
+
+
+@postgres
+async def update_ach_roles(
+        lb_format: int,
+        lb_type: str,
+        role_list: list[dict],
+        conn: asyncpg.pool.PoolConnectionProxy = None,
+) -> None:
+    async with conn.transaction():
+        await conn.execute(
+            """
+            CREATE TEMP TABLE tmp_achievement_roles (
+                lb_format INT,
+                lb_type VARCHAR(16),
+                threshold INT,
+                for_first BOOLEAN,
+                tooltip_description VARCHAR(128),
+                name VARCHAR(32),
+                clr_border INT,
+                clr_inner INT
+            ) ON COMMIT DROP
+            """
+        )
+        await conn.executemany(
+            """
+            INSERT INTO tmp_achievement_roles
+                (lb_format, lb_type, threshold, for_first, tooltip_description, name, clr_border, clr_inner)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, $7, $8)
+            """,
+            [(
+                lb_format, lb_type, r["threshold"], r["for_first"], r["tooltip_description"], r["name"],
+                r["clr_border"], r["clr_inner"],
+            ) for r in role_list],
+        )
+        await conn.execute(
+            """
+            DELETE FROM achievement_roles
+            WHERE (lb_format, lb_type, threshold) NOT IN (
+                SELECT
+                    lb_format, lb_type, threshold
+                FROM tmp_achievement_roles
+            );
+
+            UPDATE achievement_roles ar
+            SET for_first = tar.for_first,
+                tooltip_description = tar.tooltip_description,
+                name = tar.name,
+                clr_border = tar.clr_border,
+                clr_inner = tar.clr_inner
+            FROM tmp_achievement_roles tar
+            WHERE ar.lb_format = tar.lb_format
+                AND ar.lb_type = tar.lb_type
+                AND ar.threshold = tar.threshold;
+
+            INSERT INTO achievement_roles
+                (lb_format, lb_type, threshold, for_first, tooltip_description, name, clr_border, clr_inner)
+            SELECT
+                lb_format, lb_type, threshold, for_first, tooltip_description, name, clr_border, clr_inner
+            FROM tmp_achievement_roles
+            WHERE (lb_format, lb_type, threshold) NOT IN (
+                SELECT
+                    lb_format, lb_type, threshold
+                FROM achievement_roles
+            );
+            """,
+        )

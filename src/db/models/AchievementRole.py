@@ -16,6 +16,12 @@ class DiscordRole:
     guild_id: int
     role_id: int
 
+    def to_json(self) -> dict:
+        return {
+            "guild_id": str(self.guild_id),
+            "role_id": str(self.role_id),
+        }
+
 
 @dataclass
 class AchievementRole:
@@ -52,7 +58,6 @@ class AchievementRole:
           $ref: "#/components/schemas/DiscordRole"
         description: The Discord roles linked to this role, if any
     """
-    id: int
     lb_format: int
     lb_type: str
     threshold: int
@@ -62,3 +67,16 @@ class AchievementRole:
     clr_border: int
     clr_inner: int
     linked_roles: list[DiscordRole]
+
+    def to_json(self) -> dict:
+        return {
+            "lb_format": self.lb_format,
+            "lb_type": self.lb_type,
+            "threshold": self.threshold,
+            "for_first": self.for_first,
+            "tooltip_description": self.tooltip_description,
+            "name": self.name,
+            "clr_border": self.clr_border,
+            "clr_inner": self.clr_inner,
+            "linked_roles": [lr.to_json() for lr in self.linked_roles]
+        }
