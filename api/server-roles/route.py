@@ -93,4 +93,8 @@ async def get(
         find_overlapping_ids(valid_guilds, found_guilds, bot_guilds)
 
     await asyncio.gather(*[load_guild_roles(guild) for guild in bot_guilds])
-    return web.json_response([g for g in bot_guilds if len(g["roles"])])
+    return web.json_response([
+        extract(g, ["id", "name", "roles"])
+        for g in bot_guilds
+        if len(g["roles"])
+    ])
