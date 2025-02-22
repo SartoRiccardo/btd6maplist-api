@@ -425,10 +425,11 @@ async def validate_achievement_roles(body: dict) -> dict:
             has_first = True
         elif role["threshold"] <= 0:
             errors[f"roles[{i}].threshold"] = "Threshold must be positive"
-        if len(role["tooltip_description"]) == 0:
-            role["tooltip_description"] = None
-        elif len(role["tooltip_description"]) > MAX_TOOLTIP_LEN:
-            errors[f"roles[{i}].tooltip_description"] = f"Tooltip description must be max {MAX_TOOLTIP_LEN} characters long"
+        if role["tooltip_description"] is not None:
+            if len(role["tooltip_description"]) == 0:
+                role["tooltip_description"] = None
+            elif len(role["tooltip_description"]) > MAX_TOOLTIP_LEN:
+                errors[f"roles[{i}].tooltip_description"] = f"Tooltip description must be max {MAX_TOOLTIP_LEN} characters long"
         if len(role["name"]) == 0:
             errors[f"roles[{i}].name"] = f"Name cannot be blank"
         elif len(role["name"]) > MAX_ROLE_NAME_LEN:

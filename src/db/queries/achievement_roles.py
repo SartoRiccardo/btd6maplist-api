@@ -1,4 +1,5 @@
 import asyncpg.pool
+from typing import Generator
 import src.db.connection
 from src.db.models import AchievementRole, DiscordRole
 postgres = src.db.connection.postgres
@@ -77,6 +78,11 @@ async def update_ach_roles(
         role_list: list[dict],
         conn: asyncpg.pool.PoolConnectionProxy = None,
 ) -> None:
+    def generate_discord_role_list() -> Generator[tuple[int, str, int, str, str], None, None]:
+        for r in role_list:
+            for dr in r["linked_roles"]:
+                yield lb_format, lb_type, r["threshold"], dr["guild_id"], dr["role_id"]
+
     async with conn.transaction():
         await conn.execute(
             """
@@ -89,7 +95,15 @@ async def update_ach_roles(
                 name VARCHAR(32),
                 clr_border INT,
                 clr_inner INT
-            ) ON COMMIT DROP
+            ) ON COMMIT DROP;
+            
+            CREATE TEMP TABLE tmp_discord_roles (
+                ar_lb_format INT NOT NULL,
+                ar_lb_type VARCHAR(16) NOT NULL,
+                ar_threshold INT NOT NULL DEFAULT 0,
+                guild_id BIGINT NOT NULL,
+                role_id BIGINT NOT NULL PRIMARY KEY
+            ) ON COMMIT DROP;
             """
         )
         await conn.executemany(
@@ -104,6 +118,15 @@ async def update_ach_roles(
                 r["clr_border"], r["clr_inner"],
             ) for r in role_list],
         )
+        await conn.executemany(
+            """
+            INSERT INTO tmp_discord_roles
+                (ar_lb_format, ar_lb_type, ar_threshold, guild_id, role_id)
+            VALUES
+                ($1, $2, $3, $4, $5)
+            """,
+            [data for data in generate_discord_role_list()]
+        )
         await conn.execute(
             """
             DELETE FROM achievement_roles
@@ -111,8 +134,14 @@ async def update_ach_roles(
                 SELECT
                     lb_format, lb_type, threshold
                 FROM tmp_achievement_roles
-            );
-
+            )
+            AND lb_format = $1
+            AND lb_type = $2
+            """,
+            lb_format, lb_type
+        )
+        await conn.execute(
+            """
             UPDATE achievement_roles ar
             SET for_first = tar.for_first,
                 tooltip_description = tar.tooltip_description,

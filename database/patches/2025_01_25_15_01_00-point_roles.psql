@@ -22,4 +22,5 @@ CREATE TABLE IF NOT EXISTS discord_roles(
 ALTER TABLE discord_roles
     ADD CONSTRAINT achievement_roles_fk_1
     FOREIGN KEY (ar_lb_format, ar_lb_type, ar_threshold)
-        REFERENCES achievement_roles(lb_format, lb_type, threshold);
+        REFERENCES achievement_roles(lb_format, lb_type, threshold)
+        ON DELETE CASCADE;
