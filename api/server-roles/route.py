@@ -62,29 +62,13 @@ async def load_guild_roles(guild: dict) -> None:
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def get(
-        request: web.Request,
+        _r: web.Request,
         token: str = None,
         **_kwargs,
 ) -> web.Response:
-    valid_guilds = filter_valid_guilds(await discord_api().get_user_guilds(token))
-    # async with src.http.http.get(
-    #         "https://discord.com/api/v10/users/@me/guilds",
-    #         headers={"Authorization": f"Bearer {token}"}
-    # ) as resp:
-    #     if not resp.ok:
-    #         return web.json_response([])
-    #     valid_guilds = filter_valid_guilds(await resp.json())
-
     bot_guilds = []
+    valid_guilds = filter_valid_guilds(await discord_api().get_user_guilds(token))
     while len(valid_guilds):
-        # async with src.http.http.get(
-        #     f"https://discord.com/api/v10/users/@me/guilds?after={int(valid_guilds[0]['id']) - 1}",
-        #     headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": BOT_UA}
-        # ) as resp:
-        #     found_guilds = filter_valid_guilds(await resp.json()) if resp.ok else []
-        #     if not len(found_guilds):
-        #         break
-        #     find_overlapping_ids(valid_guilds, found_guilds, bot_guilds)
         found_guilds = filter_valid_guilds(
             await discord_api().get_application_guilds(int(valid_guilds[0]["id"]) - 1)
         )
