@@ -63,3 +63,10 @@ def aggregate_payload(
             grouped[i-tgi_s].append(row[i])
     new_pl.append([*current, *unchanged, *[list(set(f)) for f in grouped]])
     return new_pl
+
+
+def extract(obj: dict, props: list[str]):
+    extracted = {}
+    for p in props:
+        extracted[p] = obj[p]
+    return extracted
