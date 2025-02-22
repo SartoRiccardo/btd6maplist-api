@@ -66,6 +66,7 @@ async def get(
         token: str = None,
         **_kwargs,
 ) -> web.Response:
+    """Utility endpoint that gets valid guilds/roles for role picking sections on the website."""
     bot_guilds = []
     valid_guilds = filter_valid_guilds(await discord_api().get_user_guilds(token))
     while len(valid_guilds):
