@@ -11,7 +11,7 @@ async def get_roles(
 ) -> list[AchievementRole]:
     payload = await conn.fetch(
         """
-        SELECT 
+        SELECT DISTINCT ON (ar.lb_format, ar.lb_type, ar.threshold)
             ar.lb_format,
             ar.lb_type,
             ar.threshold,
@@ -78,10 +78,10 @@ async def update_ach_roles(
         role_list: list[dict],
         conn: asyncpg.pool.PoolConnectionProxy = None,
 ) -> None:
-    def generate_discord_role_list() -> Generator[tuple[int, str, int, str, str], None, None]:
+    def generate_discord_role_list() -> Generator[tuple[int, str, int, int, int], None, None]:
         for r in role_list:
             for dr in r["linked_roles"]:
-                yield lb_format, lb_type, r["threshold"], dr["guild_id"], dr["role_id"]
+                yield lb_format, lb_type, r["threshold"], int(dr["guild_id"]), int(dr["role_id"])
 
     async with conn.transaction():
         await conn.execute(
@@ -102,7 +102,7 @@ async def update_ach_roles(
                 ar_lb_type VARCHAR(16) NOT NULL,
                 ar_threshold INT NOT NULL DEFAULT 0,
                 guild_id BIGINT NOT NULL,
-                role_id BIGINT NOT NULL PRIMARY KEY
+                role_id BIGINT NOT NULL
             ) ON COMMIT DROP;
             """
         )
@@ -151,8 +151,8 @@ async def update_ach_roles(
             FROM tmp_achievement_roles tar
             WHERE ar.lb_format = tar.lb_format
                 AND ar.lb_type = tar.lb_type
-                AND ar.threshold = tar.threshold;
-
+                AND ar.threshold = tar.threshold
+            ;
             INSERT INTO achievement_roles
                 (lb_format, lb_type, threshold, for_first, tooltip_description, name, clr_border, clr_inner)
             SELECT
@@ -166,4 +166,38 @@ async def update_ach_roles(
             """,
         )
 
-        # TODO Modify linked roles
+        await conn.execute(
+            """
+            DELETE FROM discord_roles
+            WHERE (role_id) NOT IN (
+                SELECT role_id
+                FROM tmp_discord_roles
+                WHERE ar_lb_format = $1
+                    AND ar_lb_type = $2
+            )
+            """,
+            lb_format, lb_type
+        )
+        await conn.execute(
+            """
+            UPDATE discord_roles dr
+            SET
+                guild_id = tdr.guild_id,
+                ar_lb_format = tdr.ar_lb_format,
+                ar_lb_type = tdr.ar_lb_type,
+                ar_threshold = tdr.ar_threshold
+            FROM tmp_discord_roles tdr
+            WHERE tdr.role_id = dr.role_id
+            ;
+            INSERT INTO discord_roles
+                (ar_lb_format, ar_lb_type, ar_threshold, guild_id, role_id)
+            SELECT
+                ar_lb_format, ar_lb_type, ar_threshold, guild_id, role_id
+            FROM tmp_discord_roles
+            WHERE (role_id) NOT IN (
+                SELECT role_id
+                FROM discord_roles
+            )
+            ;
+            """
+        )
