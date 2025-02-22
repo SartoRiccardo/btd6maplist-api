@@ -445,6 +445,11 @@ async def validate_achievement_roles(body: dict) -> dict:
             else:
                 discord_role_idxs[int(discord_role["role_id"])] = (i, j)
 
+    rep_threshold_idx = get_repeated_indexes([rl["threshold"] for rl in body["roles"]])
+    if len(rep_threshold_idx):
+        for idx in rep_threshold_idx:
+            errors[f"roles[{idx}].threshold"] = "Duplicate threshold"
+
     if len(errors) == 0:
         role_dupes = await get_duplicate_ds_roles(body["lb_format"], body["lb_type"], list(discord_role_idxs.keys()))
         for dupe in role_dupes:
