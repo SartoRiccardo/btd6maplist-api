@@ -75,7 +75,7 @@ class TestAchievementRoleValidation:
                     f"Setting {path} to {dtype} returns {resp.status}"
 
     async def test_forbidden(self, assert_state_unchanged, mock_auth, btd6ml_test_client):
-        """Test a submission from a user banned from submitting"""
+        """Test a submission from a user without appropriate perms"""
 
     async def test_submit_invalid(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test setting fields to invalid values"""
@@ -104,6 +104,7 @@ class TestAchievementRoleValidation:
             ("a" * 1000, f"a role with a [keypath] too long and non-numeric"),
         ]
         invalid_schema = {
+            None: ["lb_type"],
             "roles": {
                 None: ["name", "tooltip_description"],
                 "linked_roles": ["guild_id", "role_id"],
@@ -127,9 +128,9 @@ class TestAchievementRoleValidation:
             await call_endpoints(req_data, edited_path, error_msg)
 
         validations = [
-            (0x1000000, f"a negative number to [keypath]"),
+            (0x1000000, f"a number too large to [keypath]"),
         ]
-        invalid_schema = {"roles": ["clr_border", "clr_inner"]}
+        invalid_schema = {None: ["lb_format"], "roles": ["clr_border", "clr_inner"]}
         for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 

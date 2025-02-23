@@ -145,30 +145,27 @@ def invalidate_field(
                 current_path.pop()
     elif isinstance(schema, list):
         for key in schema:
-            appended = 1
+            appended = 0
             request_data = copy.deepcopy(full_data)
             current_data = request_data
+            current_path_follow = [*current_path]
             for i, path_key in enumerate(current_path):
                 while isinstance(current_data, list) and \
                         isinstance(current_data[0], dict | list):
-                    appended += 1
-                    current_path.append(0)
+                    current_path_follow.insert(i+appended, 0)
                     current_data = current_data[0]
+                    appended += 1
                 current_data = current_data[path_key]
             while isinstance(current_data, list) and \
                     isinstance(current_data[0], dict | list):
-                appended += 1
-                current_path.append(0)
+                current_path_follow.append(0)
                 current_data = current_data[0]
-            current_path.append(key)
+            current_path_follow.append(key)
 
-            edited_path = stringify_path(current_path)
+            edited_path = stringify_path(current_path_follow)
             for test_val, error_msg in validations:
                 current_data[key] = test_val
                 yield request_data, edited_path, error_msg
-
-            for _ in range(appended):
-                current_path.pop()
 
 
 def remove_fields(data_current: Any, full_data: dict = None, current_path=None) -> Generator[tuple[dict, str], None, None]:

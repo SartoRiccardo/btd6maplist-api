@@ -414,7 +414,7 @@ async def validate_achievement_roles(body: dict) -> dict:
     if not is_format_valid(body["lb_format"]):
         errors["lb_format"] = "Format does not exist"
     if body["lb_type"] not in ["points", "no_geraldo", "black_border", "lccs"]:
-        errors["lb_format"] = "Leaderboard type does not exist"
+        errors["lb_type"] = "Leaderboard type does not exist"
 
     has_first = False
     discord_role_idxs = {}
@@ -438,7 +438,7 @@ async def validate_achievement_roles(body: dict) -> dict:
         if not (0 <= role["clr_border"] <= 0xFFFFFF):
             errors[f"roles[{i}].clr_border"] = f"Invalid color"
         if not (0 <= role["clr_inner"] <= 0xFFFFFF):
-            errors[f"roles[{i}].clr_border"] = f"Invalid color"
+            errors[f"roles[{i}].clr_inner"] = f"Invalid color"
         for j, discord_role in enumerate(role["linked_roles"]):
             if not discord_role["guild_id"].isnumeric():
                 errors[f"roles[{i}].linked_roles[{j}].guild_id"] = "Invalid Guild ID"
