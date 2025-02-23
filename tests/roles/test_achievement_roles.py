@@ -160,6 +160,13 @@ class TestAchievementRoleValidation:
                 ],
                 "schema": {None: ["lb_format"], "roles": ["clr_border", "clr_inner"]},
             },
+            # Steal role
+            {
+                "validations": [
+                    ("4208402703829", "a taken Discord role from another achievement role")
+                ],
+                "schema": {"roles": {"linked_roles": ["role_id"]}}
+            }
         ]
 
         for check in checks:
