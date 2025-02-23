@@ -25,6 +25,7 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
             "avatarURL": None,
             "bannerURL": None,
             "roles": [],
+            "achievement_roles": [],
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
@@ -50,7 +51,38 @@ class TestGetUsers:
                 "cannot_submit": False,
             },
         ]
-        await validate_user(USER_ID, profile_overrides={"roles": roles})
+        await validate_user(USER_ID, profile_overrides={
+            "roles": roles,
+            "achievement_roles": [
+                {
+                    "clr_border": 6782619,
+                    "clr_inner": 9004349,
+                    "for_first": False,
+                    "lb_format": 1,
+                    "lb_type": "points",
+                    "linked_roles": [
+                        {
+                            "guild_id": "3780309980101",
+                            "role_id": "4004915198708",
+                        },
+                    ],
+                    "name": "List lv2",
+                    "threshold": 100,
+                    "tooltip_description": "100+ points",
+                },
+                {
+                    "clr_border": 13232760,
+                    "clr_inner": 16749515,
+                    "for_first": False,
+                    "lb_format": 51,
+                    "lb_type": "points",
+                    "linked_roles": [],
+                    "name": "Experts lv1",
+                    "threshold": 1,
+                    "tooltip_description": None,
+                },
+            ],
+        })
 
     async def test_invalid_user(self, btd6ml_test_client):
         """Test getting a nonexistent user by ID, or an invalid string as an ID"""
@@ -173,6 +205,30 @@ class TestEditSelf:
                     "https://static-api.nkstatic.com/appdocs/4/assets/opendata/a5d32db006cb5d8d535a14494320fc92_ProfileAvatar26.png",
                 "bannerURL":
                     "https://static-api.nkstatic.com/appdocs/4/assets/opendata/aaeaf38ca1c20d6df888cae9c3c99abe_ProfileBanner43.png",
+                "achievement_roles": [
+                    {
+                        "clr_border": 6782619,
+                        "clr_inner": 9004349,
+                        "for_first": False,
+                        "lb_format": 1,
+                        "lb_type": "points",
+                        "linked_roles": [{"guild_id": "3780309980101", "role_id": "4004915198708"}],
+                        "name": "List lv2",
+                        "threshold": 100,
+                        "tooltip_description": "100+ points",
+                    },
+                    {
+                        "clr_border": 13232760,
+                        "clr_inner": 16749515,
+                        "for_first": False,
+                        "lb_format": 51,
+                        "lb_type": "points",
+                        "linked_roles": [],
+                        "name": "Experts lv1",
+                        "threshold": 1,
+                        "tooltip_description": None,
+                    },
+                ],
             }
             await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
