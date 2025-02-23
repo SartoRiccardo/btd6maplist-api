@@ -4,6 +4,7 @@ import pytest
 @pytest.mark.users
 @pytest.mark.get
 async def test_valid_roles(btd6ml_test_client):
+    """Test validating a user's achievement roles"""
     async with btd6ml_test_client.get("/roles/achievement") as resp:
         assert resp.ok, f"Getting achievement roles returned {resp.status}"
         ach_roles = sorted(

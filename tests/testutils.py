@@ -78,7 +78,7 @@ def fuzz_data(
         int_as_float: bool = False,
 ) -> Generator[tuple[dict, str, list | dict | float | str | None], None, None]:
     extra_expected = {} if extra_expected is None else extra_expected
-    test_values = [[], {}, 1.7, "a", None]
+    test_values = [[], {}, 1.7, "a", "1", None]
 
     def create_data(key_path: list):
         request_data = copy.deepcopy(full_data)

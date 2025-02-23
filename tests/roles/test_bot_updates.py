@@ -17,6 +17,7 @@ update_schema = {
 @pytest.mark.bot
 @pytest.mark.roles
 async def test_get_role_updates(btd6ml_test_client, mock_auth, sign_message):
+    """Test getting and resetting the update endpoints"""
     qparams = {"signature": sign_message(b"")}
     async with btd6ml_test_client.get(f"/roles/achievement/updates/bot?{urllib.parse.urlencode(qparams)}") as resp:
         assert resp.status == http.HTTPStatus.OK, f"Getting achievement updates returned {resp.status}"
@@ -60,6 +61,7 @@ async def test_get_role_updates(btd6ml_test_client, mock_auth, sign_message):
 @pytest.mark.bot
 @pytest.mark.roles
 async def test_update_delete_roles(btd6ml_test_client, mock_auth, sign_message):
+    """Test deleting all roles and checking the update endpoint"""
     qparams = {"signature": sign_message(b"")}
     await mock_auth(perms=DiscordPermRoles.ADMIN)
 
