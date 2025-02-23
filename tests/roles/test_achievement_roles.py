@@ -49,8 +49,51 @@ async def test_get_ach_roles(btd6ml_test_client):
         assert role_min not in found, f"Duplicate role {role_min} found"
 
 
-async def test_submit_roles():
+async def test_submit_roles(btd6ml_test_client, mock_auth):
     """Test changing a format's roles, and not interfering with other roles"""
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    data = {
+        "lb_format": 1,
+        "lb_type": "points",
+        "roles": [
+            sample_achievement_role(0),
+            sample_achievement_role(10),
+            sample_achievement_role(100),
+        ]
+    }
+
+    def filter_roles(roles: list[dict], unchanged: bool = True) -> list[dict]:
+        return [
+            {
+                **role,
+                "linked_roles": sorted(
+                    role["linked_roles"],
+                    key=lambda x: (x["guild_id"], x["role_id"])
+                )
+            }
+            for role in roles
+            if unchanged and (role["lb_format"], role["lb_type"]) != (1, "points")
+               or not unchanged and (role["lb_format"], role["lb_type"]) == (1, "points")
+        ]
+
+    async with btd6ml_test_client.get("/roles/achievement") as resp_pre, \
+            btd6ml_test_client.put("/roles/achievement", json=data, headers=HEADERS) as resp_edit, \
+            btd6ml_test_client.get("/roles/achievement") as resp_post:
+        assert resp_edit.status == http.HTTPStatus.NO_CONTENT, \
+            f"Editing the achievement roles returned {resp_edit.status}"
+
+        pre_roles = await resp_pre.json()
+        post_roles = await resp_post.json()
+        assert filter_roles(pre_roles) == filter_roles(post_roles), \
+            "The achievement roles that shouldn't have changed, changed"
+
+        # Order of the items is important in the check. Didn't bother sorting.
+        expected_new = [
+            {**role, "lb_format": 1, "lb_type": "points"}
+            for role in data["roles"]
+        ]
+        assert expected_new == filter_roles(post_roles, False), \
+            "Newly inserted roles are different from expected"
 
 
 class TestAchievementRoleValidation:
