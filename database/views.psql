@@ -457,7 +457,7 @@ ORDER BY placement ASC, user_id DESC;
 -- Leaderboard snapshots --
 ---------------------------
 
-CREATE VIEW all_leaderboards AS
+CREATE OR REPLACE VIEW all_leaderboards AS
 SELECT 1 AS lb_format, 'points' AS lb_type, * FROM leaderboard_maplist_points
 UNION ALL
 SELECT 1 AS lb_format, 'lccs' AS lb_type, * FROM leaderboard_maplist_lccs
@@ -475,6 +475,36 @@ UNION ALL
 SELECT 51 AS lb_format, 'black_border' AS lb_type, * FROM leaderboard_experts_black_border
 ;
 
-DROP MATERIALIZED VIEW IF EXISTS snapshot_all_leaderboards CASCADE;
-CREATE MATERIALIZED VIEW snapshot_all_leaderboards AS
-SELECT * FROM all_leaderboards;
+CREATE OR REPLACE VIEW lb_linked_roles AS
+WITH user_linked_roles AS (
+    SELECT DISTINCT ON (lb.placement, ar.lb_format, ar.lb_type)
+        lb.user_id,
+        ar.lb_format,
+        ar.lb_type,
+        ar.threshold
+    FROM all_leaderboards lb
+    JOIN achievement_roles ar
+        ON lb.lb_format = ar.lb_format AND lb.lb_type = ar.lb_type
+    WHERE lb.score >= ar.threshold AND NOT ar.for_first
+        OR lb.placement = 1 AND ar.for_first
+    ORDER BY
+        lb.placement,
+        ar.lb_format,
+        ar.lb_type,
+        ar.for_first DESC,
+        ar.threshold DESC
+)
+SELECT
+    ulr.user_id,
+    dr.guild_id,
+    dr.role_id
+FROM user_linked_roles ulr
+JOIN discord_roles dr
+    ON ulr.lb_format = dr.ar_lb_format
+    AND ulr.lb_type = dr.ar_lb_type
+    AND ulr.threshold = dr.ar_threshold
+;
+
+DROP MATERIALIZED VIEW IF EXISTS snapshot_lb_linked_roles CASCADE;
+CREATE MATERIALIZED VIEW snapshot_lb_linked_roles AS
+SELECT * FROM lb_linked_roles;

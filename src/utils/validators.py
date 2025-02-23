@@ -423,6 +423,7 @@ async def validate_achievement_roles(body: dict) -> dict:
             if has_first:
                 errors[f"roles[{i}].for_first"] = "Can only have one role for first place"
             has_first = True
+            role["threshold"] = 0
         elif role["threshold"] <= 0:
             errors[f"roles[{i}].threshold"] = "Threshold must be positive"
         if role["tooltip_description"] is not None:

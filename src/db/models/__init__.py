@@ -6,7 +6,7 @@ from .users import User, PartialUser, MaplistProfile, MaplistMedals
 from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
-from .AchievementRole import DiscordRole, AchievementRole
+from .AchievementRole import DiscordRole, AchievementRole, RoleUpdateAction
 
 
 swagger_definitions_str = """
@@ -98,6 +98,7 @@ entities = [
     Role,
     DiscordRole,
     AchievementRole,
+    RoleUpdateAction,
 ]
 for entity in entities:
     if not entity.__doc__:

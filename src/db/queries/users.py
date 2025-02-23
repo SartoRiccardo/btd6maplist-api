@@ -498,7 +498,7 @@ async def get_user_achievement_roles(uid: str | int, conn=None) -> list[Achievem
             ORDER BY
                 ar.lb_format,
                 ar.lb_type,
-                ar.for_first ASC,
+                ar.for_first DESC,
                 ar.threshold DESC
         )
         SELECT DISTINCT ON (ar.lb_format, ar.lb_type, ar.threshold)

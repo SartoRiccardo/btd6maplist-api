@@ -80,3 +80,36 @@ class AchievementRole:
             "clr_inner": self.clr_inner,
             "linked_roles": [lr.to_dict() for lr in self.linked_roles]
         }
+
+
+@dataclass
+class RoleUpdateAction:
+    """
+    type: object
+    properties:
+      user_id:
+        type: string
+        description: The ID of the user to update.
+      guild_id:
+        type: string
+        description: The ID of the guild to modify its roles in.
+      role_id:
+        type: string
+        description: The ID of the role to add/remove.
+      action:
+        type: string
+        enum: ["ADD", "DEL"]
+        description: Whether to add or delete the role.
+    """
+    user_id: int
+    guild_id: int
+    role_id: int
+    is_new: bool
+
+    def to_dict(self) -> dict:
+        return {
+            "user_id": str(self.user_id),
+            "guild_id": str(self.guild_id),
+            "role_id": str(self.role_id),
+            "action": "ADD" if self.is_new else "DEL",
+        }

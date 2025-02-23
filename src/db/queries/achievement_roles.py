@@ -1,7 +1,7 @@
 import asyncpg.pool
 from typing import Generator
 import src.db.connection
-from src.db.models import AchievementRole, DiscordRole
+from src.db.models import AchievementRole, DiscordRole, RoleUpdateAction
 postgres = src.db.connection.postgres
 
 
@@ -202,3 +202,42 @@ async def update_ach_roles(
             ;
             """
         )
+
+
+@postgres
+async def refresh_lb_linked_role_snapshot(conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
+    await conn.execute("REFRESH MATERIALIZED VIEW snapshot_lb_linked_roles")
+
+
+@postgres
+async def get_lb_linked_role_updates(
+        conn: asyncpg.pool.PoolConnectionProxy = None
+) -> list[RoleUpdateAction]:
+    payload = await conn.fetch(
+        """
+        SELECT
+            COALESCE(slr.user_id, lr.user_id) AS user_id,
+            COALESCE(slr.guild_id, lr.guild_id) AS guild_id,
+            COALESCE(slr.role_id, lr.role_id) AS role_id,
+            slr.role_id IS NULL AS is_new
+        FROM snapshot_lb_linked_roles slr
+        FULL OUTER JOIN lb_linked_roles lr
+            ON slr.user_id = lr.user_id
+            AND slr.role_id = lr.role_id
+        WHERE slr.role_id IS NULL
+            OR lr.role_id IS NULL
+        ORDER BY
+            guild_id,
+            user_id
+        """
+    )
+
+    return [
+        RoleUpdateAction(
+            row["user_id"],
+            row["guild_id"],
+            row["role_id"],
+            row["is_new"],
+        )
+        for row in payload
+    ]
