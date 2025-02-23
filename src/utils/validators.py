@@ -445,7 +445,10 @@ async def validate_achievement_roles(body: dict) -> dict:
             if not discord_role["role_id"].isnumeric():
                 errors[f"roles[{i}].linked_roles[{j}].role_id"] = "Invalid Role ID"
             else:
-                discord_role_idxs[int(discord_role["role_id"])] = (i, j)
+                role_id = int(discord_role["role_id"])
+                if role_id in discord_role_idxs:
+                    errors[f"roles[{i}].linked_roles[{j}].role_id"] = "Duplicate Discord role ID"
+                discord_role_idxs[role_id] = (i, j)
 
     rep_threshold_idx = get_repeated_indexes([rl["threshold"] for rl in body["roles"]])
     if len(rep_threshold_idx):
