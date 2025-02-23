@@ -62,9 +62,8 @@ async def get_duplicate_ds_roles(
         SELECT
             role_id
         FROM discord_roles
-        WHERE ar_lb_format != $1
-            AND ar_lb_type != $2
-            AND NOT role_id = ANY($3::bigint[])
+        WHERE NOT (ar_lb_format = $1 AND ar_lb_type = $2)
+            AND role_id = ANY($3::bigint[])
         """,
         lb_format, lb_type, role_list,
     )
@@ -169,12 +168,14 @@ async def update_ach_roles(
         await conn.execute(
             """
             DELETE FROM discord_roles
-            WHERE (role_id) NOT IN (
-                SELECT role_id
-                FROM tmp_discord_roles
-                WHERE ar_lb_format = $1
-                    AND ar_lb_type = $2
-            )
+            WHERE ar_lb_format = $1
+                AND ar_lb_type = $2
+                AND (role_id) NOT IN (
+                    SELECT role_id
+                    FROM tmp_discord_roles
+                    WHERE ar_lb_format = $1
+                        AND ar_lb_type = $2
+                )
             """,
             lb_format, lb_type
         )
