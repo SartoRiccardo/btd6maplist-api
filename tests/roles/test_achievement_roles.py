@@ -160,10 +160,11 @@ class TestAchievementRoleValidation:
                 ],
                 "schema": {None: ["lb_format"], "roles": ["clr_border", "clr_inner"]},
             },
-            # Steal role
+            # Role checks
             {
                 "validations": [
-                    ("4208402703829", "a taken Discord role from another achievement role")
+                    ("4208402703829", "a taken Discord role from another achievement role"),
+                    ("100", "a duplicate role"),
                 ],
                 "schema": {"roles": {"linked_roles": ["role_id"]}}
             }
@@ -171,6 +172,8 @@ class TestAchievementRoleValidation:
 
         for check in checks:
             for req_data, edited_path, error_msg in invalidate_field(data, check["schema"], check["validations"]):
+                if (edited_path, error_msg) == ("roles[0].linked_roles[0].role_id", "a duplicate role"):
+                    edited_path = "roles[1].linked_roles[0].role_id"
                 await call_endpoints(req_data, edited_path, error_msg)
 
     async def test_unauthorized(self, btd6ml_test_client, assert_state_unchanged):
