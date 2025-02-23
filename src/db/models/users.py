@@ -176,10 +176,12 @@ class User(PartialUser):
           $ref: "#/components/schemas/MaplistMedals"
         roles:
           type: array
-          $ref: "#/components/schemas/PartialRole"
+          items:
+            $ref: "#/components/schemas/PartialRole"
         achievement_roles:
           type: array
-          $ref: "#/components/schemas/AchievementRole"
+          items:
+            $ref: "#/components/schemas/AchievementRole"
     ---
     FullProfile:
       allOf:

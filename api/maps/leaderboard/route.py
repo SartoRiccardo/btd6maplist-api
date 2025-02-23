@@ -34,7 +34,7 @@ async def get(request: web.Request):
       required: false
       schema:
         type: string
-        enum: [points, lccs]
+        enum: [points, lccs, black_border, no_optimal_hero]
       description: The type of leaderboard to get.
     responses:
       "200":
