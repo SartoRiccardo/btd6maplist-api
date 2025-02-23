@@ -9,10 +9,11 @@ class DiscordRequests:
 
     @staticmethod
     def setup():
-        url = "https://discord.com/api/v10/users/@me"
-        headers = {"Authorization": f"Bot {config.BOT_TOKEN}", "User-Agent": config.BOT_UA}
-        resp = requests.get(url, headers=headers)
-        DiscordRequests.bot_id = resp.json()["id"]
+        if DiscordRequests.bot_id is None:
+            url = "https://discord.com/api/v10/users/@me"
+            headers = {"Authorization": f"Bot {config.BOT_TOKEN}", "User-Agent": config.BOT_UA}
+            resp = requests.get(url, headers=headers)
+            DiscordRequests.bot_id = resp.json()["id"]
 
     @staticmethod
     async def get_user_profile(access_token: str) -> dict:

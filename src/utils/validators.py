@@ -262,7 +262,7 @@ async def validate_completion_submission(
     requires_recording = body["black_border"] or body["current_lcc"] or \
             body["no_geraldo"] and (
                 not is_format_expert(body["format"]) or
-                is_format_expert(body["format"]) and not (0 <= on_map.difficulty <= 1)
+                is_format_expert(body["format"]) and not (0 <= on_map.difficulty <= 2)
             )
     if requires_recording and len(body["video_proof_url"]) == 0:
         errors["video_proof_url"] = "Missing proof URL"
