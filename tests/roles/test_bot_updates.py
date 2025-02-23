@@ -55,3 +55,23 @@ async def test_get_role_updates(btd6ml_test_client, mock_auth, sign_message):
         assert resp_get.status == http.HTTPStatus.OK, f"Getting achievement updates returned {resp.status}"
         assert len(await resp_get.json()) == 0, "Role updates present after wipe"
 
+
+@pytest.mark.get
+@pytest.mark.bot
+@pytest.mark.roles
+async def test_update_delete_roles(btd6ml_test_client, mock_auth, sign_message):
+    qparams = {"signature": sign_message(b"")}
+    await mock_auth(perms=DiscordPermRoles.ADMIN)
+
+    data = {
+        "lb_format": 1,
+        "lb_type": "points",
+        "roles": [],
+    }
+
+    async with btd6ml_test_client.put(f"/roles/achievement", headers=HEADERS, json=data) as resp_ach, \
+            btd6ml_test_client.get(f"/roles/achievement/updates/bot?{urllib.parse.urlencode(qparams)}") as resp_get, \
+            btd6ml_test_client.get("/maps/leaderboard") as resp_lb:
+        # #1 role has 2 linked roles & I'm hardcoding it
+        assert len(await resp_get.json()) == (await resp_lb.json())["total"] + 1, \
+                "Update count differs from expected"
