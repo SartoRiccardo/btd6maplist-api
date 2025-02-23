@@ -477,7 +477,7 @@ SELECT 51 AS lb_format, 'black_border' AS lb_type, * FROM leaderboard_experts_bl
 
 CREATE OR REPLACE VIEW lb_linked_roles AS
 WITH user_linked_roles AS (
-    SELECT DISTINCT ON (lb.placement, ar.lb_format, ar.lb_type)
+    SELECT DISTINCT ON (lb.user_id, ar.lb_format, ar.lb_type)
         lb.user_id,
         ar.lb_format,
         ar.lb_type,
@@ -488,7 +488,7 @@ WITH user_linked_roles AS (
     WHERE lb.score >= ar.threshold AND NOT ar.for_first
         OR lb.placement = 1 AND ar.for_first
     ORDER BY
-        lb.placement,
+        lb.user_id,
         ar.lb_format,
         ar.lb_type,
         ar.for_first DESC,
