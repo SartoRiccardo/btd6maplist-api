@@ -696,7 +696,7 @@ def gen_lb_completions(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[i
 
 def gen_misc_completions(comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int, list[Completion]]:
     comps = [
-        Completion(comp_uid+1, MapKey("MLXXXEJ"), False, True, start_timestamp, None, None, 2, 51, None, None, None, [1], [], [])
+        Completion(comp_uid, MapKey("MLXXXEJ"), False, True, start_timestamp, None, None, 2, 51, None, None, None, [1], [], [])
     ]
     return comp_uid+len(comps), lcc_uid, comps
 
