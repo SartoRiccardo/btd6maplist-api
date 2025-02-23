@@ -127,40 +127,44 @@ class TestAchievementRoleValidation:
                 assert "errors" in resp_data and error_path in resp_data["errors"], \
                     f"\"{error_path}\" was not in response.errors"
 
-        # String fields
-        validations = [
-            ("a" * 1000, f"a role with a [keypath] too long and non-numeric"),
+        checks = [
+            # String fields
+            {
+                "validations": [
+                    ("a" * 1000, f"a role with a [keypath] too long and non-numeric")
+                ],
+                "schema": {
+                    None: ["lb_type"],
+                    "roles": {
+                        None: ["name", "tooltip_description"],
+                        "linked_roles": ["guild_id", "role_id"],
+                    }
+                },
+            },
+            {
+                "validations": [
+                    ("", f"a role with an empty [keypath]"),
+                ],
+                "schema": {"roles": ["name"]}
+            },
+            # Colors & integers
+            {
+                "validations": [
+                    (-1, f"a negative number to [keypath]")
+                ],
+                "schema": {"roles": ["clr_border", "clr_inner", "threshold"]},
+            },
+            {
+                "validations": [
+                    (0x1000000, f"a number too large to [keypath]")
+                ],
+                "schema": {None: ["lb_format"], "roles": ["clr_border", "clr_inner"]},
+            },
         ]
-        invalid_schema = {
-            None: ["lb_type"],
-            "roles": {
-                None: ["name", "tooltip_description"],
-                "linked_roles": ["guild_id", "role_id"],
-            }}
-        for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
-            await call_endpoints(req_data, edited_path, error_msg)
 
-        validations = [
-            ("", f"a role with an empty [keypath]"),
-        ]
-        invalid_schema = {"roles": ["name"]}
-        for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
-            await call_endpoints(req_data, edited_path, error_msg)
-
-        # Colors & integers
-        validations = [
-            (-1, f"a negative number to [keypath]"),
-        ]
-        invalid_schema = {"roles": ["clr_border", "clr_inner", "threshold"]}
-        for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
-            await call_endpoints(req_data, edited_path, error_msg)
-
-        validations = [
-            (0x1000000, f"a number too large to [keypath]"),
-        ]
-        invalid_schema = {None: ["lb_format"], "roles": ["clr_border", "clr_inner"]}
-        for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
-            await call_endpoints(req_data, edited_path, error_msg)
+        for check in checks:
+            for req_data, edited_path, error_msg in invalidate_field(data, check["schema"], check["validations"]):
+                await call_endpoints(req_data, edited_path, error_msg)
 
     async def test_unauthorized(self, btd6ml_test_client, assert_state_unchanged):
         """Test a submission from an unauthorized user"""
@@ -179,8 +183,7 @@ class TestAchievementRoleValidation:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Modifying achievement roles without authentication returned {resp.status}"
 
-    async def test_missing_fields(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
-                                  assert_state_unchanged):
+    async def test_missing_fields(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test a submission without the required fields"""
         data = {
             "lb_format": 1,
