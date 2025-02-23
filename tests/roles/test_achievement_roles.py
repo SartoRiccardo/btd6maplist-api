@@ -76,6 +76,39 @@ class TestAchievementRoleValidation:
 
     async def test_forbidden(self, assert_state_unchanged, mock_auth, btd6ml_test_client):
         """Test a submission from a user without appropriate perms"""
+        data = {
+            "lb_format": 1,
+            "lb_type": "points",
+            "roles": [
+                sample_achievement_role(10),
+                sample_achievement_role(0),
+                sample_achievement_role(100),
+            ]
+        }
+
+        async with assert_state_unchanged("/roles/achievement"), \
+                btd6ml_test_client.put("/roles/achievement", json=data) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Modifying achievement roles without authentication returned {resp.status}"
+
+        await mock_auth()
+        async with assert_state_unchanged("/roles/achievement"), \
+                btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Modifying achievement roles without necessary perms returned {resp.status}"
+
+        await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
+        async with assert_state_unchanged("/roles/achievement"), \
+                btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Modifying Maplist achievement roles without being a Maplist Mod returned {resp.status}"
+
+        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        data["lb_format"] = 51
+        async with assert_state_unchanged("/roles/achievement"), \
+                btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Modifying Expert achievement roles without being a Expert Mod returned {resp.status}"
 
     async def test_submit_invalid(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test setting fields to invalid values"""
