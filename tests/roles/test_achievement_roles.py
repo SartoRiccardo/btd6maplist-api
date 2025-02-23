@@ -1,7 +1,7 @@
 import http
 import pytest
 import src.utils.validators
-from ..testutils import fuzz_data, invalidate_field
+from ..testutils import fuzz_data, invalidate_field, remove_fields
 from ..mocks import DiscordPermRoles
 
 
@@ -86,11 +86,6 @@ class TestAchievementRoleValidation:
             ]
         }
 
-        async with assert_state_unchanged("/roles/achievement"), \
-                btd6ml_test_client.put("/roles/achievement", json=data) as resp:
-            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
-                f"Modifying achievement roles without authentication returned {resp.status}"
-
         await mock_auth()
         async with assert_state_unchanged("/roles/achievement"), \
                 btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
@@ -167,9 +162,43 @@ class TestAchievementRoleValidation:
         for req_data, edited_path, error_msg in invalidate_field(data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
-        """Test a submission from an unauthorized user, or one not in the Maplist Discord"""
+    async def test_unauthorized(self, btd6ml_test_client, assert_state_unchanged):
+        """Test a submission from an unauthorized user"""
+        data = {
+            "lb_format": 1,
+            "lb_type": "points",
+            "roles": [
+                sample_achievement_role(10),
+                sample_achievement_role(0),
+                sample_achievement_role(100),
+            ]
+        }
+
+        async with assert_state_unchanged("/roles/achievement"), \
+                btd6ml_test_client.put("/roles/achievement", json=data) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Modifying achievement roles without authentication returned {resp.status}"
 
     async def test_missing_fields(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image,
                                   assert_state_unchanged):
         """Test a submission without the required fields"""
+        data = {
+            "lb_format": 1,
+            "lb_type": "points",
+            "roles": [
+                sample_achievement_role(10),
+                sample_achievement_role(0),
+                sample_achievement_role(100),
+            ]
+        }
+
+        await mock_auth(perms=DiscordPermRoles.ADMIN)
+
+        for req_data, path in remove_fields(data):
+            async with assert_state_unchanged(f"/roles/achievement"), \
+                    btd6ml_test_client.put(f"/roles/achievement", headers=HEADERS, json=req_data) as resp:
+                assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                    f"Removing {path} while transferring completions returns {resp.status}"
+                resp_data = await resp.json()
+                assert "errors" in resp_data and path in resp_data["errors"], \
+                    f"\"{path}\" was not in response.errors"
