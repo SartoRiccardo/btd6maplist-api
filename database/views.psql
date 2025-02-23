@@ -457,53 +457,24 @@ ORDER BY placement ASC, user_id DESC;
 -- Leaderboard snapshots --
 ---------------------------
 
-DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_points CASCADE;
-CREATE MATERIALIZED VIEW snapshot_maplist_points AS
-SELECT * FROM leaderboard_maplist_points;
+CREATE VIEW all_leaderboards AS
+SELECT 1 AS lb_format, 'points' AS lb_type, * FROM leaderboard_maplist_points
+UNION ALL
+SELECT 1 AS lb_format, 'lccs' AS lb_type, * FROM leaderboard_maplist_lccs
+UNION ALL
+SELECT 1 AS lb_format, 'no_geraldo' AS lb_type, * FROM leaderboard_maplist_no_geraldo
+UNION ALL
+SELECT 1 AS lb_format, 'black_border' AS lb_type, * FROM leaderboard_maplist_black_border
+UNION ALL
+SELECT 51 AS lb_format, 'points' AS lb_type, * FROM leaderboard_experts_points
+UNION ALL
+SELECT 51 AS lb_format, 'lccs' AS lb_type, * FROM leaderboard_experts_lccs
+UNION ALL
+SELECT 51 AS lb_format, 'no_geraldo' AS lb_type, * FROM leaderboard_experts_no_geraldo
+UNION ALL
+SELECT 51 AS lb_format, 'black_border' AS lb_type, * FROM leaderboard_experts_black_border
+;
 
---DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_all_points CASCADE;
---CREATE MATERIALIZED VIEW snapshot_maplist_all_points AS
---SELECT * FROM leaderboard_maplist_all_points;
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_experts_points CASCADE;
-CREATE MATERIALIZED VIEW snapshot_experts_points AS
-SELECT * FROM leaderboard_experts_points;
-
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_lccs CASCADE;
-CREATE MATERIALIZED VIEW snapshot_maplist_lccs AS
-SELECT * FROM leaderboard_maplist_lccs;
-
---DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_all_lccs CASCADE;
---CREATE MATERIALIZED VIEW snapshot_maplist_all_lccs AS
---SELECT * FROM leaderboard_maplist_all_lccs;
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_experts_lccs CASCADE;
-CREATE MATERIALIZED VIEW snapshot_experts_lccs AS
-SELECT * FROM leaderboard_experts_lccs;
-
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_no_geraldo CASCADE;
-CREATE MATERIALIZED VIEW snapshot_maplist_no_geraldo AS
-SELECT * FROM leaderboard_maplist_no_geraldo;
-
---DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_all_no_geraldo CASCADE;
---CREATE MATERIALIZED VIEW snapshot_maplist_all_no_geraldo AS
---SELECT * FROM leaderboard_maplist_all_no_geraldo;
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_experts_no_geraldo CASCADE;
-CREATE MATERIALIZED VIEW snapshot_experts_no_geraldo AS
-SELECT * FROM leaderboard_experts_no_geraldo;
-
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_black_border CASCADE;
-CREATE MATERIALIZED VIEW snapshot_maplist_black_border AS
-SELECT * FROM leaderboard_maplist_black_border;
-
---DROP MATERIALIZED VIEW IF EXISTS snapshot_maplist_all_black_border CASCADE;
---CREATE MATERIALIZED VIEW snapshot_maplist_all_black_border AS
---SELECT * FROM leaderboard_maplist_all_black_border;
-
-DROP MATERIALIZED VIEW IF EXISTS snapshot_experts_black_border CASCADE;
-CREATE MATERIALIZED VIEW snapshot_experts_black_border AS
-SELECT * FROM leaderboard_experts_black_border;
+DROP MATERIALIZED VIEW IF EXISTS snapshot_all_leaderboards CASCADE;
+CREATE MATERIALIZED VIEW snapshot_all_leaderboards AS
+SELECT * FROM all_leaderboards;

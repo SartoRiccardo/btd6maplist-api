@@ -16,7 +16,7 @@ class DiscordRole:
     guild_id: int
     role_id: int
 
-    def to_json(self) -> dict:
+    def to_dict(self) -> dict:
         return {
             "guild_id": str(self.guild_id),
             "role_id": str(self.role_id),
@@ -68,7 +68,7 @@ class AchievementRole:
     clr_inner: int
     linked_roles: list[DiscordRole]
 
-    def to_json(self) -> dict:
+    def to_dict(self) -> dict:
         return {
             "lb_format": self.lb_format,
             "lb_type": self.lb_type,
@@ -78,5 +78,5 @@ class AchievementRole:
             "name": self.name,
             "clr_border": self.clr_border,
             "clr_inner": self.clr_inner,
-            "linked_roles": [lr.to_json() for lr in self.linked_roles]
+            "linked_roles": [lr.to_dict() for lr in self.linked_roles]
         }

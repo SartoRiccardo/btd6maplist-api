@@ -93,4 +93,4 @@ async def get(_r: web.Request) -> web.Response:
               items:
                 $ref: "#/components/schemas/AchievementRole"
     """
-    return web.json_response([rl.to_json() for rl in await get_roles()])
+    return web.json_response([rl.to_dict() for rl in await get_roles()])

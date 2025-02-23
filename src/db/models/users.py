@@ -177,6 +177,9 @@ class User(PartialUser):
         roles:
           type: array
           $ref: "#/components/schemas/PartialRole"
+        achievement_roles:
+          type: array
+          $ref: "#/components/schemas/AchievementRole"
     ---
     FullProfile:
       allOf:
@@ -190,6 +193,7 @@ class User(PartialUser):
     completions: list[ListCompletion]
     medals: MaplistMedals
     roles: list["src.db.models.Role.Role"]
+    achievement_roles: list["src.db.models.AchievementRole.AchievementRole"]
 
     def to_dict(
             self,
@@ -206,6 +210,7 @@ class User(PartialUser):
             "created_maps": [m.to_dict() for m in self.created_maps],
             "medals": self.medals.to_dict(),
             "roles": [r.to_dict() for r in self.roles],
+            "achievement_roles": [r.to_dict() for r in self.achievement_roles],
         }
         if with_completions:
             data["completions"] = [c.to_profile_dict() for c in self.completions]
