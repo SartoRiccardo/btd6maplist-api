@@ -1,7 +1,18 @@
 import asyncio
 import src.db.connection
 from src.utils.misc import list_rm_dupe
-from src.db.models import User, PartialUser, MaplistProfile, PartialMap, ListCompletion, LCC, MaplistMedals, Role
+from src.db.models import (
+    User,
+    PartialUser,
+    MaplistProfile,
+    PartialMap,
+    ListCompletion,
+    LCC,
+    MaplistMedals,
+    Role,
+    AchievementRole,
+    DiscordRole,
+)
 from src.db.queries.subqueries import LeaderboardType, leaderboard_name
 postgres = src.db.connection.postgres
 
@@ -326,6 +337,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         comps,
         await get_user_medals(id, conn=conn),
         await get_user_roles(puser.id, conn=conn),
+        await get_user_achievement_roles(puser.id, conn=conn),
     )
 
 
@@ -459,6 +471,71 @@ async def get_user_roles(uid: str | int, conn=None) -> list[Role]:
             row["requires_recording"],
             row["cannot_submit"],
             can_grant=[rl for rl in row["can_grant"] if rl is not None],
+        )
+        for row in payload
+    ]
+
+
+@postgres
+async def get_user_achievement_roles(uid: str | int, conn=None) -> list[AchievementRole]:
+    if isinstance(uid, str):
+        uid = int(uid)
+
+    payload = await conn.fetch(
+        """
+        WITH applicable_roles AS (
+            SELECT DISTINCT ON (ar.lb_format, ar.lb_type)
+                ar.*
+            FROM all_leaderboards lb
+            JOIN achievement_roles ar
+                ON lb.lb_format = ar.lb_format AND lb.lb_type = ar.lb_type
+            WHERE lb.user_id = $1
+                AND (
+                    lb.score >= ar.threshold AND NOT ar.for_first
+                    OR
+                    lb.placement = 1 AND ar.for_first
+                )
+            ORDER BY
+                ar.lb_format,
+                ar.lb_type,
+                ar.for_first DESC,
+                ar.threshold DESC
+        )
+        SELECT DISTINCT ON (ar.lb_format, ar.lb_type, ar.threshold)
+            ar.lb_format,
+            ar.lb_type,
+            ar.threshold,
+            ar.for_first,
+            ar.tooltip_description,
+            ar.name,
+            ar.clr_border,
+            ar.clr_inner,
+            ARRAY_AGG((dr.guild_id, dr.role_id))
+                OVER (PARTITION by (dr.ar_lb_format, dr.ar_lb_type, dr.ar_threshold)) AS linked_roles
+        FROM applicable_roles ar
+        LEFT JOIN discord_roles dr
+            ON ar.lb_format = dr.ar_lb_format
+            AND ar.lb_type = dr.ar_lb_type
+            AND ar.threshold = dr.ar_threshold
+        """,
+        uid
+    )
+
+    return [
+        AchievementRole(
+            row["lb_format"],
+            row["lb_type"],
+            row["threshold"],
+            row["for_first"],
+            row["tooltip_description"],
+            row["name"],
+            row["clr_border"],
+            row["clr_inner"],
+            [
+                DiscordRole(gid, rid)
+                for gid, rid in row["linked_roles"]
+                if gid is not None and rid is not None
+            ],
         )
         for row in payload
     ]

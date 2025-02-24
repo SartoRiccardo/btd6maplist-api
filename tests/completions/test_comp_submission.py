@@ -19,6 +19,7 @@ async def test_submit_completion(btd6ml_test_client, mock_auth, comp_subm_payloa
         "https://youtu.be/DcNFeVto",
     ]
 
+    img_path, img_hash = save_image(5, filename="pc1.png", with_hash=True)
     expected_completion = {
         "id": 0,  # Set later
         "map": "MLXXXAA",
@@ -31,7 +32,7 @@ async def test_submit_completion(btd6ml_test_client, mock_auth, comp_subm_payloa
         "lcc": None,
         "format": 1,
         "subm_proof_img": [
-            f"{config.MEDIA_BASE_URL}/13f1b543d32cdbfb54e04e66b3544a91da29c8dc6e6b684eaa08982b95057472.png",
+            f"{config.MEDIA_BASE_URL}/{img_hash}.png",
         ],
         "subm_proof_vid": proof_urls,
         "accepted_by": None,
@@ -44,7 +45,7 @@ async def test_submit_completion(btd6ml_test_client, mock_auth, comp_subm_payloa
     req_submission = comp_subm_payload()
     req_submission["video_proof_url"] = proof_urls
     req_form = to_formdata(req_submission)
-    req_form.add_field("proof_completion", save_image(5, filename="pc1.png").open("rb"))
+    req_form.add_field("proof_completion", img_path.open("rb"))
     async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit", headers=HEADERS, data=req_form) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
             f"Submitting a map with a correct payload returns {resp.status}"
@@ -63,6 +64,9 @@ async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payloa
     """Test a submission including multiple images and/or video urls"""
     SUBMITTER_ID = 28
 
+    images = []
+    for i in range(2, 6):
+        images.append(save_image(i, filename=f"pc{i}.png", with_hash=True))
     expected_completion = {
         "id": 0,  # Set later
         "map": "MLXXXAA",
@@ -75,10 +79,8 @@ async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payloa
         },
         "format": 1,
         "subm_proof_img": [
-            f"{config.MEDIA_BASE_URL}/4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png",
-            f"{config.MEDIA_BASE_URL}/d3fc57f37b02f5f85665422822a88ccad68e2a7386b355029aa5e3dd347e4428.png",
-            f"{config.MEDIA_BASE_URL}/e22de4c14b2aa64938787ad85d7738509e8ad956975ab7d3925ac0e041da39df.png",
-            f"{config.MEDIA_BASE_URL}/13f1b543d32cdbfb54e04e66b3544a91da29c8dc6e6b684eaa08982b95057472.png",
+            f"{config.MEDIA_BASE_URL}/{img_hash}.png"
+            for _img_path, img_hash in images
         ],
         "subm_proof_vid": [
             "https://proof.com",
@@ -98,8 +100,8 @@ async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payloa
         "video_proof_url": ["https://proof.com"],
     }
     req_form = to_formdata(req_submission)
-    for i in range(2, 6):
-        req_form.add_field("proof_completion", save_image(i, filename=f"pc{i}.png").open("rb"))
+    for img_path, _img_hash in images:
+        req_form.add_field("proof_completion", img_path.open("rb"))
     async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit", headers=HEADERS, data=req_form) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
             f"Submitting a map with a correct payload returns {resp.status}"
@@ -385,13 +387,13 @@ class TestValidateCompletion:
         async with assert_state_unchanged("/completions/unapproved"), \
                 btd6ml_test_client.post("/maps/MLXXXEC/completions/submit", headers=HEADERS, data=req_form) as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
-                    f"Submitting expert completion without opt hero and no proof returns {resp.status}"
+                    f"Submitting expert completion without opt hero and no video proof returns {resp.status}"
 
         req_form = to_formdata(comp_data)
         req_form.add_field("proof_completion", subm_img.open("rb"))
-        async with btd6ml_test_client.post("/maps/MLXXXEA/completions/submit", headers=HEADERS, data=req_form) as resp:
+        async with btd6ml_test_client.post("/maps/MLXXXEB/completions/submit", headers=HEADERS, data=req_form) as resp:
             assert resp.status == http.HTTPStatus.CREATED, \
-                    f"Submitting a no geraldo run on a medium expert or below with no video proof returns {resp.status}"
+                    f"Submitting a no geraldo run on a high expert or below with no video proof returns {resp.status}"
 
 
 @pytest.mark.submissions
