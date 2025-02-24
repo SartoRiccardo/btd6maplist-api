@@ -67,7 +67,7 @@ class DiscordRequests:
             return await resp.json()
 
     @staticmethod
-    async def get_guild_roles(guild_id: int) -> list[dict]:
+    async def get_guild_roles(guild_id: str | int) -> list[dict]:
         url = f"https://discord.com/api/v10/guilds/{guild_id}/roles"
         headers = {"Authorization": f"Bot {config.BOT_TOKEN}", "User-Agent": config.BOT_UA}
         async with src.http.http.get(url, headers=headers) as resp:
@@ -76,7 +76,7 @@ class DiscordRequests:
             return await resp.json()
 
     @staticmethod
-    async def get_application_guild_member(guild_id: int) -> dict | None:
+    async def get_application_guild_member(guild_id: str | int) -> dict | None:
         url = f"https://discord.com/api/v10/guilds/{guild_id}/members/{DiscordRequests.bot_id}"
         headers = {"Authorization": f"Bot {config.BOT_TOKEN}", "User-Agent": config.BOT_UA}
         async with src.http.http.get(url, headers=headers) as resp:
