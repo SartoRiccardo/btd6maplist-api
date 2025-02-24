@@ -6,6 +6,8 @@ import random
 import config
 from .DiscordModelsMock import RoleMock, MemberMock, GuildMock
 
+P_MANAGE_ROLES = 1 << 28
+P_ADMIN = 1 << 3
 roles = [RoleMock(i, f"Role{i}", i) for i in range(15)]
 
 
