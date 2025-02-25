@@ -300,11 +300,16 @@ def random_achivement_roles() -> list[AchievementRole]:
     def clr() -> int:
         return rand_clr.randint(0, 0xffffff)
 
+    avail_roles = [(rid % 2 + 4, rid) for rid in range(20)]
+
     def disc_roles() -> list[tuple[int, int]]:
-        return [
-            (rand_discord.randint(1000000000000, 10000000000000), rand_discord.randint(1000000000000, 10000000000000))
-            for _ in range(3)
-        ][:rand_discord.randint(1, 3)]
+        nonlocal avail_roles
+        amount = rand_discord.randint(1, 3)
+        roles = []
+        while amount > 0 and len(avail_roles) > 0:
+            roles.append(avail_roles.pop(rand_discord.randint(0, len(avail_roles)-1)))
+            amount -= 1
+        return roles
 
     return [
         AchievementRole(1, "points", 0, True, "First", "List Champ", clr(), clr(), disc_roles()),
