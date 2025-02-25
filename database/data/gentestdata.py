@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 from datetime import datetime
 
+# Code for this file is unkept and made kind of hastily
+
 USER_COUNT = 50
 MAP_COUNT = 60
 MAP_SUBMISSION_COUNT = 120
@@ -250,8 +252,70 @@ class Completion:
         ])
 
 
+@dataclass
+class AchievementRole:
+    lb_format: int
+    lb_type: str
+    threshold: int
+    for_first: bool
+    tooltip_description: str | None
+    name: str
+    clr_border: int
+    clr_inner: int
+    # Many-to-one
+    linked_roles: list[tuple[int, int]]
+
+    def dump_ach_roles(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.lb_format,
+            self.lb_type,
+            self.threshold,
+            self.for_first,
+            self.tooltip_description,
+            self.name,
+            self.clr_border,
+            self.clr_inner,
+        ))
+
+    def dump_linked_roles(self) -> str:
+        return "\n".join([
+            SEPARATOR.join(
+                stringify(self.lb_format, self.lb_type, self.threshold, guild, role)
+            )
+            for guild, role in self.linked_roles
+        ])
+
+
 def rand_str(rand: random.Random, k: int = 10) -> str:
     return "".join(rand.choices(string.ascii_letters, k=k))
+
+
+def random_achivement_roles() -> list[AchievementRole]:
+    rand_discord = random.Random(93416)
+    rand_clr = random.Random(36157)
+
+    def clr() -> int:
+        return rand_clr.randint(0, 0xffffff)
+
+    def disc_roles() -> list[tuple[int, int]]:
+        return [
+            (rand_discord.randint(1000000000000, 10000000000000), rand_discord.randint(1000000000000, 10000000000000))
+            for _ in range(3)
+        ][:rand_discord.randint(1, 3)]
+
+    return [
+        AchievementRole(1, "points", 0, True, "First", "List Champ", clr(), clr(), disc_roles()),
+        AchievementRole(1, "points", 1, False, "1+ points", "List lv1", clr(), clr(), disc_roles()),
+        AchievementRole(1, "points", 100, False, "100+ points", "List lv2", clr(), clr(), disc_roles()),
+        AchievementRole(1, "points", 300, False, "300+ points", "List lv3", clr(), clr(), disc_roles()),
+
+        AchievementRole(1, "black_border", 0, True, None, "List BBChamp", clr(), clr(), disc_roles()),
+        AchievementRole(1, "black_border", 1, False, "1+ BB", "List BBlv1", clr(), clr(), disc_roles()),
+
+        AchievementRole(51, "points", 0, True, "FirstExp", "Experts Champ", clr(), clr(), []),
+        AchievementRole(51, "points", 1, False, None, "Experts lv1", clr(), clr(), []),
+        AchievementRole(51, "points", 15, False, None, "Experts lv2", clr(), clr(), disc_roles()),
+    ]
 
 
 def random_map_submissions() -> list[MapSubmission]:
@@ -632,7 +696,7 @@ def gen_lb_completions(map: Map, comp_uid: int = 1, lcc_uid: int = 1) -> tuple[i
 
 def gen_misc_completions(comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int, list[Completion]]:
     comps = [
-        Completion(comp_uid+1, MapKey("MLXXXEJ"), False, True, start_timestamp, None, None, 2, 51, None, None, None, [1], [], [])
+        Completion(comp_uid, MapKey("MLXXXEJ"), False, True, start_timestamp, None, None, 2, 51, None, None, None, [1], [], [])
     ]
     return comp_uid+len(comps), lcc_uid, comps
 
@@ -654,6 +718,8 @@ if __name__ == '__main__':
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps
+
+    achievement_roles = random_achivement_roles()
 
     with open(bpath / "01_maps.csv", "w") as fout:
         fout.write("\n".join(
@@ -705,6 +771,15 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.lcc.dump_lcc() for x in completions
             if x.lcc is not None
+        ))
+    with open(bpath / "10_achievement_roles.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_ach_roles() for x in achievement_roles
+        ))
+    with open(bpath / "11_discord_roles.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_linked_roles() for x in achievement_roles
+            if len(x.linked_roles)
         ))
 
     p21_total = 0

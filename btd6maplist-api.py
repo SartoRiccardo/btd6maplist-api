@@ -25,6 +25,8 @@ async def init_client_session(_app):
         expire_after=0,
         urls_expire_after={
             "data.ninjakiwi.com": 3600*24,
+            "discord.com/api/v10/users/@me/guilds": 60*5,
+            "discord.com/api/v10/guilds/*/roles": 60*5,
             "discord.com": 60*60,
         },
         allowed_codes=(200, 404, 401),

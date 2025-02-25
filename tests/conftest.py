@@ -17,6 +17,7 @@ from .testutils import clear_db_patch_data, override_config
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, utils
 import base64
+import hashlib
 btd6maplist_api = importlib.import_module("btd6maplist-api")
 
 private_key = None
@@ -205,10 +206,19 @@ def save_image(tmp_path: pathlib.Path):
         "https://dummyimage.com/500x400/ff6699/000",
     ]
 
-    def save(index: int, filename: str = "image.png") -> pathlib.Path:
+    def save(
+            index: int,
+            filename: str = "image.png",
+            with_hash: bool = False
+    ) -> tuple[pathlib.Path, str] | pathlib.Path:
         path = tmp_path / filename
-        path.write_bytes(requests.get(images[index % len(images)]).content)
-        return path
+        media = requests.get(images[index % len(images)]).content
+        path.write_bytes(media)
+        if not with_hash:
+            return path
+
+        fhash = hashlib.sha256(media).hexdigest()
+        return path, fhash
     return save
 
 

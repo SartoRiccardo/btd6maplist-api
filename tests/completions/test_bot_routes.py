@@ -216,7 +216,8 @@ class TestSubmission:
         SUBMITTER_ID = 30
         req_subm_data = comp_subm_payload(SUBMITTER_ID)
         await mock_auth()
-        images = [(f"proof_completion[{i}]", save_image(i, f"img{i}.png")) for i in range(2)]
+        image_info = [save_image(i, f"img{i}.png", with_hash=True) for i in range(2)]
+        images = [(f"proof_completion[{i}]", image_info[i][0]) for i in range(2)]
         req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
 
         expected = {
@@ -231,8 +232,8 @@ class TestSubmission:
             "lcc": None,
             "format": 1,
             "subm_proof_img": [
-                f"{config.MEDIA_BASE_URL}/02123b2b3c308aba72b03291ba8116be68939b064858e1e889f90f2173c0f91a.png",
-                f"{config.MEDIA_BASE_URL}/e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
+                f"{config.MEDIA_BASE_URL}/{image_info[0][1]}.png",
+                f"{config.MEDIA_BASE_URL}/{image_info[1][1]}.png",
             ],
             "subm_proof_vid": [],
             "accepted_by": None,

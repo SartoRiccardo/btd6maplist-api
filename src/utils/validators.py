@@ -10,12 +10,16 @@ from src.db.models import MapSubmission
 from src.db.queries.maps import map_exists, alias_exists, get_map
 from src.db.queries.users import get_user_min
 from src.db.queries.mapsubmissions import get_map_submission
+from src.db.queries.achievement_roles import get_duplicate_ds_roles
+from .formats import is_format_expert, is_format_maplist, is_format_valid
 
 
 MAX_TEXT_LEN = 100
 MAX_LONG_TEXT_LEN = 500
 MAX_ADD_CODES = 5
 MAX_PROOF_URL = 5
+MAX_TOOLTIP_LEN = 128
+MAX_ROLE_NAME_LEN = 32
 
 
 async def validate_map_code(
@@ -257,8 +261,8 @@ async def validate_completion_submission(
                 errors[f"video_proof_url[{i}]"] = "Invalid video URL"
     requires_recording = body["black_border"] or body["current_lcc"] or \
             body["no_geraldo"] and (
-                not (50 <= body["format"] < 100) or
-                50 <= body["format"] <= 100 and not (0 <= on_map.difficulty <= 1)
+                not is_format_expert(body["format"]) or
+                is_format_expert(body["format"]) and not (0 <= on_map.difficulty <= 2)
             )
     if requires_recording and len(body["video_proof_url"]) == 0:
         errors["video_proof_url"] = "Missing proof URL"
@@ -371,18 +375,90 @@ def validate_completion_perms(
         old_format: int | None = None,
 ) -> web.Response | None:
     if not is_maplist_mod and (
-            1 <= new_format <= 50 or
-            old_format and 1 <= old_format <= 50):
+            is_format_maplist(new_format) or
+            old_format and is_format_maplist(old_format)):
         return web.json_response(
             {"errors": {"format": "You must be a Maplist Moderator"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
     if not is_explist_mod and (
-            50 <= new_format <= 100 or
-            old_format and 51 <= old_format <= 100
+            is_format_expert(new_format) or
+            old_format and is_format_expert(old_format)
     ):
         return web.json_response(
             {"errors": {"format": "You must be an Expert List Moderator"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
+
+
+async def validate_achievement_roles(body: dict) -> dict:
+    check_fields_exists = {
+        "lb_format": int,
+        "lb_type": str,
+        "roles": [{
+            "threshold": int,
+            "for_first": bool,
+            "tooltip_description": str | None,
+            "name": str,
+            "clr_border": int,
+            "clr_inner": int,
+            "linked_roles": [{"guild_id": str, "role_id": str}],
+        }],
+    }
+    check = check_fields(body, check_fields_exists)
+    if len(check):
+        return check
+
+    errors = {}
+    if not is_format_valid(body["lb_format"]):
+        errors["lb_format"] = "Format does not exist"
+    if body["lb_type"] not in ["points", "no_geraldo", "black_border", "lccs"]:
+        errors["lb_type"] = "Leaderboard type does not exist"
+
+    has_first = False
+    discord_role_idxs = {}
+    for i, role in enumerate(body["roles"]):
+        if role["for_first"]:
+            if has_first:
+                errors[f"roles[{i}].for_first"] = "Can only have one role for first place"
+            has_first = True
+            role["threshold"] = 0
+        elif role["threshold"] <= 0:
+            errors[f"roles[{i}].threshold"] = "Threshold must be positive"
+        if role["tooltip_description"] is not None:
+            if len(role["tooltip_description"]) == 0:
+                role["tooltip_description"] = None
+            elif len(role["tooltip_description"]) > MAX_TOOLTIP_LEN:
+                errors[f"roles[{i}].tooltip_description"] = f"Tooltip description must be max {MAX_TOOLTIP_LEN} characters long"
+        if len(role["name"]) == 0:
+            errors[f"roles[{i}].name"] = f"Name cannot be blank"
+        elif len(role["name"]) > MAX_ROLE_NAME_LEN:
+            errors[f"roles[{i}].name"] = f"Name must be max {MAX_ROLE_NAME_LEN} characters long"
+        if not (0 <= role["clr_border"] <= 0xFFFFFF):
+            errors[f"roles[{i}].clr_border"] = f"Invalid color"
+        if not (0 <= role["clr_inner"] <= 0xFFFFFF):
+            errors[f"roles[{i}].clr_inner"] = f"Invalid color"
+        for j, discord_role in enumerate(role["linked_roles"]):
+            if not discord_role["guild_id"].isnumeric():
+                errors[f"roles[{i}].linked_roles[{j}].guild_id"] = "Invalid Guild ID"
+            if not discord_role["role_id"].isnumeric():
+                errors[f"roles[{i}].linked_roles[{j}].role_id"] = "Invalid Role ID"
+            else:
+                role_id = int(discord_role["role_id"])
+                if role_id in discord_role_idxs:
+                    errors[f"roles[{i}].linked_roles[{j}].role_id"] = "Duplicate Discord role ID"
+                discord_role_idxs[role_id] = (i, j)
+
+    rep_threshold_idx = get_repeated_indexes([rl["threshold"] for rl in body["roles"]])
+    if len(rep_threshold_idx):
+        for idx in rep_threshold_idx:
+            errors[f"roles[{idx}].threshold"] = "Duplicate threshold"
+
+    if len(errors) == 0:
+        role_dupes = await get_duplicate_ds_roles(body["lb_format"], body["lb_type"], list(discord_role_idxs.keys()))
+        for dupe in role_dupes:
+            i, j = discord_role_idxs[dupe]
+            errors[f"roles[{i}].linked_roles[{j}].role_id"] = "This role is already used elsewhere!"
+
+    return errors

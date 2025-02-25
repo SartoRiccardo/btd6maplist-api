@@ -45,6 +45,35 @@ class TestAuth:
                     "cannot_submit": False,
                 }
             ],
+            "achievement_roles": [
+                {
+                    "clr_border": 6782619,
+                    "clr_inner": 9004349,
+                    "for_first": False,
+                    "lb_format": 1,
+                    "lb_type": "points",
+                    "linked_roles": [
+                        {
+                            "guild_id": "3780309980101",
+                            "role_id": "4004915198708",
+                        },
+                    ],
+                    "name": "List lv2",
+                    "threshold": 100,
+                    "tooltip_description": "100+ points",
+                },
+                {
+                    "clr_border": 13232760,
+                    "clr_inner": 16749515,
+                    "for_first": False,
+                    "lb_format": 51,
+                    "lb_type": "points",
+                    "linked_roles": [],
+                    "name": "Experts lv1",
+                    "threshold": 1,
+                    "tooltip_description": None,
+                },
+            ]
         }
 
         async with btd6ml_test_client.post("/auth", headers=HEADERS) as resp:
@@ -92,6 +121,7 @@ class TestAuth:
             "avatarURL": None,
             "bannerURL": None,
             "roles": [],
+            "achievement_roles": [],
         }
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.OK, \
