@@ -34,5 +34,5 @@ Simply create the route you wanna make in the `api` folder, and at the endpoint 
 ## Testing
 
 To test the application, you must make a `config.test.py` where you override values in `config.py`. You don't have to put every config there, just the ones you want to override.
-- You need an empty PostgreSQL database. The testing suit will automatically wipe and initialize it and use it.
+- You need an empty PostgreSQL database. The testing suite will automatically wipe and initialize it and use it.
 - You need to create `tests/btd6maplist-bot.test.pem` with the method described above, for Bot Route tests.
