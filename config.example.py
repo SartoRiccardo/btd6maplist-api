@@ -16,6 +16,7 @@ DB_NAME = "database"
 
 BOT_PUBKEY = "btd6maplist-bot.pub.pem"
 BOT_TOKEN = "bot-token.jwt"
+BOT_UA = "DiscordBot (https://localhost:3000, 1.0)"
 
 CORS_ORIGINS = ["*"]
 
@@ -23,5 +24,5 @@ MAPLIST_GUILD_ID = "1162188507800944761"
 
 WEBHOOK_LIST_SUBM = ""
 WEBHOOK_LIST_RUN = ""
-WEBHOOK_EXPLIST_SUM = ""
+WEBHOOK_EXPLIST_SUBM = ""
 WEBHOOK_EXPLIST_RUN = ""
