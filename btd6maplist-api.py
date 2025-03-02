@@ -198,7 +198,7 @@ def get_application(
         init_database: bool = True,
 ) -> web.Application:
     app = web.Application(
-        client_max_size=1024**2 * 12,
+        client_max_size=1024**2 * 5 * 4,  # Up to 4x 5MB images.
     )
     app.add_routes(get_routes())
 

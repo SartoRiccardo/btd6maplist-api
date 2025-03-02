@@ -3,7 +3,7 @@ import math
 import http
 import aiohttp.hdrs
 from aiohttp import web
-from src.utils.files import save_media
+from src.utils.files import save_image
 from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission, check_prev_map_submission
@@ -110,7 +110,7 @@ async def post(
         if part.name == "proof_completion":
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
-            proof_fname, _fpath = await save_media(file_contents, proof_ext)
+            proof_fname, _fpath = await save_image(file_contents, proof_ext)
         elif part.name == "data":
             data = await part.json()
             if len(errors := await validate_submission(data)):

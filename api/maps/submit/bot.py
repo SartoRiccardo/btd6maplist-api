@@ -9,7 +9,7 @@ from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed, send_map_submission_webhook, delete_map_submission_webhook
 from src.utils.misc import list_to_int
 from src.db.queries.mapsubmissions import add_map_submission
-from src.utils.files import save_media
+from src.utils.files import save_image
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
@@ -33,7 +33,7 @@ async def post(
     if (btd6_map := await ninja_kiwi_api().get_btd6_map(json_data["code"])) is None:
         return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
-    proof_fname, _fp = await save_media(files[0][1], files[0][0].split(".")[-1])
+    proof_fname, _fp = await save_image(files[0][1], files[0][0].split(".")[-1])
     hook_url = WEBHOOK_LIST_SUBM if json_data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
     embeds = get_mapsubm_embed(json_data, json_data["user"], btd6_map)
 

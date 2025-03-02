@@ -5,7 +5,7 @@ import json
 import src.http
 from http import HTTPStatus
 import src.utils.routedecos
-from src.utils.files import save_media
+from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
 from src.db.queries.maps import get_map
 from src.db.queries.misc import get_config
@@ -64,7 +64,7 @@ async def post(
 
     discord_profile = json_data["user"]
     proofs_finfo = await asyncio.gather(*[
-        save_media(file[1], file[0].split(".")[-1])
+        save_image(file[1], file[0].split(".")[-1])
         for file in files
         if file is not None
     ])

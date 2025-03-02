@@ -2,7 +2,7 @@ from aiohttp import web
 import aiohttp
 import http
 from src.utils.validators import validate_completion, validate_full_map, validate_completion_perms
-from src.utils.files import save_media
+from src.utils.files import save_image
 from config import MEDIA_BASE_URL
 
 
@@ -46,7 +46,7 @@ async def get_completion_request(
         while part := await reader.next():
             if part.name == "submission_proof":
                 ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-                proof_fname, _fp = await save_media(await part.read(decode=False), ext)
+                proof_fname, _fp = await save_image(await part.read(decode=False), ext)
                 subm_proof = f"{MEDIA_BASE_URL}/{proof_fname}"
 
             elif part.name == "data":
@@ -92,7 +92,7 @@ async def get_map_form(
                 proof_ext = "png"
                 if aiohttp.hdrs.CONTENT_TYPE in part.headers:
                     proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-                fname, _fpath = await save_media(await part.read(decode=False), proof_ext)
+                fname, _fpath = await save_image(await part.read(decode=False), proof_ext)
                 files[part.name] = f"{MEDIA_BASE_URL}/{fname}"
 
             elif part.name == "data":

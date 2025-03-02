@@ -6,7 +6,7 @@ import json
 import src.http
 from http import HTTPStatus
 import src.utils.routedecos
-from src.utils.files import save_media
+from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
 from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
@@ -130,7 +130,7 @@ async def post(
         if part.name == "proof_completion" and len(proof_fnames) < MAX_FILES:
             proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
             file_contents = await part.read(decode=False)
-            fname, _fpath = await save_media(file_contents, proof_ext)
+            fname, _fpath = await save_image(file_contents, proof_ext)
             proof_fnames.append(f"{MEDIA_BASE_URL}/{fname}")
 
         elif part.name == "data":
