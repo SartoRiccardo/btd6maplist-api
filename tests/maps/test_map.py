@@ -647,8 +647,6 @@ class TestEditMaps:
             assert resp.ok, f"Delete map with correct perms returned {resp.status}"
             assert resp_get.ok, f"Get deleted map returned {resp_get.status}"
             resp_map_data = await resp_get.json()
-            import pprint
-            pprint.pp(resp_map_data)
             assert resp_map_data["deleted_on"] is not None, \
                 f"Map.deleted_on is not None after being deleted"
 

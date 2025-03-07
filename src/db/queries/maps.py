@@ -506,6 +506,7 @@ async def add_map(map_data: dict, conn=None) -> None:
         await update_list_placements(
             cur_positions=None if "placement_curver" not in map_data else (None,  map_data["placement_curver"]),
             all_positions=None if "placement_allver" not in map_data else (None,  map_data["placement_allver"]),
+            ignore_code=map_data["code"],
             conn=conn,
         )
 
@@ -539,6 +540,7 @@ async def edit_map(
         await update_list_placements(
             cur_positions=None if "placement_curver" not in map_data else (map_current.placement_cur, map_data["placement_curver"]),
             all_positions=None if "placement_allver" not in map_data else (map_current.placement_all, map_data["placement_allver"]),
+            ignore_code=map_data["code"],
             conn=conn,
         )
 
@@ -570,8 +572,8 @@ async def edit_map(
             *[map_data.get(field) for field in fields],
         )
 
-        await delete_map_relations(map_current.id, conn=conn)
-        await insert_map_relations(map_current.id, map_data, conn=conn)
+        await delete_map_relations(map_current.code, conn=conn)
+        await insert_map_relations(map_current.code, map_data, conn=conn)
 
 
 def normalize_positions(pos: tuple[int | None, int | None]) -> tuple[int, int]:
@@ -586,6 +588,7 @@ def normalize_positions(pos: tuple[int | None, int | None]) -> tuple[int, int]:
 async def update_list_placements(
         cur_positions: tuple[int | None, int | None] | None = None,
         all_positions: tuple[int | None, int | None] | None = None,
+        ignore_code: str | None = None,
         conn=None
 ) -> None:
     if cur_positions is not None and cur_positions[0] == cur_positions[1]:
@@ -608,16 +611,14 @@ async def update_list_placements(
             {
                 "placement_curver"
                 if cur_positions is None else
-                "CASE WHEN (placement_curver BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int) "
-                "   AND placement_curver != $1::int)"
+                "CASE WHEN (placement_curver BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int))"
                 "THEN placement_curver + SIGN($1::int - $2::int) "
                 "ELSE placement_curver END"
             },
             {
                 "placement_allver"
                 if cur_positions is None else
-                "CASE WHEN (placement_allver BETWEEN LEAST($3::int, $4::int) AND GREATEST($3::int, $4::int) "
-                "   AND placement_allver != $3::int)"
+                "CASE WHEN (placement_allver BETWEEN LEAST($3::int, $4::int) AND GREATEST($3::int, $4::int))"
                 "THEN placement_allver + SIGN($3::int - $4::int) "
                 "ELSE placement_allver END"
             },
@@ -626,9 +627,11 @@ async def update_list_placements(
         WHERE mlm.new_version IS NULL
             AND mlm.deleted_on IS NULL
             AND ({" OR ".join(selectors)})
+            AND mlm.code != $5
         """,
         *(normalize_positions(cur_positions) if cur_positions else (None, None)),
         *(normalize_positions(all_positions) if all_positions else (None, None)),
+        ignore_code,
     )
 
     await conn.execute(
@@ -670,12 +673,6 @@ async def delete_map(
     if not map_current:
         map_current = await get_map(code, partial=True, conn=conn)
 
-
-    print("BEFORE")
-    [print(x) for x in await conn.fetch(
-        """SELECT * FROM map_list_meta WHERE code = 'MLXXXEJ'"""
-    )]
-
     async with conn.transaction():
         indexes = [
             map_current.placement_cur,
@@ -687,6 +684,7 @@ async def delete_map(
             await update_list_placements(
                 cur_positions=(map_current.placement_cur, None),
                 all_positions=(map_current.placement_all, None),
+                ignore_code=code,
                 conn=conn,
             )
             indexes[0] = None
@@ -725,11 +723,6 @@ async def delete_map(
             """,
             meta_id, code
         )
-
-        print("AFTER")
-        [print(x) for x in await conn.fetch(
-            """SELECT * FROM map_list_meta WHERE code = 'MLXXXEJ'"""
-        )]
 
 
 @postgres
