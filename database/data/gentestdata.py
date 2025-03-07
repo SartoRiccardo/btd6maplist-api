@@ -74,6 +74,10 @@ def rm_nulls(l: list[Any | None]) -> list:
     return [x for x in l if x is not None]
 
 
+def difficultify(diff: int) -> str:
+    return nullify(None if diff == -1 else diff)
+
+
 def User(user_id: int) -> str:
     name = f"usr{user_id}"
     if user_id == 100000:
@@ -112,19 +116,27 @@ class Map:
     verifications: list[tuple[str, int]]
     map_data_compatibility: list[tuple[int, int]]
     aliases: list[str]
+    # New fields
+    botb_difficulty: int | None = None
 
     def dump_map(self) -> str:
         return SEPARATOR.join(stringify(
-            self.id,
             self.code,
             self.name,
-            self.placement_cur,
-            self.placement_all,
-            self.difficulty,
             nullify(self.r6_start),
             nullify(None),
-            ";".join(self.optimal_heros),
             nullify(self.map_preview_url),
+        ))
+
+    def dump_map_meta(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.id,
+            self.code,
+            difficultify(self.placement_cur),
+            difficultify(self.placement_all),
+            difficultify(self.difficulty),
+            ";".join(self.optimal_heros),
+            difficultify(self.botb_difficulty),
             dateify(self.created_on),
             dateify(self.deleted_on),
             nullify(self.new_version),
@@ -133,28 +145,28 @@ class Map:
     def dump_aliases(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, alias)
+                stringify(alias, self.code)
             ) for alias in self.aliases
         )
 
     def dump_add_codes(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(code, descr, self.id)
+                stringify(code, descr, self.code)
             ) for code, descr in self.additional_codes
         )
 
     def dump_verifications(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, user_id, nullify(version))
+                stringify(user_id, nullify(version), self.code)
             ) for user_id, version in self.verifications
         )
 
     def dump_creators(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, user_id, nullify(role))
+                stringify(user_id, nullify(role), self.code)
             ) for user_id, role in self.creators
         )
 
@@ -217,10 +229,22 @@ class Completion:
     subm_proof_img: list[str]
     subm_proof_vid: list[str]
 
+    @property
+    def comp_meta_id(self):
+        return self.id + (-1 if self.id % 2 == 0 else 1)
+
     def dump_completion(self) -> str:
         return SEPARATOR.join(stringify(
             self.id,
             self.map.code,
+            self.subm_notes,
+            self.subm_wh_payload,
+        ))
+
+    def dump_completion_meta(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.comp_meta_id,
+            self.id,
             self.black_border,
             self.no_geraldo,
             self.lcc.id if self.lcc else None,
@@ -229,13 +253,11 @@ class Completion:
             self.new_version,
             self.accepted_by,
             self.format,
-            self.subm_notes,
-            self.subm_wh_payload,
         ))
 
     def dump_players(self) -> str:
         return "\n".join(
-            SEPARATOR.join(stringify(self.id, user_id))
+            SEPARATOR.join(stringify(user_id, self.comp_meta_id))
             for user_id in self.players
         )
 
@@ -725,6 +747,10 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_map() for x in maps
         ))
+    with open(bpath / "12_map_list_meta.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_map_meta() for x in maps
+        ))
     with open(bpath / "02_users.csv", "w") as fout:
         fout.write("\n".join(
             User(user_id) for user_id in range(1, USER_COUNT+1))
@@ -754,11 +780,11 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_submission() for x in map_submissions
         ))
-    with open(bpath / "20_list_completions.csv", "w") as fout:
+    with open(bpath / "20_completions.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_completion() for x in completions
         ))
-    with open(bpath / "21_listcomp_players.csv", "w") as fout:
+    with open(bpath / "23_comp_players.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_players() for x in completions
         ))
@@ -766,6 +792,10 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_proofs() for x in completions
             if len(x.subm_proof_img) + len(x.subm_proof_vid)
+        ))
+    with open(bpath / "21_completions_meta.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_completion_meta() for x in completions
         ))
     with open(bpath / "08_leastcostchimps.csv", "w") as fout:
         fout.write("\n".join(
