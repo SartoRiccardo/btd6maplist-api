@@ -243,6 +243,10 @@ async def test_fuzz(btd6ml_test_client, mock_auth, map_payload, valid_codes):
         "optimal_heros": ["geraldo", "brickell"],
     }
     extra_expected = {
+        "placement_curver": [None],
+        "placement_allver": [None],
+        "difficulty": [None],
+        "botb_difficulty": [None],
         "map_data": [str],
         "r6_start": [str],
         "map_preview_url": [str],
@@ -367,8 +371,8 @@ async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid
 
     await mock_auth(perms=DiscordPermRoles.ADMIN)
 
-    r6_start_path = save_image(1, filename="r6start.png")
-    preview_path = save_image(2, filename="preview.png")
+    r6_start_path, r6_hash = save_image(1, filename="r6start.png", with_hash=True)
+    preview_path, prev_hash = save_image(2, filename="preview.png", with_hash=True)
 
     req_map_data = {
         **map_payload(valid_codes[0]),
@@ -380,24 +384,14 @@ async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid
     form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Adding a map with images in the payload return {resp.status}"
-        await assert_images(
-            valid_codes[0], (
-                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-            )
-        )
+        await assert_images(valid_codes[0], (f"{r6_hash}.webp", f"{prev_hash}.webp"))
 
     form_data = to_formdata(req_map_data)
     form_data.add_field("r6_start", r6_start_path.open("rb"))
     form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Editing a map with images in the payload return {resp.status}"
-        await assert_images(
-            valid_codes[0], (
-                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-            )
-        )
+        await assert_images(valid_codes[0], (f"{r6_hash}.webp", f"{prev_hash}.webp"))
 
     form_data = to_formdata({
         **req_map_data,

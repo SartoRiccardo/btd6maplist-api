@@ -285,9 +285,9 @@ def map_payload():
         return {
             "code": code,
             "name": "Test Map Data",
-            "placement_allver": -1,
-            "placement_curver": -1,
-            "difficulty": -1,
+            "placement_allver": None,
+            "placement_curver": None,
+            "difficulty": None,
             "r6_start": None,
             "map_data": None,
             "map_preview_url": None,

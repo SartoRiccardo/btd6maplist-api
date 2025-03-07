@@ -526,7 +526,7 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
             LEFT JOIN tmp_additional_codes tac
                 ON ac.code = tac.code
             WHERE tac.code IS NULL
-                AND ac.code = $1
+                AND ac.belongs_to = $1
         )
         ;
         DELETE FROM creators
@@ -541,8 +541,8 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
         )
         ;
         DELETE FROM verifications
-        WHERE (map, user_id, version) IN (
-            SELECT v.map, v.user_id, v.version
+        WHERE (map, user_id, COALESCE(version, -1)) IN (
+            SELECT v.map, v.user_id, COALESCE(v.version, -1)
             FROM verifications v
             LEFT JOIN tmp_verifications tv
                 ON v.map = tv.map
@@ -663,21 +663,33 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
     )
 
     meta_id = await conn.fetchval(
-        """
+        f"""
         INSERT INTO map_list_meta
             (code, placement_curver, placement_allver, difficulty, botb_difficulty, optimal_heros)
+        
         SELECT
-            $1::varchar(10), $2, $3, $4, $5, $6
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM map_list_meta
-            WHERE code = $1::varchar(10)
-                AND placement_curver = $2
-                AND placement_allver = $3
-                AND difficulty = $4
-                AND optimal_heros = $6
-                AND botb_difficulty = $5
-        )
+            $1::varchar(10),
+            {"$2::int" if "placement_curver" in map_data else "placement_curver"},
+            {"$3::int" if "placement_allver" in map_data else "placement_allver"},
+            {"$4::int" if "difficulty" in map_data else "difficulty"},
+            {"$5::int" if "botb_difficulty" in map_data else "botb_difficulty"},
+            $6
+        FROM map_list_meta
+        WHERE code = $1::varchar(10)
+            AND new_version IS NULL
+            AND deleted_on IS NULL
+        
+        UNION ALL
+        
+        SELECT
+            $1::varchar(10), 
+            $2,
+            $3,
+            $4,
+            $5,
+            $6
+        
+        LIMIT 1
         RETURNING id
         """,
         map_code,
@@ -722,7 +734,6 @@ async def edit_map(
         map_current: PartialMap | None = None,
         conn=None
 ) -> None:
-    map_data["optimal_heros"] = ";".join(map_data["optimal_heros"])
     if not map_current:
         map_current = await get_map(map_data["code"], partial=True, conn=conn)
 
@@ -734,32 +745,18 @@ async def edit_map(
             conn=conn,
         )
 
-        fields = [
-            field for field in [
-                "name",
-                "placement_allver",
-                "placement_curver",
-                "difficulty",
-                "map_data",
-                "r6_start",
-                "optimal_heros",
-                "map_preview_url",
-            ] if field in map_data
-        ]
-
-        field_format = "{}=${}"
         await conn.execute(
             f"""
             UPDATE maps
             SET
-                {", ".join([
-                    field_format.format(field, i+2)
-                    for i, field in enumerate(fields)
-                ] + ["deleted_on=NULL"])}
+                name = $2,
+                map_data = $3,
+                r6_start = $4,
+                map_preview_url = $5
             WHERE code=$1
             """,
-            map_data["code"],
-            *[map_data.get(field) for field in fields],
+            map_data["code"], map_data["name"], map_data["map_data"], map_data["r6_start"],
+            map_data["map_preview_url"],
         )
 
         await set_map_relations(map_current.code, map_data, conn=conn)
@@ -788,39 +785,47 @@ async def update_list_placements(
         return
 
     selectors = []
+    args = []
+    base_idx = 2
+
+    curver_selector = "placement_curver"
     if cur_positions:
-        selectors.append("placement_curver BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)")
+        selectors.append(f"placement_curver BETWEEN LEAST(${base_idx}::int, ${base_idx+1}::int) AND GREATEST(${base_idx}::int, ${base_idx+1}::int)")
+        curver_selector = f"""
+            CASE WHEN (placement_curver BETWEEN LEAST(${base_idx}::int, ${base_idx+1}::int) AND GREATEST(${base_idx}::int, ${base_idx+1}::int))
+            THEN placement_curver + SIGN(${base_idx}::int - ${base_idx+1}::int)
+            ELSE placement_curver END
+        """
+        args += [*normalize_positions(cur_positions)]
+        base_idx += 2
+
+    allver_selector = "placement_allver"
     if all_positions:
-        selectors.append("placement_allver BETWEEN LEAST($3::int, $4::int) AND GREATEST($3::int, $4::int)")
+        selectors.append(f"placement_allver BETWEEN LEAST(${base_idx}::int, ${base_idx+1}::int) AND GREATEST(${base_idx}::int, ${base_idx+1}::int)")
+        allver_selector = f"""
+            CASE WHEN (placement_allver BETWEEN LEAST(${base_idx}::int, ${base_idx + 1}::int) AND GREATEST(${base_idx}::int, ${base_idx + 1}::int))
+            THEN placement_allver + SIGN(${base_idx}::int - ${base_idx + 1}::int)
+            ELSE placement_allver END
+        """
+        args += [*normalize_positions(all_positions)]
+        base_idx += 2
+
     await conn.execute(
         f"""
         INSERT INTO map_list_meta
             (placement_curver, placement_allver, code, difficulty, botb_difficulty, optimal_heros)
         SELECT
-            {
-                "placement_curver"
-                if cur_positions is None else
-                "CASE WHEN (placement_curver BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int))"
-                "THEN placement_curver + SIGN($1::int - $2::int) "
-                "ELSE placement_curver END"
-            },
-            {
-                "placement_allver"
-                if cur_positions is None else
-                "CASE WHEN (placement_allver BETWEEN LEAST($3::int, $4::int) AND GREATEST($3::int, $4::int))"
-                "THEN placement_allver + SIGN($3::int - $4::int) "
-                "ELSE placement_allver END"
-            },
+            {curver_selector},
+            {allver_selector},
             code, difficulty, botb_difficulty, optimal_heros
         FROM map_list_meta mlm
         WHERE mlm.new_version IS NULL
             AND mlm.deleted_on IS NULL
             AND ({" OR ".join(selectors)})
-            AND mlm.code != $5
+            AND mlm.code != $1
         """,
-        *(normalize_positions(cur_positions) if cur_positions else (None, None)),
-        *(normalize_positions(all_positions) if all_positions else (None, None)),
         ignore_code,
+        *args,
     )
 
     await link_new_version(conn=conn)

@@ -59,15 +59,20 @@ class TestMaplists:
     async def test_legacy_list(self, btd6ml_test_client):
         """Test the legacy list and its pagination"""
         # Currently doesn't paginate will do so in the future
+        legacy_map_schema = {
+            **list_map_schema,
+            "placement": int | None
+        }
+
         async with btd6ml_test_client.get("/maps/legacy") as resp:
             assert resp.ok, f"GET /maps/legacy returned {resp.status}"
             resp_data = await resp.json()
             assert resp_data[0]["placement"] > 0, "First map's placement is negative"
             for i, map_data in enumerate(resp_data):
-                if i > 0 and map_data["placement"] != -1:
+                if i > 0 and map_data["placement"] is not None:
                     assert resp_data[i-1]["placement"] < map_data["placement"], \
                         "Placement does not increase in legacy list"
-                assert map_data["placement"] > 50 or map_data["placement"] == -1, \
+                assert map_data["placement"] is None or map_data["placement"] > 50, \
                     f"LegacyMap[{i}].placement is misplaced"
-                assert len(src.utils.validators.check_fields(map_data, list_map_schema)) == 0, \
+                assert len(src.utils.validators.check_fields(map_data, legacy_map_schema)) == 0, \
                     f"Error while validating LegacyMap[{i}]"

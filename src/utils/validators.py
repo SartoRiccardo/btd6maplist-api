@@ -71,9 +71,9 @@ def typecheck_full_map(body: dict) -> dict:
     check_fields_exists = {
         "code": str,
         "name": str,
-        "placement_allver": int,
-        "placement_curver": int,
-        "difficulty": int,
+        "placement_allver": int | None,
+        "placement_curver": int | None,
+        "difficulty": int | None,
         "r6_start": str | None,
         "map_data": str | None,
         "additional_codes": [{"code": str, "description": str}],
@@ -174,21 +174,23 @@ async def validate_full_map(
         else:
             body["verifiers"][i]["id"] = str(usr.id)
 
-    if not (-1 <= body["difficulty"] <= 4):
-        errors["difficulty"] = "Must be between -1 and 4, included"
-    elif body["difficulty"] <= body["placement_curver"] <= body["placement_allver"] < 0:
+    if body["difficulty"] is not None and not (0 <= body["difficulty"] <= 4):
+        errors["difficulty"] = "Must be between 0 and 4, included"
+    elif body["difficulty"] is body["placement_curver"] is body["placement_allver"] is None:
         errors["placement_allver"] = "At least one of these should be set"
         errors["placement_curver"] = "At least one of these should be set"
         errors["difficulty"] = "At least one of these should be set"
     # FIMXE: Should take 50 from config
-    if body["placement_curver"] > 50:
-        del body["placement_curver"]
-    elif body["placement_curver"] < -1:
-        errors["placement_curver"] = "Must either be -1 or a between 1 and 50"
-    if body["placement_allver"] > 50:
-        del body["placement_allver"]
-    elif body["placement_allver"] < -1:
-        errors["placement_allver"] = "Must either be -1 or a between 1 and 50"
+    if body["placement_curver"] is not None:
+        if body["placement_curver"] > 50:
+            del body["placement_curver"]
+        elif body["placement_curver"] <= 0:
+            errors["placement_curver"] = "Must be a between 1 and 50"
+    if body["placement_allver"] is not None:
+        if body["placement_allver"] > 50:
+            del body["placement_allver"]
+        elif body["placement_allver"] <= 0:
+            errors["placement_allver"] = "Must be a between 1 and 50"
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
