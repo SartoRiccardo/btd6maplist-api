@@ -92,9 +92,11 @@ class PartialMap:
         description: The map's code.
       placement_cur:
         type: integer
+        nullable: true
         description: The map's placement in the list ~ current version (starts from 1). If none, it's set to `-1`.
       placement_all:
         type: integer
+        nullable: true
         description: The map's placement in the list ~ all versions (starts from 1). If none, it's set to `-1`.
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
@@ -122,18 +124,17 @@ class PartialMap:
         nullable: true
         description: Timestamp of the map's deletion (in seconds).
     """
-    id: int  # Only for internal use
     code: str
     name: str
     placement_cur: int | None
     placement_all: int | None
     difficulty: int | None
+    botb_difficulty: int | None
     r6_start: str | None
     map_data: str
     deleted_on: datetime | None
     optimal_heros: list[str]
     map_preview_url: str | None
-    new_version: int | None  # Only for internal use
     created_on: datetime
 
     def to_dict(self) -> dict:
@@ -143,6 +144,7 @@ class PartialMap:
             "placement_all": self.placement_all,
             "placement_cur": self.placement_cur,
             "difficulty": self.difficulty,
+            "botb_difficulty": self.botb_difficulty,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],

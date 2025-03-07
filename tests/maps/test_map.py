@@ -527,7 +527,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
 
     async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.ok, f"PUT /maps/MLXXXAA returned {resp.status}"
-        await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
+        await assert_map_placements("MLXXXAA", (10, 10, None), "Maplist")
 
     # Expert Mods
     await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
@@ -537,7 +537,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
 
     async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.ok, f"PUT /maps/MLXXXAB returned {resp.status}"
-        await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
+        await assert_map_placements("MLXXXAB", (1, None, 2), "Experts")
 
     @pytest.mark.delete
     async def test_forbidden(self, btd6ml_test_client, mock_auth):
@@ -642,22 +642,24 @@ class TestEditMaps:
         await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         last_map = "MLXXXEJ"
-        async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp, \
+                btd6ml_test_client.get(f"/maps/{last_map}") as resp_get:
             assert resp.ok, f"Delete map with correct perms returned {resp.status}"
-            async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get:
-                assert resp_get.ok, f"Get deleted map returned {resp.status}"
-                resp_map_data = await resp_get.json()
-                assert resp_map_data["deleted_on"] is not None, \
-                    f"Map.deleted_on is not None after being deleted"
+            assert resp_get.ok, f"Get deleted map returned {resp_get.status}"
+            resp_map_data = await resp_get.json()
+            import pprint
+            pprint.pp(resp_map_data)
+            assert resp_map_data["deleted_on"] is not None, \
+                f"Map.deleted_on is not None after being deleted"
 
-                current_deleted_on = resp_map_data["deleted_on"]
-                async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp_delete_again:
-                    assert resp_delete_again.status == http.HTTPStatus.NO_CONTENT, \
-                        f"Deleting a map again returns {resp_delete_again.status}"
-                async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get_again:
-                    resp_del_data = await resp_get_again.json()
-                    assert current_deleted_on == resp_del_data["deleted_on"], \
-                        "Map.deleted_on changed upon double deletion"
+            current_deleted_on = resp_map_data["deleted_on"]
+            async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp_delete_again:
+                assert resp_delete_again.status == http.HTTPStatus.NO_CONTENT, \
+                    f"Deleting a map again returns {resp_delete_again.status}"
+            async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get_again:
+                resp_del_data = await resp_get_again.json()
+                assert current_deleted_on == resp_del_data["deleted_on"], \
+                    "Map.deleted_on changed upon double deletion"
 
             async with btd6ml_test_client.get(f"/maps/50") as resp_get:
                 resp_map_data = await resp_get.json()
@@ -673,11 +675,11 @@ class TestEditMaps:
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                     resp_map_data = await resp_get.json()
                     assert resp_map_data["deleted_on"] is None, "Map.deleted_on is not None after partial deletion"
-                    assert resp_map_data["placement_cur"] == (-1 if maplist_first else prev_values[0]), \
-                        "Map.placement_cur != -1 after deletion"
-                    assert resp_map_data["placement_all"] == (-1 if maplist_first else prev_values[1]), \
-                        "Map.placement_all != -1 after deletion"
-                    assert resp_map_data["difficulty"] == (prev_values[2] if maplist_first else -1), \
+                    assert resp_map_data["placement_cur"] == (None if maplist_first else prev_values[0]), \
+                        "Map.placement_cur is not None after deletion"
+                    assert resp_map_data["placement_all"] == (None if maplist_first else prev_values[1]), \
+                        "Map.placement_all is not None after deletion"
+                    assert resp_map_data["difficulty"] == (prev_values[2] if maplist_first else None), \
                         "Map.difficulty changed after deletion by Maplist Mod"
 
             await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD if maplist_first else DiscordPermRoles.MAPLIST_MOD)
@@ -686,9 +688,9 @@ class TestEditMaps:
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                     resp_map_data = await resp_get.json()
                     assert resp_map_data["deleted_on"] is not None, "Map.deleted_on is None after remaining deletion"
-                    assert resp_map_data["placement_cur"] == -1, "Map.placement_cur != -1 after full deletion"
-                    assert resp_map_data["placement_all"] == -1, "Map.placement_all != -1 after full deletion"
-                    assert resp_map_data["difficulty"] == -1, "Map.difficulty != -1 after full deletion"
+                    assert resp_map_data["placement_cur"] is None, "Map.placement_cur is not None after full deletion"
+                    assert resp_map_data["placement_all"] is None, "Map.placement_all is not None after full deletion"
+                    assert resp_map_data["difficulty"] is None, "Map.difficulty is not None after full deletion"
 
         await delete_gradually("MLXXXDJ", (40, 35, 0), True)
         await delete_gradually("MLXXXEA", (40, 35, 0), False)
@@ -776,10 +778,10 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/{valid_codes[0]}") as resp_get:
             resp_map_data = await resp_get.json()
-            assert resp_map_data["placement_cur"] == -1, \
-                "Map.placement_cur != -1 when added with a large payload"
-            assert resp_map_data["placement_all"] == -1, \
-                "Map.placement_all != -1 when added with a large payload"
+            assert resp_map_data["placement_cur"] is None, \
+                "Map.placement_cur is not None when added with a large payload"
+            assert resp_map_data["placement_all"] is None, \
+                "Map.placement_all is not None when added with a large payload"
 
     async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
         prev_map_data = await resp_get.json()
@@ -789,9 +791,9 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
         async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
             resp_map_data = await resp_get.json()
             assert resp_map_data["placement_cur"] == prev_map_data["placement_cur"], \
-                "Map.placement_cur != -1 when added with a large payload"
+                "Map.placement_cur is not None when added with a large payload"
             assert resp_map_data["placement_all"] == prev_map_data["placement_all"], \
-                "Map.placement_all != -1 when added with a large payload"
+                "Map.placement_all is not None when added with a large payload"
 
     await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
