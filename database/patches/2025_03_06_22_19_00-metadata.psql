@@ -1,0 +1,148 @@
+-- Maps
+CREATE TABLE map_list_meta (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(10) NOT NULL,
+    placement_curver INT DEFAULT NULL,
+    placement_allver INT DEFAULT NULL,
+    difficulty INT DEFAULT NULL,
+    optimal_heros TEXT NOT NULL DEFAULT '',
+    botb_difficulty INT DEFAULT NULL,
+    created_on TIMESTAMP DEFAULT NOW(),
+    deleted_on TIMESTAMP,
+    new_version INT
+);
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_map_list_meta_1
+    FOREIGN KEY (new_version) REFERENCES map_list_meta(id);
+
+-- Update relations
+ALTER TABLE map_aliases ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE additional_codes ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE creators ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE verifications ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE mapver_compatibilities ADD COLUMN map_tmp VARCHAR(10);
+
+UPDATE map_aliases u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE additional_codes u SET map_tmp = m.code
+FROM maps m WHERE u.belongs_to = m.id;
+
+UPDATE creators u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE verifications u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE mapver_compatibilities u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+ALTER TABLE map_aliases DROP CONSTRAINT fk_maps_1;
+ALTER TABLE additional_codes DROP CONSTRAINT fk_maps_1;
+ALTER TABLE creators DROP CONSTRAINT fk_maps_1;
+ALTER TABLE verifications DROP CONSTRAINT fk_maps_1;
+ALTER TABLE mapver_compatibilities DROP CONSTRAINT fk_maps_1;
+
+ALTER TABLE map_aliases DROP COLUMN map;
+ALTER TABLE additional_codes DROP COLUMN belongs_to;
+ALTER TABLE creators DROP COLUMN map;
+ALTER TABLE verifications DROP COLUMN map;
+ALTER TABLE mapver_compatibilities DROP COLUMN map;
+
+ALTER TABLE map_aliases ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE additional_codes ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE creators ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE verifications ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE mapver_compatibilities ALTER COLUMN map_tmp SET NOT NULL;
+
+ALTER TABLE map_aliases RENAME COLUMN map_tmp TO map;
+ALTER TABLE additional_codes RENAME COLUMN map_tmp TO belongs_to;
+ALTER TABLE creators RENAME COLUMN map_tmp TO map;
+ALTER TABLE verifications RENAME COLUMN map_tmp TO map;
+ALTER TABLE mapver_compatibilities RENAME COLUMN map_tmp TO map;
+
+-- Nobody forked this yet and I've never used new_version so idc about a perfect transfer
+INSERT INTO map_list_meta
+    (code, placement_curver, placement_allver, difficulty, created_on, deleted_on, optimal_heros)
+SELECT
+    code, placement_curver, placement_allver, difficulty, created_on, deleted_on, optimal_heros
+FROM maps;
+
+UPDATE map_list_meta SET placement_curver = NULL WHERE placement_curver = -1;
+UPDATE map_list_meta SET placement_allver = NULL WHERE placement_allver = -1;
+UPDATE map_list_meta SET difficulty = NULL WHERE difficulty = -1;
+
+DROP INDEX maps_uq_code;
+ALTER TABLE maps DROP CONSTRAINT fk_maps_1;
+ALTER TABLE maps DROP CONSTRAINT maps_pkey;
+ALTER TABLE maps
+    DROP COLUMN id CASCADE,
+    DROP COLUMN placement_curver CASCADE,
+    DROP COLUMN placement_allver CASCADE,
+    DROP COLUMN difficulty CASCADE,
+    DROP COLUMN created_on CASCADE,
+    DROP COLUMN deleted_on CASCADE,
+    DROP COLUMN optimal_heros CASCADE,
+    DROP COLUMN new_version CASCADE;
+ALTER TABLE maps ADD PRIMARY KEY (code);
+
+ALTER TABLE map_aliases ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE additional_codes ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (belongs_to) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE creators ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE verifications ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE mapver_compatibilities ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_maps_1
+    FOREIGN KEY (code) REFERENCES maps(code);
+
+-- Completions
+ALTER TABLE listcomp_players ADD COLUMN tmp_run INT;
+
+CREATE TABLE completions_meta (
+    id SERIAL PRIMARY KEY,
+    completion INT NOT NULL,
+    black_border BOOLEAN,
+    no_geraldo BOOLEAN,  -- no optimal hero
+    lcc INT,
+    created_on TIMESTAMP DEFAULT NOW(),
+    deleted_on TIMESTAMP,
+    new_version INT,
+    accepted_by BIGINT,
+    format INT NOT NULL
+);
+ALTER TABLE completions_meta ADD CONSTRAINT fk_lccs_1
+  FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
+
+INSERT INTO completions_meta
+    (completion, black_border, no_geraldo, lcc, created_on, deleted_on, new_version, accepted_by, format)
+SELECT
+    id, black_border, no_geraldo, lcc, created_on, deleted_on, new_version, accepted_by, format
+FROM list_completions;
+
+UPDATE listcomp_players u SET tmp_run = cm.id
+FROM completions_meta cm WHERE cm.completion = u.run;
+
+ALTER TABLE listcomp_players DROP COLUMN run CASCADE;
+ALTER TABLE listcomp_players ALTER COLUMN tmp_run SET NOT NULL;
+ALTER TABLE listcomp_players RENAME COLUMN tmp_run TO run;
+ALTER TABLE listcomp_players ADD CONSTRAINT fk_completions_meta_1
+  FOREIGN KEY (run) REFERENCES completions_meta(id) ON DELETE CASCADE;
+
+ALTER TABLE list_completions
+    DROP COLUMN black_border CASCADE,
+    DROP COLUMN no_geraldo CASCADE,
+    DROP COLUMN lcc CASCADE,
+    DROP COLUMN created_on CASCADE,
+    DROP COLUMN deleted_on CASCADE,
+    DROP COLUMN new_version CASCADE,
+    DROP COLUMN accepted_by CASCADE,
+    DROP COLUMN format CASCADE;
+ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+
+
+ALTER TABLE list_completions RENAME TO completions;
+ALTER TABLE listcomp_players RENAME TO comp_players;

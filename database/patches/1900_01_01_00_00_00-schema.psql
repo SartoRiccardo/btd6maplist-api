@@ -132,8 +132,6 @@ CREATE TABLE list_completions (
   subm_notes TEXT,
   subm_wh_payload TEXT
 );
---ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
---  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 ALTER TABLE list_completions ADD CONSTRAINT fk_lccs_1
   FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
 ALTER TABLE list_completions ADD CONSTRAINT fk_list_completions_1
