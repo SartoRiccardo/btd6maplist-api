@@ -121,7 +121,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             FROM maps m
             JOIN map_list_meta mlm
                 ON m.code = mlm.code
-            WHERE m.placement_allver = $1::int
+            WHERE mlm.placement_allver = $1::int
                 AND mlm.deleted_on IS NULL
                 AND mlm.new_version IS NULL
         """
@@ -181,6 +181,18 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
                     JOIN map_list_meta mlm
                         ON m.code = mlm.code
                     WHERE m.code = $1
+                        AND mlm.deleted_on IS NOT NULL
+                    ORDER BY mlm.created_on DESC
+                )
+                
+                UNION
+
+                (
+                    SELECT 7 AS ord, {columns}
+                    FROM maps m
+                    JOIN map_list_meta mlm
+                        ON m.code = mlm.code
+                    WHERE LOWER(m.name) = LOWER($1)
                         AND mlm.deleted_on IS NOT NULL
                     ORDER BY mlm.created_on DESC
                 )
@@ -431,73 +443,253 @@ async def alias_exists(alias: str, conn=None) -> bool:
 
 
 @postgres
-async def insert_map_relations(map_id: str, map_data: dict, conn=None) -> None:
-    await conn.executemany(
-        "INSERT INTO additional_codes(code, description, belongs_to) VALUES ($1, $2, $3)",
-        [
-            (obj["code"], obj["description"], map_id)
-            for obj in map_data["additional_codes"]
-        ]
-    )
-    await conn.executemany(
+async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
+    await conn.execute(
         """
-        INSERT INTO creators(map, user_id, role)
-        VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING
-        """,
-        [
-            (map_id, int(obj["id"]), obj["role"])
-            for obj in map_data["creators"]
-        ]
-    )
-    await conn.executemany(
+        CREATE TEMP TABLE tmp_additional_codes (
+            code VARCHAR(10),
+            description TEXT,
+            belongs_to VARCHAR(10)
+        ) ON COMMIT DROP;
+        
+        CREATE TEMP TABLE tmp_creators (
+            user_id BIGINT,
+            role TEXT,
+            map VARCHAR(10)
+        ) ON COMMIT DROP;
+        
+        CREATE TEMP TABLE tmp_verifications (
+            user_id BIGINT,
+            version INT,
+            map VARCHAR(10)
+        ) ON COMMIT DROP;
+        
+        CREATE TEMP TABLE tmp_mapver_compatibilities (
+            version INT,
+            status INT,
+            map VARCHAR(10)
+        ) ON COMMIT DROP;
+        
+        CREATE TEMP TABLE tmp_map_aliases (
+            alias VARCHAR(255),
+            map VARCHAR(10)
+        ) ON COMMIT DROP;
         """
-        INSERT INTO verifications(map, user_id, version)
+    )
+
+    queries = """
+        INSERT INTO tmp_additional_codes
+            (code, description, belongs_to)
+        VALUES
+            ($1, $2, $3)
+        ;
+        INSERT INTO tmp_creators
+            (map, user_id, role)
+        VALUES
+            ($1, $2, $3)
+        ;
+        INSERT INTO tmp_verifications
+            (map, user_id, version)
+        VALUES
+            ($1, $2, $3)
+        ;
+        INSERT INTO tmp_mapver_compatibilities
+            (map, version, status)
         VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING
-        """,
-        [
-            (map_id, int(obj["id"]), obj["version"])
-            for obj in map_data["verifiers"]
-        ]
-    )
-    await conn.executemany(
-        "INSERT INTO mapver_compatibilities(map, version, status) VALUES ($1, $2, $3)",
-        [
-            (map_id, obj["version"], obj["status"])
-            for obj in map_data["version_compatibilities"]
-        ]
-    )
+        ;
+        INSERT INTO tmp_map_aliases
+            (map, alias)
+        VALUES
+            ($1, $2)
+    """.split(";")
+
+    q_params = [
+        [(obj["code"], obj["description"], map_code)
+         for obj in map_data["additional_codes"]],
+        [(map_code, int(obj["id"]), obj["role"])
+         for obj in map_data["creators"]],
+        [(map_code, int(obj["id"]), obj["version"])
+         for obj in map_data["verifiers"]],
+        [(map_code, obj["version"], obj["status"])
+         for obj in map_data["version_compatibilities"]],
+        [(map_code, alias) for alias in map_data["aliases"]],
+    ]
+
+    for query, params in zip(queries, q_params):
+        await conn.executemany(query, params)
+
+    queries = """
+        DELETE FROM additional_codes
+        WHERE code IN (
+            SELECT ac.code
+            FROM additional_codes ac
+            LEFT JOIN tmp_additional_codes tac
+                ON ac.code = tac.code
+            WHERE tac.code IS NULL
+                AND ac.code = $1
+        )
+        ;
+        DELETE FROM creators
+        WHERE (map, user_id) IN (
+            SELECT c.map, c.user_id
+            FROM creators c
+            LEFT JOIN tmp_creators tc
+                ON c.map = tc.map
+                AND c.user_id = tc.user_id
+            WHERE tc.map IS NULL
+                AND c.map = $1
+        )
+        ;
+        DELETE FROM verifications
+        WHERE (map, user_id, version) IN (
+            SELECT v.map, v.user_id, v.version
+            FROM verifications v
+            LEFT JOIN tmp_verifications tv
+                ON v.map = tv.map
+                AND v.user_id = tv.user_id
+                AND v.version = tv.version
+            WHERE tv.map IS NULL
+                AND v.map = $1
+        )
+        ;
+        DELETE FROM mapver_compatibilities
+        WHERE (map, version) IN (
+            SELECT c.map, c.version
+            FROM mapver_compatibilities c
+            LEFT JOIN tmp_mapver_compatibilities tc
+                ON c.map = tc.map
+                AND c.version = tc.version
+            WHERE tc.map IS NULL
+                AND c.map = $1
+        )
+        ;
+        DELETE FROM map_aliases
+        WHERE (map, alias) IN (
+            SELECT a.map, a.alias
+            FROM map_aliases a
+            LEFT JOIN tmp_map_aliases ta
+                ON a.alias = ta.alias
+            WHERE ta.alias IS NULL
+                AND a.map = $1
+        )
+    """.split(";")
+
+    for query in queries:
+        await conn.execute(query, map_code)
 
     await conn.execute(
         """
-        DELETE FROM map_aliases al
-        USING maps m
-        WHERE al.alias = ANY($1::VARCHAR(20)[])
+        UPDATE additional_codes ac
+        SET
+            description = tac.description,
+            belongs_to = tac.belongs_to
+        FROM tmp_additional_codes tac
+        WHERE tac.code = ac.code
+        ;
+        INSERT INTO additional_codes
+            (code, description, belongs_to)
+        SELECT
+            tac.code, tac.description, tac.belongs_to
+        FROM tmp_additional_codes tac
+        LEFT JOIN additional_codes ac
+            ON tac.code = ac.code
+        WHERE ac.code IS NULL
+        ;
+        
+        UPDATE creators c
+        SET
+            role = tc.role
+        FROM tmp_creators tc
+        WHERE tc.map = c.map
+            AND tc.user_id = c.user_id
+        ;
+        INSERT INTO creators
+            (map, user_id, role)
+        SELECT
+            tc.map, tc.user_id, tc.role
+        FROM tmp_creators tc
+        LEFT JOIN creators c
+            ON tc.map = c.map
+            AND tc.user_id = c.user_id
+        WHERE c.map IS NULL
+        ;
+        
+        INSERT INTO verifications
+            (map, user_id, version)
+        SELECT
+            tv.map, tv.user_id, tv.version
+        FROM tmp_verifications tv
+        LEFT JOIN verifications v
+            ON tv.map = v.map
+            AND tv.user_id = v.user_id
+            AND tv.version = v.version
+        WHERE v.map IS NULL
+        ;
+        
+        UPDATE mapver_compatibilities v
+        SET
+            status = tv.status
+        FROM tmp_mapver_compatibilities tv
+        WHERE tv.map = v.map
+            AND tv.version = v.version
+        ;
+        INSERT INTO mapver_compatibilities
+            (map, status, version)
+        SELECT
+            tv.map, tv.status, tv.version
+        FROM tmp_mapver_compatibilities tv
+        LEFT JOIN verifications v
+            ON tv.map = v.map
+            AND tv.version = v.version
+        WHERE v.map IS NULL
+        ;
+        
+        UPDATE map_aliases a
+        SET
+            map = ta.map
+        FROM tmp_map_aliases ta
+        WHERE ta.alias = a.alias
+        ;
+        INSERT INTO map_aliases
+            (map, alias)
+        SELECT
+            ta.map, ta.alias
+        FROM tmp_map_aliases ta
+        LEFT JOIN map_aliases a
+            ON ta.alias = a.alias
+        WHERE a.alias IS NULL
+        ;
+        """
+    )
+
+    meta_id = await conn.fetchval(
+        """
+        INSERT INTO map_list_meta
+            (code, placement_curver, placement_allver, difficulty, botb_difficulty, optimal_heros)
+        SELECT
+            $1::varchar(10), $2, $3, $4, $5, $6
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM map_list_meta
+            WHERE code = $1::varchar(10)
+                AND placement_curver = $2
+                AND placement_allver = $3
+                AND difficulty = $4
+                AND optimal_heros = $6
+                AND botb_difficulty = $5
+        )
+        RETURNING id
         """,
-        map_data["aliases"],
-    )
-    await conn.executemany(
-        "INSERT INTO map_aliases(map, alias) VALUES ($1, $2)",
-        [(map_id, alias) for alias in map_data["aliases"]]
+        map_code,
+        map_data.get("placement_curver", None),
+        map_data.get("placement_allver", None),
+        map_data.get("difficulty", None),
+        map_data.get("botb_difficulty", None),
+        ";".join(map_data["optimal_heros"]),
     )
 
-
-@postgres
-async def delete_map_relations(map_id: str, conn=None) -> None:
-    relations = [
-        ("additional_codes", "belongs_to"),
-        ("creators", "map"),
-        ("verifications", "map"),
-        ("mapver_compatibilities", "map"),
-        ("map_aliases", "map"),
-    ]
-    coros = [
-        conn.execute(f"DELETE FROM {table} WHERE {fkey}=$1", map_id)
-        for table, fkey in relations
-    ]
-    for coro in coros:
-        await coro
+    if meta_id:
+        await link_new_version(conn=conn)
 
 
 @postgres
@@ -512,18 +704,16 @@ async def add_map(map_data: dict, conn=None) -> None:
 
         await conn.execute(
             """
-            INSERT INTO maps(
-                code, name, placement_allver, placement_curver, difficulty,
-                map_data, r6_start, optimal_heros, map_preview_url
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO maps
+                (code, name, map_data, r6_start, map_preview_url)
+            VALUES
+                ($1, $2, $3, $4, $5)
             """,
-            map_data["code"], map_data["name"], map_data.get("placement_allver", -1),
-            map_data.get("placement_curver", -1), map_data["difficulty"], map_data["map_data"],
-            map_data["r6_start"], ";".join(map_data["optimal_heros"]), map_data["map_preview_url"],
+            map_data["code"], map_data["name"], map_data["map_data"],
+            map_data["r6_start"], map_data["map_preview_url"],
         )
 
-        await insert_map_relations(map_data["code"], map_data, conn=conn)
+        await set_map_relations(map_data["code"], map_data, conn=conn)
 
 
 @postgres
@@ -572,8 +762,7 @@ async def edit_map(
             *[map_data.get(field) for field in fields],
         )
 
-        await delete_map_relations(map_current.code, conn=conn)
-        await insert_map_relations(map_current.code, map_data, conn=conn)
+        await set_map_relations(map_current.code, map_data, conn=conn)
 
 
 def normalize_positions(pos: tuple[int | None, int | None]) -> tuple[int, int]:
@@ -634,6 +823,11 @@ async def update_list_placements(
         ignore_code,
     )
 
+    await link_new_version(conn=conn)
+
+
+@postgres
+async def link_new_version(conn=None) -> None:
     await conn.execute(
         """
         UPDATE map_list_meta mlm_old
@@ -646,15 +840,6 @@ async def update_list_placements(
             AND mlm_old.created_on < mlm_new.created_on
         """
     )
-
-    # await conn.execute(
-    #     f"""
-    #     UPDATE map_list_data
-    #     SET {field} = {field} + SIGN($1::int - $2::int)
-    #     WHERE {field} BETWEEN LEAST($1::int, $2::int) AND GREATEST($1::int, $2::int)
-    #     """,
-    #     old_pos, new_pos
-    # )
 
 
 @postgres
