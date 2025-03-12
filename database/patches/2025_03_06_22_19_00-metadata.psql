@@ -135,11 +135,11 @@ ALTER TABLE list_completions
     DROP COLUMN black_border CASCADE,
     DROP COLUMN no_geraldo CASCADE,
     DROP COLUMN lcc CASCADE,
-    DROP COLUMN created_on CASCADE,
     DROP COLUMN deleted_on CASCADE,
     DROP COLUMN new_version CASCADE,
     DROP COLUMN accepted_by CASCADE,
     DROP COLUMN format CASCADE;
+ALTER TABLE list_completions RENAME COLUMN created_on TO submitted_on;
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 

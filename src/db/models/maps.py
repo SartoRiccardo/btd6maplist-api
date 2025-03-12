@@ -116,9 +116,6 @@ class PartialMap:
         type: array
         items:
           $ref: "#/components/schemas/Btd6Hero"
-      created_on:
-        type: integer
-        description: Timestamp of the map's creation date (in seconds).
       deleted_on:
         type: integer
         nullable: true
@@ -135,7 +132,6 @@ class PartialMap:
     deleted_on: datetime | None
     optimal_heros: list[str]
     map_preview_url: str | None
-    created_on: datetime
 
     def to_dict(self) -> dict:
         return {
@@ -149,7 +145,6 @@ class PartialMap:
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
-            "created_on": int(self.created_on.timestamp()),
             "map_preview_url": self.map_preview_url if self.map_preview_url else
                 f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
         }

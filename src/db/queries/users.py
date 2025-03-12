@@ -67,9 +67,16 @@ async def get_completions_by(
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
-            JOIN listcomp_players ply
+            SELECT
+                r.id AS run_meta_id,
+                c.id AS run_id,
+                r.*,
+                c.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
+            JOIN completions c
+                ON r.completion = c.id
+            JOIN comp_players ply
                 ON ply.run = r.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
@@ -77,32 +84,35 @@ async def get_completions_by(
                 {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
+                AND r.new_version IS NULL
         ),
         unique_runs AS (
-            SELECT DISTINCT ON (rwf.id)
-                rwf.id AS run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+            SELECT DISTINCT ON (rwf.run_id)
+                rwf.run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
                 rwf.format,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.id) AS subm_proof_vid,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
                 rwf.subm_notes,
                 
-                m.name, m.placement_curver, m.placement_allver, m.difficulty,
-                m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url,
-                m.id AS map_id, m.created_on,
+                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
+                m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
                 
                 lccs.id AS lcc_id, lccs.leftover,
                 
-                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.id) AS user_ids
+                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.run_meta_id) AS user_ids
             FROM runs_with_flags rwf
-            JOIN listcomp_players ply
-                ON ply.run = rwf.id
+            JOIN comp_players ply
+                ON ply.run = rwf.run_meta_id
             LEFT JOIN completion_proofs cp
-                ON cp.run = rwf.id
+                ON cp.run = rwf.run_id
             LEFT JOIN leastcostchimps lccs
                 ON rwf.lcc = lccs.id
+            JOIN map_list_meta mlm
+                ON mlm.code = rwf.map
             JOIN maps m
-                ON m.code = rwf.map
-            WHERE m.deleted_on IS NULL
+                ON m.code = mlm.code
+            WHERE mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
         )
         SELECT COUNT(*) OVER() AS total_count, uq.*
         FROM unique_runs uq
@@ -121,19 +131,17 @@ async def get_completions_by(
         ListCompletion(
             row["run_id"],
             PartialMap(
-                row["map_id"],
                 row["map"],
                 row["name"],
                 row["placement_curver"],
                 row["placement_allver"],
                 row["difficulty"],
+                row["botb_difficulty"],
                 row["r6_start"],
                 row["map_data"],
                 None,
                 row["optimal_heros"].split(";"),
                 row["map_preview_url"],
-                None,
-                row["created_on"],
             ),
             list_rm_dupe(row["user_ids"], preserve_order=False),
             row["black_border"],
@@ -173,10 +181,11 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
         FROM runs_with_flags rwf
         JOIN listcomp_players ply
             ON ply.run = rwf.id
-        JOIN maps m
+        JOIN map_list_meta m
             ON m.code = rwf.map
         WHERE ply.user_id = $1
             AND m.deleted_on IS NULL
+            AND m.new_version IS NULL
         GROUP BY (rwf.map, rwf.format)
         """,
         uid
@@ -225,33 +234,36 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
     payload = await conn.fetch(
         """
         SELECT
-            m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
-            m.r6_start, m.map_data, m.optimal_heros, m.map_preview_url, m.id,
-            m.new_version, m.created_on
-        FROM maps m JOIN creators c
+            m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
+            m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.created_on,
+            mlm.botb_difficulty
+        FROM maps m
+        JOIN map_list_meta mlm
+            ON m.code = mlm.code
+        JOIN creators c
             ON m.id = c.map
         WHERE c.user_id=$1
-            AND m.deleted_on IS NULL
+            AND mlm.deleted_on IS NULL
+            AND mlm.new_version IS NULL
         """,
         int(uid)
     )
     return [
         PartialMap(
-            m[9],
-            m[0],
-            m[1],
-            m[2],
-            m[3],
-            m[4],
-            m[5],
-            m[6],
+            pl_map["code"],
+            pl_map["name"],
+            pl_map["placement_curver"],
+            pl_map["placement_allver"],
+            pl_map["difficulty"],
+            pl_map["botb_difficulty"],
+            pl_map["r6_start"],
+            pl_map["map_data"],
             None,
-            m[7].split(";"),
-            m[8],
-            m[10],
-            m[11],
+            pl_map["optimal_heros"].split(";"),
+            pl_map["map_preview_url"],
+            pl_map["created_on"],
         )
-        for m in payload
+        for pl_map in payload
     ]
 
 
@@ -274,13 +286,14 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             FROM runs_with_flags rwf
             JOIN listcomp_players ply
                 ON ply.run = rwf.id
-            JOIN maps m
+            JOIN map_list_meta m
                 ON rwf.map = m.code
             WHERE ply.user_id = $1
                 AND rwf.accepted_by IS NOT NULL
                 AND rwf.deleted_on IS NULL
                 AND rwf.new_version IS NULL
                 AND m.deleted_on IS NULL
+                AND m.new_version IS NULL
             GROUP BY rwf.map
         )
         SELECT
@@ -383,30 +396,38 @@ async def get_completions_on(
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
+            SELECT
+                r.id AS run_meta_id,
+                c.id AS run_id,
+                r.*,
+                c.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
+            JOIN completions c
+                ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
-            JOIN listcomp_players ply
+            JOIN comp_players ply
                 ON ply.run = r.id
-            WHERE r.map = $2
+            WHERE c.map = $2
                 {'AND r.format = ANY($3::int[])' if len(allowed_formats) > 0 else ''}
                 AND ply.user_id = $1
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
+                AND r.new_version IS NULL
         )
         SELECT DISTINCT ON (run_id)
-            r.id AS run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
+            r.run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,
             lcc.id AS lcc_id, lcc.leftover,
-            ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.id) AS user_ids,
-            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY r.id) AS subm_proof_img,
-            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY r.id) AS subm_proof_vid,
+            ARRAY_AGG(ply.user_id) OVER(PARTITION BY r.run_meta_id) AS user_ids,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY r.run_id) AS subm_proof_img,
+            ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY r.run_id) AS subm_proof_vid,
             r.subm_notes
         FROM runs_with_flags r
-        JOIN listcomp_players ply
-            ON ply.run = r.id
+        JOIN comp_players ply
+            ON ply.run = r.run_meta_id
         LEFT JOIN completion_proofs cp
-            ON cp.run = r.id 
+            ON cp.run = r.run_id
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = r.lcc
         """,

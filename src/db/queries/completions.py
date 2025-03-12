@@ -32,13 +32,13 @@ async def submit_run(
 
         run_id = await conn.fetchval(
             """
-            INSERT INTO list_completions
-                (map, black_border, no_geraldo, lcc, format, subm_notes)
+            INSERT INTO completions
+                (map, subm_notes)
             VALUES
-                ($1, $2, $3, $4, $5, $6)
+                ($1, $2)
             RETURNING id
             """,
-            map_code, black_border, no_geraldo, lcc_id, format_id, notes,
+            map_code, notes,
         )
 
         proofs = [(run_id, url, 0) for url in proof_img_url] + \
@@ -52,12 +52,23 @@ async def submit_run(
             proofs,
         )
 
+        run_meta_id = await conn.fetchval(
+            """
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, format)
+            VALUES
+                ($1, $2, $3, $4, $5)
+            RETURNING id
+            """,
+            run_id, black_border, no_geraldo, lcc_id, format_id,
+        )
+
         await conn.execute(
             """
-            INSERT INTO listcomp_players(run, user_id)
+            INSERT INTO comp_players(run, user_id)
             VALUES($1, $2)
             """,
-            run_id, player_id
+            run_meta_id, player_id
         )
 
         return run_id
@@ -70,7 +81,18 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
 
     run = await conn.fetchrow(
         """
-        WITH the_run AS (SELECT * FROM list_completions WHERE id=$1),
+        WITH the_run AS (
+            SELECT
+                c.id AS run_id,
+                cm.id AS run_meta_id,
+                c.*,
+                cm.*
+            FROM completions c
+            JOIN completions_meta cm
+                ON c.id = cm.completion
+            WHERE c.id = $1
+                AND cm.new_version IS NULL
+        ),
         runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
             FROM the_run r
@@ -89,11 +111,11 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
             ARRAY_AGG(u.name) OVER() AS user_names
         FROM runs_with_flags run
         LEFT JOIN completion_proofs cp
-            ON cp.run = run.id
+            ON cp.run = run.run_id
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
-        LEFT JOIN listcomp_players ply
-            ON ply.run = run.id
+        LEFT JOIN comp_players ply
+            ON ply.run = run.run_meta_id
         LEFT JOIN users u
             ON ply.user_id = u.discord_id
         """,
@@ -209,7 +231,7 @@ async def add_completion(
         user_ids: list[int],
         mod_id: int,
         subm_proof: str | None = None,
-        conn: asyncpg.pool.Pool | None = None
+        conn: asyncpg.pool.PoolConnectionProxy | None = None
 ) -> None:
     async with conn.transaction():
         lcc_id = None
@@ -272,14 +294,16 @@ async def delete_completion(
 ) -> None:
     q = (
         """
-        DELETE FROM list_completions
-        WHERE id=$1
+        DELETE FROM completions
+        WHERE id = $1
         """
     ) if hard_delete else (
         """
-        UPDATE list_completions
-        SET deleted_on=NOW()
-        WHERE id=$1
+        UPDATE completions_meta
+        SET deleted_on = NOW()
+        WHERE completion = $1
+            AND deleted_on IS NULL
+            AND new_version IS NULL
         """
     )
 
@@ -295,37 +319,47 @@ async def get_unapproved_completions(
     payload = await conn.fetch(
         """
         WITH unapproved_runs AS (
-            SELECT r.*, (r.lcc IS NOT NULL) AS current_lcc
-            FROM list_completions r
-            WHERE r.deleted_on IS NULL
-                AND r.accepted_by IS NULL
+            SELECT
+                c.id AS run_id,
+                cm.id AS run_meta_id,
+                cm.*,
+                c.*,
+                (cm.lcc IS NOT NULL) AS current_lcc
+            FROM completions_meta cm
+            JOIN completions c
+                ON cm.completion = c.id
+            WHERE cm.deleted_on IS NULL
+                AND cm.accepted_by IS NULL
+                AND cm.new_version IS NULL
         ),
         unique_runs AS (
-            SELECT DISTINCT ON (run.id)
+            SELECT DISTINCT ON (run.run_id)
 
                 run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-                run.created_on, run.deleted_on,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                run.created_on AS comp_created_on, run.deleted_on AS comp_deleted_on,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.run_id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.run_id) AS subm_proof_vid,
                 run.subm_notes,
-                run.id AS run_id, run.subm_wh_payload,
+                run.run_id, run.subm_wh_payload,
                 
                 lcc.id AS lcc_id, lcc.leftover,
-                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.run_meta_id) AS user_ids,
                 
-                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
-                m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
+                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start, 
+                m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty
             FROM unapproved_runs run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
-            LEFT JOIN listcomp_players ply
-                ON ply.run = run.id
+            LEFT JOIN comp_players ply
+                ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
-                ON cp.run = run.id
+                ON cp.run = run.run_id
             JOIN maps m
                 ON m.code = run.map
-            WHERE m.deleted_on IS NULL
-                AND m.new_version IS NULL
+            JOIN map_list_meta mlm
+                ON m.code = mlm.code
+            WHERE mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
         )
         SELECT 
             COUNT(*) OVER() AS total_count, uq.*
@@ -342,19 +376,17 @@ async def get_unapproved_completions(
         ListCompletionWithMeta(
             run["run_id"],
             PartialMap(
-                run["map_id"],
                 run["map"],
                 run["name"],
                 run["placement_curver"],
                 run["placement_allver"],
                 run["difficulty"],
+                run["botb_difficulty"],
                 run["r6_start"],
-                "",
-                run["deleted_on"],
-                run["optimal_heros"].split(","),
+                run["map_data"],
+                None,
+                run["optimal_heros"].split(";"),
                 run["map_preview_url"],
-                run["new_version"],
-                run["created_on"],
             ),
             list_rm_dupe(run["user_ids"], preserve_order=False),
             run["black_border"],
@@ -369,8 +401,8 @@ async def get_unapproved_completions(
             list_rm_dupe(run["subm_proof_vid"]),
             run["subm_notes"],
             run["accepted_by"],
-            run["created_on"],
-            run["deleted_on"],
+            run["comp_created_on"],
+            run["comp_deleted_on"],
             run["subm_wh_payload"],
         )
         for run in payload
@@ -415,37 +447,47 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
+            SELECT
+                c.id AS run_id,
+                r.id AS run_meta_id,
+                c.*,
+                r.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
+            JOIN completions c
+                ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
+            WHERE r.deleted_on IS NULL
+                AND r.new_version IS NULL
         ),
         accepted_runs AS (
-            SELECT DISTINCT ON (run.id)
-                run.id AS run_id, run.map,
-                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+            SELECT DISTINCT ON (run.run_id)
+                run.run_id, run.map,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.run_meta_id) AS user_ids,
                 run.black_border, run.no_geraldo, run.current_lcc, run.format,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.run_id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.run_id) AS subm_proof_vid,
                 run.subm_notes, run.accepted_by, run.created_on AS run_created_on, run.deleted_on AS run_deleted_on,
                 
                 lcc.id AS lcc_id, lcc.leftover,
                 
-                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
-                m.optimal_heros, m.map_preview_url, m.created_on AS map_created_on
+                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
+                mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, m.map_data
             FROM runs_with_flags run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
-            LEFT JOIN listcomp_players ply
-                ON ply.run = run.id
+            LEFT JOIN comp_players ply
+                ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
-                ON cp.run = run.id
+                ON cp.run = run.run_id
+            JOIN map_list_meta mlm
+                ON mlm.code = run.map
             JOIN maps m
                 ON m.code = run.map
-                AND m.deleted_on IS NULL
-                AND m.new_version IS NULL
-            WHERE run.deleted_on IS NULL
-                AND run.accepted_by IS NOT NULL
+            WHERE run.accepted_by IS NOT NULL
+                AND mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
                 {format_filter}
         )
         SELECT *
@@ -461,19 +503,17 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         ListCompletionWithMeta(
             row["run_id"],
             PartialMap(
-                row["map_id"],
                 row["map"],
                 row["name"],
                 row["placement_curver"],
                 row["placement_allver"],
                 row["difficulty"],
+                row["botb_difficulty"],
                 row["r6_start"],
-                "",
+                row["map_data"],
                 None,
-                row["optimal_heros"].split(","),
+                row["optimal_heros"].split(";"),
                 row["map_preview_url"],
-                None,
-                row["map_created_on"],
             ),
             list_rm_dupe(row["user_ids"], preserve_order=False),
             row["black_border"],

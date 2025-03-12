@@ -237,6 +237,7 @@ class Completion:
         return SEPARATOR.join(stringify(
             self.id,
             self.map.code,
+            dateify(self.created_on),
             self.subm_notes,
             self.subm_wh_payload,
         ))

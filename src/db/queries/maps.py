@@ -97,7 +97,7 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialMap | None:
     columns = """
         m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
-        m.map_data, mlm.deleted_on, mlm.optimal_heros, m.map_preview_url, mlm.created_on, mlm.botb_difficulty
+        m.map_data, mlm.deleted_on, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty
         """
     placement_union = ""
     if code.isnumeric() and abs(int(code)) < 1000:  # Current version index
@@ -203,7 +203,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
             m.r6_start, m.map_data, v.is_verified, m.deleted_on,
-            m.optimal_heros, m.map_preview_url, m.created_on, m.botb_difficulty
+            m.optimal_heros, m.map_preview_url, m.botb_difficulty
         FROM possible_map m
         LEFT JOIN verified_maps v
             ON v.map = m.code
@@ -227,7 +227,6 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             pl_map["deleted_on"],
             pl_map["optimal_heros"].split(";"),
             pl_map["map_preview_url"],
-            pl_map["created_on"],
         )
 
     lccs = await get_lccs_for(map_code, conn=conn)
@@ -274,7 +273,6 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         pl_map["deleted_on"],
         pl_map["optimal_heros"].split(";"),
         pl_map["map_preview_url"],
-        pl_map["created_on"],
         [(row["user_id"], row["role"], row["name"]) for row in pl_creat],
         [(row["code"], row["description"]) for row in pl_codes],
         [(uid, ver/10 if ver else None, name) for uid, ver, name in pl_verif],
@@ -391,6 +389,8 @@ async def get_completions_for(
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
                 
+                -- This only fetches the largest leftover.
+                -- To fetch leftover for all runs, join with leastcostchimps here.
                 rwf.lcc_id AS lcc_id, rwf.leftover,
                 
                 ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.meta_id) AS user_ids,

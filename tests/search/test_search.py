@@ -17,7 +17,6 @@ map_schema = {
     "map_data": str | None,
     "optimal_heros": [str],
     "deleted_on": int | None,
-    "created_on": int,
     "map_preview_url": str
 }
 
