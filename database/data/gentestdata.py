@@ -240,6 +240,7 @@ class Completion:
             dateify(self.created_on),
             self.subm_notes,
             self.subm_wh_payload,
+            None,  # Copied from ID
         ))
 
     def dump_completion_meta(self) -> str:
@@ -254,6 +255,7 @@ class Completion:
             self.new_version,
             self.accepted_by,
             self.format,
+            None,  # Copied from ID
         ))
 
     def dump_players(self) -> str:
@@ -724,6 +726,30 @@ def gen_misc_completions(comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int,
     return comp_uid+len(comps), lcc_uid, comps
 
 
+def gen_round_completions(comp_uid: int) -> tuple[int, list[Completion]]:
+    if comp_uid % 2 == 0:
+        return comp_uid+1, [
+            Completion(
+                comp_uid,
+                MapKey("MLXXXEJ"),
+                True,
+                True,
+                start_timestamp + 1,
+                None,
+                3,
+                None if lcc_uid % 3 == 0 else 3,
+                1,
+                None,
+                None,
+                LCC(lcc_uid, lcc_uid * 1000),
+                [19, 40, 41],
+                [],
+                [],
+            ),
+        ]
+    return comp_uid, []
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -737,7 +763,13 @@ if __name__ == '__main__':
     comp_uid, lcc_uid, completions_lccs = gen_extra_lccs(maps[0], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lb = gen_lb_completions(maps[37], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_misc = gen_misc_completions(comp_uid=comp_uid, lcc_uid=lcc_uid)
-    completions += completions_rec + completions_pro + completions_lccs + completions_lb + completions_misc
+    comp_uid, completions_round = gen_round_completions(comp_uid=comp_uid)
+    completions += completions_rec + \
+                   completions_pro + \
+                   completions_lccs + \
+                   completions_lb + \
+                   completions_misc + \
+                   completions_round
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps

@@ -36,7 +36,7 @@ JOIN leastcostchimps lcc
 WHERE cm.accepted_by IS NOT NULL
     AND cm.deleted_on IS NULL
     AND cm.new_version IS NULL
-ORDER BY c.map, cm.format, lcc.leftover DESC, cm.created_on ASC;
+ORDER BY c.map, cm.format, lcc.leftover DESC, c.submitted_on ASC;
 
 
 ---------------

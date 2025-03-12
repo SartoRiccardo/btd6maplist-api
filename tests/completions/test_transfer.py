@@ -21,24 +21,27 @@ class TestTransfer:
         await mock_auth(perms=DiscordPermRoles.ADMIN)
 
         old_comp_ids = []
-        async with btd6ml_test_client.get(f"/maps/{TEST_CODE_FROM}/completions") as resp:
-            assert resp.status == http.HTTPStatus.OK, f"Getting a deleted map's completions returns {resp.status}"
-            for comp in (await resp.json())["completions"]:
-                old_comp_ids.append(comp["id"])
+        async with btd6ml_test_client.get(f"/maps/{TEST_CODE_FROM}/completions") as resp_get_from, \
+                btd6ml_test_client.get(f"/maps/{TEST_CODE_TO}/completions") as resp_get_to:
+            assert resp_get_from.status == http.HTTPStatus.OK, \
+                f"Getting a deleted map's completions returns {resp_get_from.status}"
+            old_source_comp_count = (await resp_get_from.json())["total"]
+            old_target_comp_count = (await resp_get_to.json())["total"]
 
         async with btd6ml_test_client.put(
                 f"/maps/{TEST_CODE_FROM}/completions/transfer",
                 headers=HEADERS,
                 data=json.dumps({"code": TEST_CODE_TO}),
-        ) as resp:
+        ) as resp, \
+                btd6ml_test_client.get(f"/maps/{TEST_CODE_FROM}/completions") as resp_get_from, \
+                btd6ml_test_client.get(f"/maps/{TEST_CODE_TO}/completions") as resp_get_to:
+            import pprint
+            pprint.pprint(await resp_get_to.json())
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Transferring completions properly returns {resp.status}"
-            async with btd6ml_test_client.get(f"/maps/{TEST_CODE_FROM}/completions") as resp_get:
-                assert (await resp_get.json())["total"] == 0, "Old map still has completions after transferring them"
-            async with btd6ml_test_client.get(f"/maps/{TEST_CODE_TO}/completions") as resp_get:
-                new_comp_ids = [comp["id"] for comp in (await resp_get.json())["completions"]]
-                for old_id in old_comp_ids:
-                    assert old_id in new_comp_ids, "Old completion wasn't transferred"
+            assert (await resp_get_from.json())["total"] == 0, "Old map still has completions after transferring them"
+            assert old_source_comp_count + old_target_comp_count == (await resp_get_to.json())["total"], \
+                "Some old completions weren't transferred"
 
     async def test_transfer_perms(self, btd6ml_test_client, mock_auth):
         """Test transferring a map's completions as a Maplist/Expert mod"""

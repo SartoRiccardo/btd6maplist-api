@@ -248,12 +248,12 @@ class TestEditCompletion:
         }
 
         await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp:
+        async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp, \
+                btd6ml_test_client.get("/completions/1") as resp_get:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Editing a completion with a correct payload returns {resp.status}"
-            async with btd6ml_test_client.get("/completions/1") as resp_get:
-                assert expected_completion == await resp_get.json(), \
-                    "Modified completion differs from expected"
+            assert expected_completion == await resp_get.json(), \
+                "Modified completion differs from expected"
 
     @pytest.mark.delete
     async def test_delete(self, btd6ml_test_client, mock_auth, assert_state_unchanged):

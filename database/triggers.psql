@@ -35,8 +35,7 @@ CREATE PROCEDURE set_comp_as_verification(comp_meta_id INT) AS
 $$
 DECLARE
     comp_id INT;
-    completion completions;
-    comp_map INT;
+    current_completion completions;
     current_btd6_ver INT;
     is_verified BOOLEAN;
 BEGIN
@@ -44,15 +43,9 @@ BEGIN
     FROM completions_meta
     WHERE id = comp_meta_id;
 
-    SELECT * INTO completion
-    FROM completions
-    WHERE id = completion_meta.completion;
-
-    SELECT m.id INTO comp_map
-    FROM map_list_meta m
-    WHERE m.code = completion.map
-        AND m.deleted_on IS NULL
-        AND m.new_version IS NULL;
+    SELECT c.* INTO current_completion
+    FROM completions c
+    WHERE c.id = comp_id;
 
     SELECT c.value::int INTO current_btd6_ver
     FROM config c
@@ -63,11 +56,11 @@ BEGIN
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version=current_btd6_ver
-        AND map=comp_map;
+        AND map=current_completion.map;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT comp_map, user_id, current_btd6_ver
+        SELECT current_completion.map, user_id, current_btd6_ver
         FROM comp_players
         WHERE run = comp_id;
     END IF;
@@ -77,11 +70,11 @@ BEGIN
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version IS NULL
-        AND map=comp_map;
+        AND map=current_completion.map;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT comp_map, user_id, NULL
+        SELECT current_completion.map, user_id, NULL
         FROM comp_players
         WHERE run = comp_id;
     END IF;

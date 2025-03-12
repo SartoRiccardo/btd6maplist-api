@@ -111,10 +111,13 @@ CREATE TABLE completions_meta (
     deleted_on TIMESTAMP,
     new_version INT,
     accepted_by BIGINT,
-    format INT NOT NULL
+    format INT NOT NULL,
+    copied_from_id INT
 );
 ALTER TABLE completions_meta ADD CONSTRAINT fk_lccs_1
   FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
+ALTER TABLE completions_meta ADD CONSTRAINT fk_completions_1
+  FOREIGN KEY (completion) REFERENCES list_completions(id) ON DELETE CASCADE;
 
 INSERT INTO completions_meta
     (completion, black_border, no_geraldo, lcc, created_on, deleted_on, new_version, accepted_by, format)
@@ -138,11 +141,13 @@ ALTER TABLE list_completions
     DROP COLUMN deleted_on CASCADE,
     DROP COLUMN new_version CASCADE,
     DROP COLUMN accepted_by CASCADE,
-    DROP COLUMN format CASCADE;
+    DROP COLUMN format CASCADE,
+    ADD COLUMN copied_from_id INT;
 ALTER TABLE list_completions RENAME COLUMN created_on TO submitted_on;
 ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
   FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
 
 
 ALTER TABLE list_completions RENAME TO completions;
+ALTER SEQUENCE list_completions_id_seq RENAME TO completions_id_seq;
 ALTER TABLE listcomp_players RENAME TO comp_players;

@@ -133,6 +133,10 @@ class PartialMap:
     optimal_heros: list[str]
     map_preview_url: str | None
 
+    @property
+    def id(self):
+        return self.code
+
     def to_dict(self) -> dict:
         return {
             "code": self.code,
