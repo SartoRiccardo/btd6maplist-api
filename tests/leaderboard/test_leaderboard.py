@@ -77,7 +77,7 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
            "exp_nogerry_points_true", "exp_nogerry_points_extreme"]
     points = 0
     for i, comp in enumerate(user_comps):
-        if comp["map"]["difficulty"] == -1:
+        if comp["map"]["difficulty"] is None:
             continue
         if i == 0 or comp["map"]["code"] != user_comps[i - 1]["map"]["code"]:
             points += config[config_keys[comp["map"]["difficulty"]]]
@@ -105,7 +105,7 @@ async def calc_completion_count(
     for i, comp in enumerate(user_comps):
         if req_field == "placement_cur" and comp["map"]["placement_cur"] not in range(1, 50):
             continue
-        elif req_field == "difficulty" and comp["map"]["difficulty"] == -1:
+        elif req_field == "difficulty" and comp["map"]["difficulty"] is None:
             continue
 
         if comp[count_key] and (i == 0 or user_comps[i - 1]["map"]["code"] != comp["map"]["code"]):
@@ -117,6 +117,9 @@ async def get_lb_score(user_id: int, lb_format: int, value: str, btd6ml_test_cli
     async with btd6ml_test_client.get(f"/maps/leaderboard?format={lb_format}&value={value}") as resp:
         assert resp.status == http.HTTPStatus.OK, \
             f"Getting the leaderboard returns {resp.status}"
+        import pprint
+        pprint.pp((await resp.json())["entries"])
+        print(user_id)
         return next(
             entry for entry in (await resp.json())["entries"]
             if entry["user"]["id"] == str(user_id)
@@ -286,7 +289,7 @@ class TestRecalc:
         async with btd6ml_test_client.get(f"/users/{USER_ID}/completions") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Get a user's completions returned {resp.status}"
             for compl in (await resp.json())["completions"]:
-                if compl["map"]["difficulty"] != -1:
+                if compl["map"]["difficulty"] is not None:
                     map_code = compl["map"]["code"]
 
         req_data = map_payload(map_code)

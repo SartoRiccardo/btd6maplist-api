@@ -1,7 +1,4 @@
-
-
-def is_format_valid(f: int) -> bool:
-    return 0 <= f < 100
+from .misc import MAPLIST_FORMATS
 
 
 def is_format_maplist(f: int) -> bool:
@@ -13,4 +10,7 @@ def is_format_expert(f: int) -> bool:
 
 
 def format_exists(f: int) -> bool:
-    return f in [1, 2, 51]
+    return f in MAPLIST_FORMATS
+
+
+is_format_valid = format_exists

@@ -241,8 +241,8 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
         JOIN map_list_meta mlm
             ON m.code = mlm.code
         JOIN creators c
-            ON m.id = c.map
-        WHERE c.user_id=$1
+            ON m.code = c.map
+        WHERE c.user_id = $1
             AND mlm.deleted_on IS NULL
             AND mlm.new_version IS NULL
         """,
@@ -272,29 +272,33 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
     payload = await conn.fetch(
         """
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
+            SELECT
+                r.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
+            WHERE r.accepted_by IS NOT NULL
+                AND r.deleted_on IS NULL
+                AND r.new_version IS NULL
         ),
         medals_per_map AS (
             SELECT
-                rwf.map,
+                c.map,
                 BOOL_OR(rwf.black_border) AS black_border,
                 BOOL_OR(rwf.no_geraldo) AS no_geraldo,
                 BOOL_OR(rwf.current_lcc) AS current_lcc
             FROM runs_with_flags rwf
-            JOIN listcomp_players ply
+            JOIN completions c
+                ON c.id = rwf.completion
+            JOIN comp_players ply
                 ON ply.run = rwf.id
             JOIN map_list_meta m
-                ON rwf.map = m.code
+                ON c.map = m.code
             WHERE ply.user_id = $1
-                AND rwf.accepted_by IS NOT NULL
-                AND rwf.deleted_on IS NULL
-                AND rwf.new_version IS NULL
                 AND m.deleted_on IS NULL
                 AND m.new_version IS NULL
-            GROUP BY rwf.map
+            GROUP BY c.map
         )
         SELECT
             COUNT(*) AS wins,

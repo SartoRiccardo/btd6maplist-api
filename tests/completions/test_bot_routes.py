@@ -232,8 +232,8 @@ class TestSubmission:
             "lcc": None,
             "format": 1,
             "subm_proof_img": [
-                f"{config.MEDIA_BASE_URL}/{image_info[0][1]}.png",
-                f"{config.MEDIA_BASE_URL}/{image_info[1][1]}.png",
+                f"{config.MEDIA_BASE_URL}/{image_info[0][1]}.webp",
+                f"{config.MEDIA_BASE_URL}/{image_info[1][1]}.webp",
             ],
             "subm_proof_vid": [],
             "accepted_by": None,

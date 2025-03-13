@@ -32,7 +32,7 @@ async def test_submit_completion(btd6ml_test_client, mock_auth, comp_subm_payloa
         "lcc": None,
         "format": 1,
         "subm_proof_img": [
-            f"{config.MEDIA_BASE_URL}/{img_hash}.png",
+            f"{config.MEDIA_BASE_URL}/{img_hash}.webp",
         ],
         "subm_proof_vid": proof_urls,
         "accepted_by": None,
@@ -79,7 +79,7 @@ async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payloa
         },
         "format": 1,
         "subm_proof_img": [
-            f"{config.MEDIA_BASE_URL}/{img_hash}.png"
+            f"{config.MEDIA_BASE_URL}/{img_hash}.webp"
             for _img_path, img_hash in images
         ],
         "subm_proof_vid": [

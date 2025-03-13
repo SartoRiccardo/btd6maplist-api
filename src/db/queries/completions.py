@@ -301,22 +301,30 @@ async def delete_completion(
         hard_delete: bool = False,
         conn=None,
 ) -> None:
-    q = (
+    if hard_delete:
+        return await conn.execute(
+            """
+            DELETE FROM completions
+            WHERE id = $1
+            """,
+            cid
+        )
+
+    await conn.execute(
         """
-        DELETE FROM completions
-        WHERE id = $1
-        """
-    ) if hard_delete else (
-        """
-        UPDATE completions_meta
-        SET deleted_on = NOW()
+        INSERT INTO completions_meta
+            (completion, black_border, no_geraldo, lcc, accepted_by, format, deleted_on)
+        SELECT
+            completion, black_border, no_geraldo, lcc, accepted_by, format, NOW()
+        FROM completions_meta
         WHERE completion = $1
             AND deleted_on IS NULL
             AND new_version IS NULL
-        """
+        """,
+        cid
     )
 
-    await conn.execute(q, cid)
+    await link_completions(conn=conn)
 
 
 @postgres
@@ -421,22 +429,38 @@ async def get_unapproved_completions(
 
 
 @postgres
-async def accept_completion(cid: int, who: int, conn=None) -> None:
+async def accept_completion(cid: int, who: int, conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
     await conn.execute(
         """
-        UPDATE list_completions
-        SET accepted_by=$2
-        WHERE id=$1
+        WITH new_entry AS (
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, accepted_by, format, copied_from_id)
+            SELECT
+                completion, black_border, no_geraldo, lcc, $2, format, id
+            FROM completions_meta
+            WHERE completion = $1
+                AND deleted_on IS NULL
+                AND new_version IS NULL
+            RETURNING id AS new_id, copied_from_id AS old_id
+        )
+        INSERT INTO comp_players
+            (run, user_id)
+        SELECT
+            cm.new_id, cp.user_id
+        FROM new_entry cm
+        JOIN comp_players cp
+            ON cm.old_id = cp.run
         """,
         cid, who,
     )
+    await link_completions(conn=conn)
 
 
 @postgres
 async def add_completion_wh_payload(run_id: int, payload: str | None, conn=None) -> None:
     await conn.execute(
         """
-        UPDATE list_completions
+        UPDATE completions
         SET subm_wh_payload=$2
         WHERE id=$1
         """,

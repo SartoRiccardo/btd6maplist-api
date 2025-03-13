@@ -273,7 +273,7 @@ async def validate_completion_submission(
             errors["leftover"] = "Missing or non-integer saveup"
         elif 0 > body["leftover"]:
             errors["leftover"] = "Must be greater than 0"
-    if body["format"] not in [1, 2, 51]:
+    if not is_format_valid(body["format"]):
         errors["format"] = "Must be a valid format"
     if body["notes"] is not None:
         if len(body["notes"]) == 0:
@@ -306,7 +306,7 @@ async def validate_completion(body: dict) -> dict[str, str]:
         if 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
 
-    if body["format"] not in [1, 2, 51]:
+    if not is_format_valid(body["format"]):
         errors["format"] = "Must be a valid format"
 
     if len(body["user_ids"]) == 0:

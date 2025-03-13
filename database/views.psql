@@ -328,7 +328,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.no_geraldo
@@ -356,7 +356,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.no_geraldo
@@ -384,7 +384,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.no_geraldo
@@ -416,7 +416,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.black_border
@@ -444,7 +444,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.black_border
@@ -472,7 +472,7 @@ WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
     JOIN completions_meta r
-        ON r.id = r.completion
+        ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
     WHERE r.black_border
