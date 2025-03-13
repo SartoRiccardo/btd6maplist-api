@@ -17,13 +17,15 @@ async def search(
         payload = await conn.fetch(
             """
             SELECT
-                id, code, name, placement_curver, placement_allver, difficulty,
-                r6_start, map_data, optimal_heros, map_preview_url, created_on,
-                SIMILARITY(name, $1) AS simil
-            FROM maps
-            WHERE deleted_on IS NULL
-                AND new_version IS NULL
-                AND SIMILARITY(name, $1) > 0.1
+                m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
+                m.r6_start, m.map_data, optimal_heros, map_preview_url, mlm.botb_difficulty,
+                SIMILARITY(m.name, $1) AS simil
+            FROM maps m
+            JOIN map_list_meta mlm
+                ON m.code = mlm.code
+            WHERE mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
+                AND SIMILARITY(m.name, $1) > 0.1
             ORDER BY simil DESC
             LIMIT $2
             """,
@@ -33,19 +35,17 @@ async def search(
             (
                 row["simil"],
                 PartialMap(
-                    row["id"],
                     row["code"],
                     row["name"],
                     row["placement_curver"],
                     row["placement_allver"],
                     row["difficulty"],
+                    row["botb_difficulty"],
                     row["r6_start"],
                     row["map_data"],
                     None,
                     row["optimal_heros"].split(";"),
                     row["map_preview_url"],
-                    None,
-                    row["created_on"],
                 ),
             )
             for row in payload

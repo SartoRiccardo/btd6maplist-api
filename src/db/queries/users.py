@@ -164,8 +164,15 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
+            SELECT
+                c.id AS run_id,
+                r.id AS run_meta_id,
+                c.*,
+                r.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
+            JOIN completions c
+                ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.accepted_by IS NOT NULL
@@ -179,8 +186,8 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
             BOOL_OR(rwf.no_geraldo) AS no_geraldo,
             BOOL_OR(rwf.current_lcc) AS current_lcc
         FROM runs_with_flags rwf
-        JOIN listcomp_players ply
-            ON ply.run = rwf.id
+        JOIN comp_players ply
+            ON ply.run = rwf.run_meta_id
         JOIN map_list_meta m
             ON m.code = rwf.map
         WHERE ply.user_id = $1
@@ -235,7 +242,7 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
         """
         SELECT
             m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
-            m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.created_on,
+            m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url,
             mlm.botb_difficulty
         FROM maps m
         JOIN map_list_meta mlm
@@ -261,7 +268,6 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
             None,
             pl_map["optimal_heros"].split(";"),
             pl_map["map_preview_url"],
-            pl_map["created_on"],
         )
         for pl_map in payload
     ]

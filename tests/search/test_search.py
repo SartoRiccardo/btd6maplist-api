@@ -10,9 +10,10 @@ user_schema = {
 map_schema = {
     "code": str,
     "name": str,
-    "placement_all": int,
-    "placement_cur": int,
-    "difficulty": int,
+    "placement_all": int | None,
+    "placement_cur": int | None,
+    "difficulty": int | None,
+    "botb_difficulty": int | None,
     "r6_start": str | None,
     "map_data": str | None,
     "optimal_heros": [str],
