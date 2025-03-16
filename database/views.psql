@@ -240,10 +240,17 @@ ORDER BY placement ASC, user_id DESC;
 ---------------------
 
 CREATE OR REPLACE VIEW leaderboard_experts_points AS
-WITH expert_maps AS (
+WITH config_values AS (
+    SELECT
+        (SELECT value::int FROM config WHERE name='exp_bb_multi') AS exp_bb_multi,
+        (SELECT value::int FROM config WHERE name='exp_lcc_extra') AS exp_lcc_extra
+),
+expert_maps AS (
     SELECT m.code,
         c1.value::int AS points,
-        c2.value::int AS extra_nogerry
+        c2.value::int AS extra_nogerry,
+        cv.exp_bb_multi,
+        cv.exp_lcc_extra
     FROM map_list_meta m
     JOIN config c1
         ON m.difficulty = c1.difficulty
@@ -251,19 +258,24 @@ WITH expert_maps AS (
     JOIN config c2
         ON m.difficulty = c2.difficulty
         AND c2.name LIKE 'exp_nogerry_points_%'
+    CROSS JOIN config_values cv
     WHERE m.deleted_on IS NULL
         AND m.new_version IS NULL
 ),
-completion_points AS (
+completions_with_flags AS (
     SELECT
+        cm.id AS comp_meta_id,
         lc.map,
-        ply.user_id,
-        BOOL_OR(cm.no_geraldo) AS no_geraldo
+        cm.no_geraldo,
+        cm.black_border,
+        (lccs.id IS NOT NULL AND lbm.id = lccs.id) AS current_lcc
     FROM completions lc
     JOIN completions_meta cm
         ON lc.id = cm.completion
-    JOIN comp_players ply
-        ON cm.id = ply.run
+    LEFT JOIN leastcostchimps lccs
+        ON lccs.id = cm.lcc
+    LEFT JOIN lccs_by_map lbm
+        ON lbm.map = lc.map
     WHERE (
             cm.format BETWEEN 51 AND 100
             OR cm.format = 1  -- Explist completions are a superset of Maplist Completions
@@ -271,14 +283,26 @@ completion_points AS (
         AND cm.accepted_by IS NOT NULL
         AND cm.deleted_on IS NULL
         AND cm.new_version IS NULL
-    GROUP BY (lc.map, ply.user_id)
+),
+completion_points AS (
+    SELECT
+        c.map,
+        ply.user_id,
+        BOOL_OR(c.no_geraldo) AS no_geraldo,
+        BOOL_OR(c.black_border) AS black_border,
+        BOOL_OR(c.current_lcc) AS current_lcc
+    FROM completions_with_flags c
+    JOIN comp_players ply
+        ON c.comp_meta_id = ply.run
+    GROUP BY (c.map, ply.user_id)
 ),
 leaderboard AS (
     SELECT 
         cp.user_id, 
         SUM(
-            m.points 
+            m.points * CASE WHEN cp.black_border THEN m.exp_bb_multi ELSE 1 END
             + CASE WHEN cp.no_geraldo THEN m.extra_nogerry ELSE 0 END
+            + CASE WHEN cp.current_lcc THEN m.exp_lcc_extra ELSE 0 END
         ) AS score
     FROM completion_points cp
     JOIN expert_maps m

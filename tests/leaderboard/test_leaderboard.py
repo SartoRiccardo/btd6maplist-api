@@ -68,7 +68,7 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     async with btd6ml_test_client.get(f"/users/{user_id}/completions?formats=1,51") as resp:
         user_comps = sorted(
             (await resp.json())["completions"],
-            key=lambda x: (x["map"]["code"], x["no_geraldo"]),
+            key=lambda x: x["map"]["code"],
             reverse=True,
         )
 
@@ -76,13 +76,22 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     config_keys_nogerry = ["exp_nogerry_points_casual", "exp_nogerry_points_medium", "exp_nogerry_points_high",
            "exp_nogerry_points_true", "exp_nogerry_points_extreme"]
     points = 0
+    used_multis = {"no_gerry": False, "lcc": False, "bb": False}
     for i, comp in enumerate(user_comps):
         if comp["map"]["difficulty"] is None:
             continue
         if i == 0 or comp["map"]["code"] != user_comps[i - 1]["map"]["code"]:
+            used_multis = {"no_gerry": False, "lcc": False, "bb": False}
             points += config[config_keys[comp["map"]["difficulty"]]]
-            if comp["no_geraldo"]:
+            if comp["no_geraldo"] and not used_multis["no_gerry"]:
+                used_multis["no_gerry"] = True
                 points += config[config_keys_nogerry[comp["map"]["difficulty"]]]
+            if comp["black_border"] and not used_multis["bb"]:
+                used_multis["bb"] = True
+                points += config[config_keys[comp["map"]["difficulty"]]] * (config["exp_bb_multi"]-1)
+            if comp["current_lcc"] and not used_multis["lcc"]:
+                used_multis["lcc"] = True
+                points += config["exp_lcc_extra"]
     return points
 
 
@@ -117,9 +126,6 @@ async def get_lb_score(user_id: int, lb_format: int, value: str, btd6ml_test_cli
     async with btd6ml_test_client.get(f"/maps/leaderboard?format={lb_format}&value={value}") as resp:
         assert resp.status == http.HTTPStatus.OK, \
             f"Getting the leaderboard returns {resp.status}"
-        import pprint
-        pprint.pp((await resp.json())["entries"])
-        print(user_id)
         return next(
             entry for entry in (await resp.json())["entries"]
             if entry["user"]["id"] == str(user_id)
@@ -211,6 +217,13 @@ class TestRecalc:
             "exp_points_high": 32,
             "exp_points_true": 43,
             "exp_points_extreme": 54,
+            "exp_nogerry_points_casual": 2,
+            "exp_nogerry_points_medium": 3,
+            "exp_nogerry_points_high": 4,
+            "exp_nogerry_points_true": 5,
+            "exp_nogerry_points_extreme": 6,
+            "exp_bb_multi": 3,
+            "exp_lcc_extra": 6,
 
             "points_top_map": 200,
             "points_bottom_map": 1,
@@ -222,15 +235,13 @@ class TestRecalc:
         }
         async with btd6ml_test_client.put("/config", headers=HEADERS, json={"config": req_config}) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Editing config returned {resp.status}"
-            import pprint
-            pprint.pprint(await resp.json())
 
         user_id = 47
         points = await calc_ml_user_points(user_id, btd6ml_test_client)
         assert await get_lb_score(user_id, 1, "points", btd6ml_test_client) == points, \
             "Maplist user points differ from expected"
 
-        user_id = 1
+        user_id = 39
         points = await calc_exp_user_points(user_id, btd6ml_test_client)
         assert await get_lb_score(user_id, 51, "points", btd6ml_test_client) == points, \
             "Experts user points differ from expected"

@@ -118,6 +118,7 @@ class Map:
     aliases: list[str]
     # New fields
     botb_difficulty: int | None = None
+    remake_of: int | None = None
 
     def dump_map(self) -> str:
         return SEPARATOR.join(stringify(
@@ -137,6 +138,7 @@ class Map:
             difficultify(self.difficulty),
             ";".join(self.optimal_heros),
             difficultify(self.botb_difficulty),
+            difficultify(self.remake_of),
             dateify(self.created_on),
             dateify(self.deleted_on),
             nullify(self.new_version),

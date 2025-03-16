@@ -7,6 +7,7 @@ CREATE TABLE map_list_meta (
     difficulty INT DEFAULT NULL,
     optimal_heros TEXT NOT NULL DEFAULT '',
     botb_difficulty INT DEFAULT NULL,
+    remake_of INT DEFAULT NULL,
     created_on TIMESTAMP DEFAULT NOW(),
     deleted_on TIMESTAMP,
     new_version INT
@@ -151,3 +152,22 @@ ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
 ALTER TABLE list_completions RENAME TO completions;
 ALTER SEQUENCE list_completions_id_seq RENAME TO completions_id_seq;
 ALTER TABLE listcomp_players RENAME TO comp_players;
+
+
+-- Expert List points
+INSERT INTO config
+    (name, value, type)
+VALUES
+    ('exp_bb_multi', '1', 'int'),
+    ('exp_lcc_extra', '0', 'int');
+
+-- Nostalgia Pack
+CREATE TABLE retro_maps (
+    id SERIAL PRIMARY KEY,
+    game INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT NOT NULL,
+    difficulty INT NOT NULL  -- Changes meaning depending on retro_maps.game
+);
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_retro_maps_1
+    FOREIGN KEY (remake_of) REFERENCES retro_maps(id);

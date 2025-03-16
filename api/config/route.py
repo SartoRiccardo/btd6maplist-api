@@ -25,6 +25,8 @@ var_perms = {
     "exp_nogerry_points_high": (False, True),
     "exp_nogerry_points_true": (False, True),
     "exp_nogerry_points_extreme": (False, True),
+    "exp_bb_multi": (False, True),
+    "exp_lcc_extra": (False, True),
 }
 
 
