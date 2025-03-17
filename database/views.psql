@@ -242,8 +242,8 @@ ORDER BY placement ASC, user_id DESC;
 CREATE OR REPLACE VIEW leaderboard_experts_points AS
 WITH config_values AS (
     SELECT
-        (SELECT value::int FROM config WHERE name='exp_bb_multi') AS exp_bb_multi,
-        (SELECT value::int FROM config WHERE name='exp_lcc_extra') AS exp_lcc_extra
+        (SELECT value::float FROM config WHERE name='exp_bb_multi') AS exp_bb_multi,
+        (SELECT value::float FROM config WHERE name='exp_lcc_extra') AS exp_lcc_extra
 ),
 expert_maps AS (
     SELECT m.code,
