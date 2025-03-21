@@ -171,3 +171,23 @@ CREATE TABLE retro_maps (
 );
 ALTER TABLE map_list_meta ADD CONSTRAINT fk_retro_maps_1
     FOREIGN KEY (remake_of) REFERENCES retro_maps(id);
+
+-- Format config
+CREATE TABLE formats (
+    id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    map_submission_wh TEXT,
+    run_submission_wh TEXT,
+    hidden BOOLEAN DEFAULT TRUE NOT NULL,
+    run_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:LCCOnly
+    map_submission_status INT DEFAULT 0 NOT NULL  -- 0:Closed 1:Open
+);
+INSERT INTO formats
+    (id, name, run_submission_status, hidden, map_submission_status)
+VALUES
+    (1, 'Maplist', 1, FALSE, 1),
+    (2, 'Maplist (all versions)', 0, TRUE, 0),
+    (51, 'Expert List', 1, FALSE, 1),
+    (52, 'Best of the Best', 1, FALSE, 0),
+    (11, 'Nostalgia Pack', 2, FALSE, 1)
+;

@@ -7,7 +7,28 @@ from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
 from .AchievementRole import DiscordRole, AchievementRole, RoleUpdateAction
+from .Format import Format
 
+entities = [
+    Map,
+    PartialMap,
+    PartialExpertMap,
+    PartialListMap,
+    LCC,
+    ListCompletion,
+    ListCompletionWithMeta,
+    User,
+    PartialUser,
+    MaplistProfile,
+    LeaderboardEntry,
+    MaplistMedals,
+    MapSubmission,
+    Role,
+    DiscordRole,
+    AchievementRole,
+    RoleUpdateAction,
+    Format,
+]
 
 swagger_definitions_str = """
 DiscordID:
@@ -29,9 +50,10 @@ MaplistFormat:
 
 ExpertDifficulty:
   type: int
-  enum: [-1, 0, 1, 2, 3, 4]
+  nullable: true
+  enum: [0, 1, 2, 3, 4]
   description: >
-    The Expert difficulty. If none, it's set to `-1`.\\n
+    The Expert difficulty.\\n
     * `0` - Casual Expert.\\n
     * `1` - Medium Expert.\\n
     * `2` - High Expert.\\n
@@ -81,25 +103,6 @@ def remove_init_indent(docstring: str, init_padding: int) -> str:
     )
 
 
-entities = [
-    Map,
-    PartialMap,
-    PartialExpertMap,
-    PartialListMap,
-    LCC,
-    ListCompletion,
-    ListCompletionWithMeta,
-    User,
-    PartialUser,
-    MaplistProfile,
-    LeaderboardEntry,
-    MaplistMedals,
-    MapSubmission,
-    Role,
-    DiscordRole,
-    AchievementRole,
-    RoleUpdateAction,
-]
 for entity in entities:
     if not entity.__doc__:
         continue
