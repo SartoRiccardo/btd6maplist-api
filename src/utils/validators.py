@@ -123,6 +123,7 @@ async def validate_full_map(
     else:
         map_res = await get_map(body["code"])
 
+        # REFACTOR just take 1 query
         async def cannot_be_taken(a: str) -> bool:
             """Returns True if the alias cannot be taken"""
             exists = await alias_exists(a)
@@ -144,9 +145,7 @@ async def validate_full_map(
             (len(body["map_preview_url"]) == 0 or not validators.url(body["map_preview_url"])):
         errors["map_preview_url"] = "Must be a URL"
 
-    if len(body["creators"]) == 0:
-        errors["creators"] = "Must have at least one creator"
-    elif rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
+    if rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
         for idx in rep_idx:
             errors[f"creators[{idx}].id"] = "Duplicate creator"
     else:

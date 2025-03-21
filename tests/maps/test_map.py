@@ -91,12 +91,8 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
 
     cur_code = valid_codes[0]
     req_map_data = {
-        **map_payload(cur_code),
+        **map_payload(cur_code, []),
         "placement_curver": 10,
-        "creators": [
-            {"id": "1", "role": None},
-            {"id": "usr2", "role": "Suggested the idea"},
-        ],
     }
     form_data = to_formdata(req_map_data)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
@@ -123,10 +119,7 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
             "map_preview_url": f"https://data.ninjakiwi.com/btd6/maps/map/{cur_code}/preview",
             "verified": False,
             "deleted_on": None,
-            "creators": [
-                {"id": "1", "name": "usr1", "role": None},
-                {"id": "2", "name": "usr2", "role": "Suggested the idea"},
-            ],
+            "creators": [],
         }
         for key in value_eq_check:
             exp_value = value_eq_check[key]
