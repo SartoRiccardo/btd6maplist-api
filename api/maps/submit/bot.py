@@ -33,7 +33,7 @@ async def post(
         return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
     proof_fname, _fp = await save_image(files[0][1], files[0][0].split(".")[-1])
-    embeds = get_mapsubm_embed(json_data, json_data["user"], btd6_map)
+    embeds = await get_mapsubm_embed(json_data, json_data["user"], btd6_map)
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}

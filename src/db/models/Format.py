@@ -39,6 +39,7 @@ class Format:
     hidden: bool
     run_submission_status: int
     map_submission_status: int
+    emoji: str | None
 
     def to_dict(self) -> dict:
         return {

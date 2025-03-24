@@ -120,7 +120,7 @@ async def post(
             if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
                 return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
-            embeds = get_mapsubm_embed(data, discord_profile, btd6_map)
+            embeds = await get_mapsubm_embed(data, discord_profile, btd6_map)
 
     if len(embeds) == 0 or data is None or proof_fname is None:
         return web.json_response(

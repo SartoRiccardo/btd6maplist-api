@@ -117,6 +117,44 @@ async def test_multi_images_urls(btd6ml_test_client, mock_auth, comp_subm_payloa
 @pytest.mark.post
 @pytest.mark.submissions
 class TestValidateCompletion:
+    async def test_closed_submissions(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
+        """Test submitting to a format that doesn't accept completions"""
+        img_path, img_hash = save_image(5, filename="pc1.png", with_hash=True)
+
+        await mock_auth()
+        req_submission = comp_subm_payload()
+        req_submission["format"] = 2
+        req_form = to_formdata(req_submission)
+        req_form.add_field("proof_completion", img_path.open("rb"))
+        async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit", headers=HEADERS, data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a completion to a format that doesn't accept completions returns {resp.status}"
+            assert "format" in (await resp.json()).get("errors", {}), \
+                "\"format\" is not present in errors"
+
+    async def test_lcc_only_submissions(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
+        """Test submitting to a format that only accepts LCCs"""
+        img_path, img_hash = save_image(5, filename="pc1.png", with_hash=True)
+
+        await mock_auth()
+        req_submission = comp_subm_payload()
+        req_submission["format"] = 11
+        req_form = to_formdata(req_submission)
+        req_form.add_field("proof_completion", img_path.open("rb"))
+        async with btd6ml_test_client.post("/maps/MLXXXBA/completions/submit", headers=HEADERS, data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a non-LCC completion to a format that only accepts LCCs returns {resp.status}"
+            assert "current_lcc" in (await resp.json()).get("errors", {}), \
+                "\"current_lcc\" is not present in errors"
+
+        req_submission["current_lcc"] = True
+        req_submission["leftover"] = 999
+        req_form = to_formdata(req_submission)
+        req_form.add_field("proof_completion", img_path.open("rb"))
+        async with btd6ml_test_client.post("/maps/MLXXXBA/completions/submit", headers=HEADERS, data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Submitting an LCC completion to a format that only accepts LCCs returns {resp.status}"
+
     @pytest.mark.users
     async def test_new_user(self, btd6ml_test_client, mock_auth, comp_subm_payload, save_image):
         """Test submitting as a new user"""

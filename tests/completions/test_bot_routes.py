@@ -203,8 +203,7 @@ class TestSubmission:
     async def test_submit_completion(self, btd6ml_test_client, mock_auth, comp_subm_payload,
                                      save_image, submission_formdata):
         """Test submitting a completion"""
-        SUBMITTER_ID = 30
-        req_subm_data = comp_subm_payload(SUBMITTER_ID)
+        req_subm_data = comp_subm_payload(self.SUBMITTER_ID)
         await mock_auth()
         image_info = [save_image(i, f"img{i}.png", with_hash=True) for i in range(2)]
         images = [(f"proof_completion[{i}]", image_info[i][0]) for i in range(2)]
@@ -214,7 +213,7 @@ class TestSubmission:
             "id": 0,  # Set later
             "map": self.MAP_CODE,
             "users": [
-                {"id": str(SUBMITTER_ID), "name": f"usr{SUBMITTER_ID}"},
+                {"id": str(self.SUBMITTER_ID), "name": f"usr{self.SUBMITTER_ID}"},
             ],
             "black_border": False,
             "no_geraldo": False,
@@ -240,6 +239,47 @@ class TestSubmission:
                 expected["id"] = int(resp.headers["Location"].split("/")[-1])
                 expected["created_on"] = resp_data["created_on"]
                 assert resp_data == expected, "Submitted completion differs from expected"
+
+    async def test_closed_submissions(self, btd6ml_test_client, mock_auth, comp_subm_payload,
+                                      save_image, submission_formdata):
+        """Test submitting a completion to a format that doesn't accept them"""
+        await mock_auth()
+        req_subm_data = comp_subm_payload(self.SUBMITTER_ID)
+        req_subm_data["format"] = 2
+        image_info = [save_image(i, f"img{i}.png", with_hash=True) for i in range(2)]
+        images = [(f"proof_completion[{i}]", image_info[i][0]) for i in range(2)]
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
+
+        async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a completion to a format that doesn't accept completions returns {resp.status}"
+            assert "format" in (await resp.json()).get("errors", {}), \
+                "\"format\" is not present in errors"
+
+    async def test_lcc_only_submissions(self, btd6ml_test_client, mock_auth, comp_subm_payload,
+                                      save_image, submission_formdata):
+        """Test submitting a completion to a format that doesn't accept them"""
+        MAP_CODE = "MLXXXBA"
+
+        await mock_auth()
+        req_subm_data = comp_subm_payload(self.SUBMITTER_ID)
+        req_subm_data["format"] = 11
+        image_info = [save_image(i, f"img{i}.png", with_hash=True) for i in range(2)]
+        images = [(f"proof_completion[{i}]", image_info[i][0]) for i in range(2)]
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=MAP_CODE)
+
+        async with btd6ml_test_client.post(f"/maps/{MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a non-LCC completion to a format that only accepts LCCs returns {resp.status}"
+            assert "current_lcc" in (await resp.json()).get("errors", {}), \
+                "\"current_lcc\" is not present in errors"
+
+        req_subm_data["current_lcc"] = True
+        req_subm_data["leftover"] = 999
+        req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=MAP_CODE)
+        async with btd6ml_test_client.post(f"/maps/{MAP_CODE}/completions/submit/bot", data=req_form) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Submitting an LCC completion to a format that only accepts LCCs returns {resp.status}"
 
     async def test_invalid(self, btd6ml_test_client, mock_auth, save_image, submission_formdata,
                            assert_state_unchanged, comp_subm_payload):

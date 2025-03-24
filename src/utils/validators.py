@@ -266,8 +266,9 @@ async def validate_completion_submission(
         errors["format"] = "This format does not exist"
     elif list_format.run_submission_status == FormatStatus.CLOSED:
         errors["format"] = "This format does not accept completion submissions"
-    elif list_format.run_submission_status == FormatStatus.LCC_ONLY and body["current_lcc"] is None:
+    elif list_format.run_submission_status == FormatStatus.LCC_ONLY and not body["current_lcc"]:
         errors["format"] = "This format only accepts LCC completion submissions"
+        errors["current_lcc"] = "Must be true for this format"
     else:
         requires_recording = format_idxs[body["format"]].run_requires_recording(
             on_map,

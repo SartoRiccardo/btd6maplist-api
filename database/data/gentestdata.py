@@ -280,6 +280,23 @@ class Completion:
 
 
 @dataclass
+class RetroMap:
+    id: int
+    game: int
+    name: str
+    sort_order: int
+    difficulty: int
+
+    def dump_retro_map(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.id,
+            self.game,
+            self.name,
+            self.sort_order,
+            self.difficulty,
+        ))
+
+@dataclass
 class AchievementRole:
     lb_format: int
     lb_type: str
@@ -443,6 +460,7 @@ def random_maps() -> tuple[int, list[Map]]:
                 None if plc < 40 else f"@{plc-39}",
                 None if plc < 45 or plc > 50 else f"deleted_maplist_map_{plc-45}",
             ]),
+            remake_of=(plc//11 + 1) if plc % 11 == 0 else None,
         ))
         map_uid += 1
 
@@ -752,6 +770,22 @@ def gen_round_completions(comp_uid: int) -> tuple[int, list[Completion]]:
     return comp_uid, []
 
 
+def gen_retro_maps() -> list[RetroMap]:
+    amount = 200
+    maps = []
+    for i in range(1, amount):
+        maps.append(
+            RetroMap(
+                i,
+                i//50+1,
+                f"Track BTD{i//50+1}",
+                i % 30,
+                i // 20,
+            )
+        )
+    return maps
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -775,6 +809,7 @@ if __name__ == '__main__':
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps
+    retro_maps = gen_retro_maps()
 
     achievement_roles = random_achivement_roles()
 
@@ -782,7 +817,11 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_map() for x in maps
         ))
-    with open(bpath / "12_map_list_meta.csv", "w") as fout:
+    with open(bpath / "12_retro_maps.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_retro_map() for x in retro_maps
+        ))
+    with open(bpath / "13_map_list_meta.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_map_meta() for x in maps
         ))

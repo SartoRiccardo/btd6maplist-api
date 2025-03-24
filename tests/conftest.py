@@ -413,6 +413,7 @@ def map_payload():
             "placement_curver": None,
             "difficulty": None,
             "botb_difficulty": None,
+            "remake_of": None,
             "r6_start": None,
             "map_data": None,
             "map_preview_url": None,

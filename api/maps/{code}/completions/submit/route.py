@@ -148,7 +148,7 @@ async def post(
                     status=http.HTTPStatus.BAD_REQUEST,
                 )
 
-            embeds = get_runsubm_embed(data, discord_profile, resource)
+            embeds = await get_runsubm_embed(data, discord_profile, resource)
             if getattr(resource, format_idxs[data["format"]].key) is None:
                 return web.json_response(
                     {"errors": {"format": "That map does not accept completions for that format"}},

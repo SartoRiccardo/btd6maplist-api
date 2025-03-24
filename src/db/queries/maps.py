@@ -98,7 +98,8 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
 async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialMap | None:
     columns = """
         m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
-        m.map_data, mlm.deleted_on, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty
+        m.map_data, mlm.deleted_on, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
+        mlm.remake_of
         """
     placement_union = ""
     if code.isnumeric() and abs(int(code)) < 1000:  # Current version index
@@ -204,7 +205,8 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         SELECT
             m.code, m.name, m.placement_curver, m.placement_allver, m.difficulty,
             m.r6_start, m.map_data, v.is_verified, m.deleted_on,
-            m.optimal_heros, m.map_preview_url, m.botb_difficulty
+            m.optimal_heros, m.map_preview_url, m.botb_difficulty,
+            m.remake_of
         FROM possible_map m
         LEFT JOIN verified_maps v
             ON v.map = m.code
@@ -223,6 +225,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             pl_map["placement_allver"],
             pl_map["difficulty"],
             pl_map["botb_difficulty"],
+            pl_map["remake_of"],
             pl_map["r6_start"],
             pl_map["map_data"],
             pl_map["deleted_on"],
@@ -269,6 +272,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         pl_map["placement_allver"],
         pl_map["difficulty"],
         pl_map["botb_difficulty"],
+        pl_map["remake_of"],
         pl_map["r6_start"],
         pl_map["map_data"],
         pl_map["deleted_on"],

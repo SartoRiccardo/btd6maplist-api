@@ -100,6 +100,14 @@ class PartialMap:
         description: The map's placement in the list ~ all versions (starts from 1). If none, it's set to `-1`.
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
+      remake_of:
+        type: integer
+        nullable: true
+        description: Which map this is a remake of.
+      botb_difficulty:
+        type: integer
+        nullable: true
+        description: The map's Best of the Best pack difficulty.
       r6_start:
         type: string
         nullable: true
@@ -127,6 +135,7 @@ class PartialMap:
     placement_allver: int | None
     difficulty: int | None
     botb_difficulty: int | None
+    remake_of: int | None
     r6_start: str | None
     map_data: str
     deleted_on: datetime | None
@@ -145,6 +154,7 @@ class PartialMap:
             "placement_curver": self.placement_curver,
             "difficulty": self.difficulty,
             "botb_difficulty": self.botb_difficulty,
+            "remake_of": self.remake_of,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],

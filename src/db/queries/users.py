@@ -98,6 +98,7 @@ async def get_completions_by(
                 
                 m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
                 m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
+                mlm.remake_of,
                 
                 lccs.id AS lcc_id, lccs.leftover,
                 
@@ -139,6 +140,7 @@ async def get_completions_by(
                 row["placement_allver"],
                 row["difficulty"],
                 row["botb_difficulty"],
+                row["remake_of"],
                 row["r6_start"],
                 row["map_data"],
                 None,
@@ -245,7 +247,7 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
         SELECT
             m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
             m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url,
-            mlm.botb_difficulty
+            mlm.botb_difficulty, mlm.remake_of
         FROM maps m
         JOIN map_list_meta mlm
             ON m.code = mlm.code
@@ -265,6 +267,7 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
             pl_map["placement_allver"],
             pl_map["difficulty"],
             pl_map["botb_difficulty"],
+            pl_map["remake_of"],
             pl_map["r6_start"],
             pl_map["map_data"],
             None,

@@ -18,7 +18,8 @@ async def search(
             """
             SELECT
                 m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
-                m.r6_start, m.map_data, optimal_heros, map_preview_url, mlm.botb_difficulty,
+                m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
+                mlm.remake_of,
                 SIMILARITY(m.name, $1) AS simil
             FROM maps m
             JOIN map_list_meta mlm
@@ -41,6 +42,7 @@ async def search(
                     row["placement_allver"],
                     row["difficulty"],
                     row["botb_difficulty"],
+                    row["remake_of"],
                     row["r6_start"],
                     row["map_data"],
                     None,

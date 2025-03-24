@@ -84,14 +84,14 @@ async def post(
         json_data["black_border"],
         json_data["no_geraldo"],
         json_data["format"],
-        lcc_data,  # leftover, proof
+        lcc_data,  # leftover
         int(discord_profile["id"]),
         proof_urls,
         json_data["video_proof_url"],
         json_data["notes"],
     )
 
-    embeds = get_runsubm_embed(json_data, discord_profile, resource)
+    embeds = await get_runsubm_embed(json_data, discord_profile, resource)
     embeds[0]["url"] = f"{WEB_BASE_URL}/completions/{run_id}"
     embeds[0]["image"] = {"url": proof_urls[0]}
     embeds[0]["footer"] = {"text": f"Run No.{run_id}"}

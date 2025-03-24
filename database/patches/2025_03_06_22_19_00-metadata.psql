@@ -180,7 +180,8 @@ CREATE TABLE formats (
     run_submission_wh TEXT,
     hidden BOOLEAN DEFAULT TRUE NOT NULL,
     run_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:LCCOnly
-    map_submission_status INT DEFAULT 0 NOT NULL  -- 0:Closed 1:Open
+    map_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open
+    emoji VARCHAR(255)
 );
 INSERT INTO formats
     (id, name, run_submission_status, hidden, map_submission_status)

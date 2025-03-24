@@ -84,6 +84,22 @@ class TestGetSubmissions:
 @pytest.mark.post
 @pytest.mark.submissions
 class TestSubmitMap:
+    async def test_closed_submissions(self, btd6ml_test_client, mock_auth, map_submission_payload, save_image,
+                                      valid_codes, assert_state_unchanged):
+        """Test submitting a map to a format with map submissions closed"""
+        await mock_auth()
+
+        proof_completion = save_image(1)
+        valid_data = map_submission_payload(valid_codes[4])
+        valid_data["format"] = 2
+
+        form_data = to_formdata(valid_data)
+        form_data.add_field("proof_completion", proof_completion.open("rb"))
+        async with assert_state_unchanged("/maps/submit"), \
+                btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a map to a list with map submissions closed returned {resp.status}"
+
     async def test_missing_fields(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
                                   save_image):
         """Test a submission without the required fields"""
@@ -184,8 +200,7 @@ class TestSubmitMap:
         for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
-                                save_image):
+    async def test_unauthorized(self, btd6ml_test_client):
         """Test a submission from an unauthorized user or one not in the Maplist Discord"""
         async with btd6ml_test_client.post("/maps/submit") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \

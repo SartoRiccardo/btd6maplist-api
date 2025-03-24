@@ -9,21 +9,15 @@ import src.http
 from ..requests import discord_api
 
 propositions = {
-    1: ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
-    51: ["Casual", "Casual/Medium", "Medium", "Medium/High", "High", "High/True", "True", "True/Extreme", "Extreme"],
+    1: ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
+    51: ("Difficulty", ["Casual Expert", "Casual/Medium Expert", "Medium Expert", "Medium/High Expert", "High Expert",
+                        "High/True Expert", "True Expert", "True/Extreme Expert", "Extreme Expert"]),
+    52: ("Difficulty", ["Beginner", "Intermediate", "Advanced", "Expert/Extreme"])
 }
 propositions[2] = propositions[1]
 
-formats = {
-    1: {"emoji": Emj.curver, "name": "Maplist"},
-    2: {"emoji": Emj.allver, "name": "Maplist (all versions)"},
-    51: {"emoji": Emj.experts, "name": "Expert List"},
-}
 
-
-PENDING_CLR = 0x1e88e5
-LIST_CLR = 0x1e88e5
-EXPERTS_CLR = 0x1e88e5
+PENDING_CLR = LIST_CLR = EXPERTS_CLR = 0x1e88e5
 FAIL_CLR = 0xb71c1c
 ACCEPT_CLR = 0x43a047
 
@@ -33,11 +27,22 @@ def get_avatar_url(discord_profile: dict) -> str:
            if "avatar" in discord_profile else discord_profile["avatar_url"]  # Bot-only
 
 
-def get_mapsubm_embed(
+async def get_mapsubm_embed(
         data: dict,
         discord_profile: dict,
         btd6_map: dict,
 ) -> list[dict]:
+    field_proposed = None
+    if data["format"] == 11:
+        # Get map from db
+        pass
+    elif data["format"] in propositions:
+        prop_name, prop_labels = propositions[data["format"]]
+        field_proposed = {
+            "name": f"Proposed {prop_name}",
+            "value": prop_labels[data["proposed"]],
+        }
+
     embeds = [
         {
             "title": f"{btd6_map['name']} - {data['code']}",
@@ -46,15 +51,6 @@ def get_mapsubm_embed(
                 "name": discord_profile["username"],
                 "icon_url": get_avatar_url(discord_profile),
             },
-            "fields": [
-                {
-                    "name": f"Proposed {'List Position' if data['format'] == 'list' else 'Difficulty'}",
-                    "value":
-                        propositions[data["format"]][data["proposed"]]
-                        if data['format'] == 'list' else
-                        (propositions[data["format"]][data["proposed"]] + " Expert"),
-                },
-            ],
             "color": LIST_CLR if data["format"] == "list" else EXPERTS_CLR
         },
         {
@@ -64,16 +60,21 @@ def get_mapsubm_embed(
             },
         }
     ]
+
+    if field_proposed:
+        embeds[0]["fields"] = [field_proposed]
+
     if data["notes"]:
         embeds[0]["description"] = data["notes"]
     return embeds
 
 
-def get_runsubm_embed(
+async def get_runsubm_embed(
         data: dict,
         discord_profile: dict,
         resource: "src.db.models.PartialMap"
 ) -> list[dict]:
+    format = await get_format(data["format"])
     embeds = [
         {
             "title": f"{resource.name}",
@@ -84,7 +85,7 @@ def get_runsubm_embed(
             "fields": [
                 {
                     "name": "Format",
-                    "value": f"{formats[data['format']]['emoji']} {formats[data['format']]['name']}",
+                    "value": f"{format.emoji} {format.name}",
                     "inline": True,
                 },
             ],

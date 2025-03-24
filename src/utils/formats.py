@@ -38,6 +38,10 @@ class FormatValueValidators:
         error_msg = None if valid else "Must be between 0 and 4, included"
         return valid, error_msg, False
 
+    @staticmethod
+    async def np_map(val: int) -> ValidatorReturns:
+        return True, None, False
+
 
 format_idxs = {
     1: FormatInfo(
@@ -49,6 +53,11 @@ format_idxs = {
         "placement_allver",
         FormatValueValidators.placement_curver,
         lambda on_map, bb, noh, lcc: bb or lcc or noh,
+    ),
+    11: FormatInfo(
+        "remake_of",
+        FormatValueValidators.np_map,
+        lambda on_map, bb, noh, lcc: False,
     ),
     51: FormatInfo(
         "difficulty",
@@ -66,13 +75,3 @@ format_idxs = {
 @cache_for(60)
 async def get_maplist_map_count():
     return (await get_config())["map_count"]
-
-
-def is_format_expert(f: int) -> bool:
-    return 50 <= f < 100
-
-
-@cache_for(60)
-async def is_format_valid(format_id: int) -> bool:
-    format = await get_format()
-    return format_id in MAPLIST_FORMATS

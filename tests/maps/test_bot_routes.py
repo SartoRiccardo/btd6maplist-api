@@ -3,7 +3,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 import json
-from ..testutils import fuzz_data
+from ..testutils import fuzz_data, to_formdata
 from ..mocks import Permissions
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -36,13 +36,13 @@ async def assert_submit_map(btd6ml_test_client, mock_auth, valid_codes, save_ima
         proof_comp = save_image(2)
         req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
 
-        async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
+        async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp, \
+                btd6ml_test_client.get("/maps/submit") as resp_get:
             assert resp.status == http.HTTPStatus.CREATED, \
                 f"Submitting a map through a bot returns {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] == valid_codes[code_idx], \
-                    "Most recently submitted code differs from expected"
+            resp_data = await resp_get.json()
+            assert resp_data["submissions"][0]["code"] == valid_codes[code_idx], \
+                "Most recently submitted code differs from expected"
     return submit
 
 
@@ -55,6 +55,25 @@ class TestSubmit:
     async def test_submit_map(self, assert_submit_map):
         """Test submitting a map"""
         await assert_submit_map(self.CODE_IDX)
+
+    async def test_closed_submissions(self, btd6ml_test_client, mock_auth, submission_payload, save_image,
+                                      valid_codes, assert_state_unchanged, submission_formdata):
+        """Test submitting a map to a format with map submissions closed"""
+        await mock_auth()
+
+        proof_completion = save_image(1)
+        valid_data = submission_payload(valid_codes[4])
+        valid_data["format"] = 2
+        data_str = json.dumps(valid_data)
+        proof_comp = save_image(2)
+        req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
+
+        form_data = to_formdata(valid_data)
+        form_data.add_field("proof_completion", proof_completion.open("rb"))
+        async with assert_state_unchanged("/maps/submit"), \
+                btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a map to a list with map submissions closed returned {resp.status}"
 
     @pytest.mark.post
     async def test_fuzz(self, btd6ml_test_client, mock_auth, valid_codes, save_image,

@@ -11,7 +11,7 @@ async def get_formats(
         """
         SELECT 
             id, name, map_submission_wh, run_submission_wh, hidden, run_submission_status,
-            map_submission_status
+            map_submission_status, emoji
         FROM
             formats
         """
@@ -26,6 +26,7 @@ async def get_formats(
             row["hidden"],
             row["run_submission_status"],
             row["map_submission_status"],
+            row["emoji"],
         )
         for row in payload
     ]
@@ -40,7 +41,7 @@ async def get_format(
         """
         SELECT 
             name, map_submission_wh, run_submission_wh, hidden, run_submission_status,
-            map_submission_status
+            map_submission_status, emoji
         FROM
             formats
         WHERE id = $1
@@ -56,4 +57,5 @@ async def get_format(
         row["hidden"],
         row["run_submission_status"],
         row["map_submission_status"],
+        row["emoji"],
     ) if row else None

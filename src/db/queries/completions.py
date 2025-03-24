@@ -363,7 +363,7 @@ async def get_unapproved_completions(
                 ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.run_meta_id) AS user_ids,
                 
                 m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start, 
-                m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty
+                m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, mlm.remake_of
             FROM unapproved_runs run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
@@ -399,6 +399,7 @@ async def get_unapproved_completions(
                 run["placement_allver"],
                 run["difficulty"],
                 run["botb_difficulty"],
+                run["remake_of"],
                 run["r6_start"],
                 run["map_data"],
                 None,
@@ -506,7 +507,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 lcc.id AS lcc_id, lcc.leftover,
                 
                 m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
-                mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, m.map_data
+                mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, m.map_data, mlm.remake_of
             FROM runs_with_flags run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
@@ -542,6 +543,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 row["placement_allver"],
                 row["difficulty"],
                 row["botb_difficulty"],
+                row["remake_of"],
                 row["r6_start"],
                 row["map_data"],
                 None,
