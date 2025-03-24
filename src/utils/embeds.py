@@ -2,11 +2,11 @@ import json
 import aiohttp
 from src.db.queries.completions import add_completion_wh_payload
 from src.db.queries.mapsubmissions import add_map_submission_wh
+from src.db.queries.format import get_format
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
 import src.http
 from ..requests import discord_api
-from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
 
 propositions = {
     1: ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
@@ -113,7 +113,12 @@ def get_runsubm_embed(
     return embeds
 
 
-async def send_run_webhook(run_id: int, hook_url: str, form_data: aiohttp.FormData, payload_json: str) -> None:
+async def send_run_webhook(run_id: int, format_id: int, form_data: aiohttp.FormData, payload_json: str) -> None:
+    list_format = await get_format(format_id)
+    hook_url = list_format.run_submission_wh if list_format else None
+    if hook_url is None:
+        return
+
     msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
     await add_completion_wh_payload(run_id, f"{msg_id};{payload_json}")
 
@@ -124,7 +129,12 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
     msg_id, payload = comp.subm_wh_payload.split(";", 1)
     content = json.loads(payload)
     content["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
-    hook_url = WEBHOOK_LIST_RUN if 0 < comp.format <= 50 else WEBHOOK_EXPLIST_RUN
+
+    list_format = await get_format(comp.format)
+    hook_url = list_format.run_submission_wh if list_format else None
+    if hook_url is None:
+        return
+
     if await discord_api().patch_webhook(hook_url, msg_id, content):
         await add_completion_wh_payload(comp.id, None)
 
@@ -132,7 +142,12 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
 async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail: bool = False):
     if mapsubm.wh_data is None:
         return
-    hook_url = [WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM][mapsubm.for_list]
+
+    list_format = await get_format(mapsubm.for_list)
+    hook_url = list_format.map_submission_wh if list_format else None
+    if hook_url is None:
+        return
+
     msg_id, wh_data = mapsubm.wh_data.split(";", 1)
     wh_data = json.loads(wh_data)
     wh_data["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
@@ -140,14 +155,25 @@ async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail:
         await add_map_submission_wh(mapsubm.code, None)
 
 
-async def send_map_submission_webhook(hook_url: str, code: str, wh_data: dict) -> None:
+async def send_map_submission_wh(
+        prev_submission: "src.db.models.MapSubmission",
+        format_id: int,
+        map_code: str,
+        wh_data: dict,
+) -> None:
+    if prev_submission and prev_submission.wh_data:
+        old_list_format = await get_format(prev_submission.for_list)
+        old_hook_url = old_list_format.map_submission_wh if old_list_format else None
+        await discord_api().delete_webhook(old_hook_url, prev_submission.wh_data.split(";")[0])
+
+    list_format = await get_format(format_id)
+    hook_url = list_format.map_submission_wh if list_format else None
+    if hook_url is None:
+        return
+
     form_data = aiohttp.FormData()
     wh_data_str = json.dumps(wh_data)
     form_data.add_field("payload_json", wh_data_str)
 
     msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
-    await add_map_submission_wh(code, f"{msg_id};{wh_data_str}")
-
-
-async def delete_map_submission_webhook(hook_url: str, msg_id: str) -> None:
-    await discord_api().delete_webhook(hook_url, msg_id)
+    await add_map_submission_wh(map_code, f"{msg_id};{wh_data_str}")

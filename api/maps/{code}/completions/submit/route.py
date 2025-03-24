@@ -8,13 +8,11 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.utils.formats import is_format_maplist, is_format_expert
+from src.utils.formats import is_format_expert
 from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import (
-    WEBHOOK_LIST_RUN,
-    WEBHOOK_EXPLIST_RUN,
     MEDIA_BASE_URL,
     WEB_BASE_URL,
 )
@@ -166,7 +164,6 @@ async def post(
                     {"errors": {"format": "Submitted maplist (all versions) run for non-experts map"}},
                     status=HTTPStatus.BAD_REQUEST,
                 )
-            hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
 
     proof_fnames = [url for url in proof_fnames if url is not None]
     if not (len(embeds) and len(proof_fnames)):
@@ -206,7 +203,7 @@ async def post(
     payload_json = json.dumps(json_data)
     form_data.add_field("payload_json", payload_json)
 
-    asyncio.create_task(send_run_webhook(run_id, hook_url, form_data, payload_json))
+    asyncio.create_task(send_run_webhook(run_id, data["format"], form_data, payload_json))
     return web.Response(
         status=http.HTTPStatus.CREATED,
         headers={"Location": f"/completions/{run_id}"}

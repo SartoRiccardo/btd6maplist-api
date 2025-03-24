@@ -8,12 +8,11 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_submission, check_prev_map_submission
 from src.requests import ninja_kiwi_api
-from config import WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM, MEDIA_BASE_URL
+from config import MEDIA_BASE_URL
 from src.utils.embeds import (
     get_mapsubm_embed,
     propositions,
-    send_map_submission_webhook,
-    delete_map_submission_webhook,
+    send_map_submission_wh,
 )
 from src.db.queries.mapsubmissions import (
     add_map_submission,
@@ -122,7 +121,6 @@ async def post(
                 return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
             embeds = get_mapsubm_embed(data, discord_profile, btd6_map)
-            hook_url = WEBHOOK_LIST_SUBM if data["format"] == "list" else WEBHOOK_EXPLIST_SUBM
 
     if len(embeds) == 0 or data is None or proof_fname is None:
         return web.json_response(
@@ -147,13 +145,9 @@ async def post(
         edit=(prev_submission is not None),
     )
 
-    async def update_wh():
-        if prev_submission and prev_submission.wh_data:
-            old_hook_url = WEBHOOK_LIST_SUBM if prev_submission.for_list == 0 else WEBHOOK_EXPLIST_SUBM
-            await delete_map_submission_webhook(old_hook_url, prev_submission.wh_data.split(";")[0])
-        await send_map_submission_webhook(hook_url, data["code"], wh_data)
-
-    asyncio.create_task(update_wh())
+    asyncio.create_task(
+        send_map_submission_wh(prev_submission, data["format"], data["code"], wh_data)
+    )
     return web.Response(status=http.HTTPStatus.NO_CONTENT if prev_submission is not None else http.HTTPStatus.CREATED)
 
 

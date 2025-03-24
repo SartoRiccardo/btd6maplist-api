@@ -6,10 +6,7 @@ import src.http
 import src.log
 from aiohttp import web
 from src.db.queries.maps import get_list_maps, add_map
-from config import (
-    WEBHOOK_EXPLIST_SUBM,
-    WEBHOOK_LIST_SUBM,
-)
+from src.db.queries.format import get_format
 from src.utils.embeds import ACCEPT_CLR
 from src.utils.forms import get_map_form
 from src.db.queries.mapsubmissions import get_map_submission, add_map_submission_wh
@@ -133,7 +130,12 @@ async def post(
         subm = await get_map_submission(json_body["code"])
         if subm is None or subm.wh_data is None:
             return
-        hook_url = [WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM][subm.for_list]
+
+        list_format = await get_format(subm.for_list)
+        hook_url = list_format.map_submission_wh if list_format else None
+        if hook_url is None:
+            return
+
         msg_id, wh_data = subm.wh_data.split(";", 1)
         wh_data = json.loads(wh_data)
         wh_data["embeds"][0]["color"] = ACCEPT_CLR
