@@ -27,9 +27,9 @@ async def calc_ml_user_points(user_id: int, btd6ml_test_client) -> int:
             bonuses_applied = {"ger": False, "bb": False, "lcc": False}
             points += raw_pts * multiplier
             multiplier = 1
-            if compl["map"]["placement_cur"] in range(1, config["map_count"]+1):
+            if compl["map"]["placement_curver"] in range(1, config["map_count"]+1):
                 raw_pts = src.utils.misc.point_formula(
-                    compl["map"]["placement_cur"],
+                    compl["map"]["placement_curver"],
                     config["points_bottom_map"],
                     config["points_top_map"],
                     config["map_count"],
@@ -99,7 +99,7 @@ async def calc_completion_count(
         user_id: int,
         formats: list[int],
         btd6ml_test_client,
-        req_field: str = "placement_cur",
+        req_field: str = "placement_curver",
         count_key: str = "current_lcc",
 ) -> int:
     async with btd6ml_test_client.get(
@@ -112,7 +112,7 @@ async def calc_completion_count(
         )
     comp_count = 0
     for i, comp in enumerate(user_comps):
-        if req_field == "placement_cur" and comp["map"]["placement_cur"] not in range(1, 50):
+        if req_field == "placement_curver" and comp["map"]["placement_curver"] not in range(1, 50):
             continue
         elif req_field == "difficulty" and comp["map"]["difficulty"] is None:
             continue

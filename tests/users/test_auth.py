@@ -16,7 +16,7 @@ class TestAuth:
         expected_created_map_ids = ["MLXXXAG", "MLXXXCJ"]
         expected_created_maps = []
         copy_keys = ["code", "botb_difficulty", "deleted_on", "difficulty", "map_data", "map_preview_url", "name",
-                     "optimal_heros", "placement_all", "placement_cur", "r6_start"]
+                     "optimal_heros", "placement_allver", "placement_curver", "r6_start"]
         for map_id in expected_created_map_ids:
             async with btd6ml_test_client.get(f"/maps/{map_id}") as resp:
                 map_data = await resp.json()

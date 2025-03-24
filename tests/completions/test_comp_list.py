@@ -25,8 +25,8 @@ schema_completion_map = {
     "map": {
         "name": str,
         "code": str,
-        "placement_cur": int | None,
-        "placement_all": int | None,
+        "placement_curver": int | None,
+        "placement_allver": int | None,
         "difficulty": int | None,
         "botb_difficulty": int | None,
         "r6_start": str | None,

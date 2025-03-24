@@ -90,11 +90,11 @@ class PartialMap:
       code:
         type: string
         description: The map's code.
-      placement_cur:
+      placement_curver:
         type: integer
         nullable: true
         description: The map's placement in the list ~ current version (starts from 1). If none, it's set to `-1`.
-      placement_all:
+      placement_allver:
         type: integer
         nullable: true
         description: The map's placement in the list ~ all versions (starts from 1). If none, it's set to `-1`.
@@ -123,8 +123,8 @@ class PartialMap:
     """
     code: str
     name: str
-    placement_cur: int | None
-    placement_all: int | None
+    placement_curver: int | None
+    placement_allver: int | None
     difficulty: int | None
     botb_difficulty: int | None
     r6_start: str | None
@@ -141,8 +141,8 @@ class PartialMap:
         return {
             "code": self.code,
             "name": self.name,
-            "placement_all": self.placement_all,
-            "placement_cur": self.placement_cur,
+            "placement_allver": self.placement_allver,
+            "placement_curver": self.placement_curver,
             "difficulty": self.difficulty,
             "botb_difficulty": self.botb_difficulty,
             "r6_start": self.r6_start,
@@ -241,10 +241,10 @@ class Map(PartialMap):
         code:
           type: string
           description: The map's code.
-        placement_cur:
+        placement_curver:
           type: integer
           description: The map's placement in the list ~ current version (starts from 1). If none, set to `-1`.
-        placement_all:
+        placement_allver:
           type: integer
           description: The map's placement in the list ~ all versions (starts from 1). If none, set to `-1`.
         difficulty:

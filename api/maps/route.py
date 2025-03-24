@@ -9,6 +9,7 @@ from src.db.queries.maps import get_list_maps, add_map
 from src.db.queries.format import get_format
 from src.utils.embeds import ACCEPT_CLR
 from src.utils.forms import get_map_form
+from src.utils.formats import format_idxs
 from src.db.queries.mapsubmissions import get_map_submission, add_map_submission_wh
 
 
@@ -111,15 +112,10 @@ async def post(
         return json_body
 
     errors = {}
-    key_checks = [
-        ("placement_curver", 1),
-        ("placement_allver", 2),
-        ("difficulty", 51),
-        ("botb_difficulty", 52),
-    ]
-    for key, fmt in key_checks:
-        if json_body.get(key, None) is not None and not permissions.has("create:map", fmt):
-            errors[key] = f"You are missing `create:map` on format `{fmt}`"
+    for format_id in format_idxs:
+        if json_body.get(format_idxs[format_id].key, None) is not None \
+                and not permissions.has("create:map", format_id):
+            errors[format_idxs[format_id].key] = f"You are missing `create:map` on format `{format_id}`"
     if len(errors):
         return web.json_response(
             {"errors": errors, "data": {}},

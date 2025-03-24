@@ -10,8 +10,8 @@ user_schema = {
 map_schema = {
     "code": str,
     "name": str,
-    "placement_all": int | None,
-    "placement_cur": int | None,
+    "placement_allver": int | None,
+    "placement_curver": int | None,
     "difficulty": int | None,
     "botb_difficulty": int | None,
     "r6_start": str | None,

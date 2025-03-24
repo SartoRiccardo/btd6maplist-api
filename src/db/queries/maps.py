@@ -739,8 +739,8 @@ async def edit_map(
 
     async with conn.transaction():
         await update_list_placements(
-            cur_positions=None if "placement_curver" not in map_data else (map_current.placement_cur, map_data["placement_curver"]),
-            all_positions=None if "placement_allver" not in map_data else (map_current.placement_all, map_data["placement_allver"]),
+            cur_positions=None if "placement_curver" not in map_data else (map_current.placement_curver, map_data["placement_curver"]),
+            all_positions=None if "placement_allver" not in map_data else (map_current.placement_allver, map_data["placement_allver"]),
             ignore_code=map_data["code"],
             conn=conn,
         )
@@ -863,8 +863,8 @@ async def delete_map(
 
     async with conn.transaction():
         indexes = [
-            map_current.placement_cur,
-            map_current.placement_all,
+            map_current.placement_curver,
+            map_current.placement_allver,
             map_current.difficulty,
             map_current.botb_difficulty,
         ]
@@ -872,9 +872,9 @@ async def delete_map(
         new_cur_pos = None
         new_all_pos = None
         if permissions.has("delete:map", 1):
-            new_cur_pos = (map_current.placement_cur, None)
+            new_cur_pos = (map_current.placement_curver, None)
         if permissions.has("delete:map", 2):
-            new_all_pos = (map_current.placement_all, None)
+            new_all_pos = (map_current.placement_allver, None)
         if new_cur_pos is not None and new_all_pos is not None:
             await update_list_placements(
                 cur_positions=new_cur_pos,

@@ -303,6 +303,7 @@ def map_payload():
             "placement_allver": None,
             "placement_curver": None,
             "difficulty": None,
+            "botb_difficulty": None,
             "r6_start": None,
             "map_data": None,
             "map_preview_url": None,

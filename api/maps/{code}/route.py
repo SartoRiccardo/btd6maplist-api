@@ -4,6 +4,7 @@ import http
 import src.log
 from src.db.queries.maps import get_map, edit_map, delete_map
 from src.utils.forms import get_map_form
+from src.utils.formats import format_idxs
 import src.utils.routedecos
 
 
@@ -90,15 +91,9 @@ async def put(
         return json_body
 
     json_body["code"] = resource.code
-    if not permissions.has("edit:map", 1):
-        if "placement_curver" in json_body:
-            del json_body["placement_curver"]
-    if not permissions.has("edit:map", 2):
-        if "placement_allver" in json_body:
-            del json_body["placement_allver"]
-    if not permissions.has("edit:map", 51):
-        if "difficulty" in json_body:
-            del json_body["difficulty"]
+    for format_id in format_idxs:
+        if not permissions.has("edit:map", format_id) and format_idxs[format_id].key in json_body:
+            del json_body[format_idxs[format_id].key]
 
     await edit_map(json_body, resource)
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, discord_profile["id"]))

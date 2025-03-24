@@ -7,7 +7,7 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.utils.formats import is_format_expert
+from src.utils.formats import format_idxs
 from src.db.queries.maps import get_map
 from src.db.queries.misc import get_config
 from src.db.queries.completions import submit_run
@@ -37,16 +37,11 @@ async def post(
 
     if len(errors := await validate_completion_submission(json_data, resource)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
-    if resource.difficulty is None and is_format_expert(json_data["format"]):
+    if getattr(resource, format_idxs[json_data["format"]].key) is None:
         return web.json_response(
-            {"errors": {"format": "Submitted experts run for non-experts map"}},
+            {"errors": {"format": "That map does not accept completions for that format"}},
             status=HTTPStatus.BAD_REQUEST,
         )
-    # if (resource.placement_cur is None or resource.placement_all is None) and json_data["format"] in range(1, 50):
-    #     return web.json_response(
-    #         {"errors": {"format": "Submitted maplist run for non-maplist map"}},
-    #         status=HTTPStatus.BAD_REQUEST,
-    #     )
 
     if not permissions.has_in_any("create:completion_submission"):
         return web.json_response(
@@ -63,7 +58,7 @@ async def post(
 
     maplist_cfg = await get_config()
     if resource.difficulty is None and \
-            resource.placement_cur not in range(1, maplist_cfg["map_count"] + 1):
+            resource.placement_curver not in range(1, maplist_cfg["map_count"] + 1):
         return web.json_response(
             {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
             status=http.HTTPStatus.BAD_REQUEST,

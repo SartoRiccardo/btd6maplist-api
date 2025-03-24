@@ -6,7 +6,7 @@ from aiohttp import web
 from src.utils.files import save_image
 from http import HTTPStatus
 import src.utils.routedecos
-from src.utils.validators import validate_submission, check_prev_map_submission
+from src.utils.validators import validate_map_submission, check_prev_map_submission
 from src.requests import ninja_kiwi_api
 from config import MEDIA_BASE_URL
 from src.utils.embeds import (
@@ -106,7 +106,7 @@ async def post(
         elif part.name == "data":
             data = await part.json()
 
-            if len(errors := await validate_submission(data)):
+            if len(errors := await validate_map_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
             
             if not permissions.has("create:map_submission", data["format"]):

@@ -3,7 +3,7 @@ import http
 from aiohttp import web
 from http import HTTPStatus
 import src.utils.routedecos
-from src.utils.validators import validate_submission, check_prev_map_submission
+from src.utils.validators import validate_map_submission, check_prev_map_submission
 from src.requests import ninja_kiwi_api
 from config import MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed, send_map_submission_wh
@@ -26,7 +26,7 @@ async def post(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    if len(errors := await validate_submission(json_data)):
+    if len(errors := await validate_map_submission(json_data)):
         return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
     if (btd6_map := await ninja_kiwi_api().get_btd6_map(json_data["code"])) is None:

@@ -8,7 +8,7 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.utils.formats import is_format_expert
+from src.utils.formats import format_idxs
 from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
@@ -106,7 +106,7 @@ async def post(
 
     maplist_cfg = await get_config()
     if resource.difficulty is None and \
-            resource.placement_cur not in range(1, maplist_cfg["map_count"] + 1):
+            resource.placement_curver not in range(1, maplist_cfg["map_count"] + 1):
         return web.json_response(
             {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
             status=http.HTTPStatus.BAD_REQUEST,
@@ -149,19 +149,9 @@ async def post(
                 )
 
             embeds = get_runsubm_embed(data, discord_profile, resource)
-            if resource.difficulty is None and is_format_expert(data["format"]):
+            if getattr(resource, format_idxs[data["format"]].key) is None:
                 return web.json_response(
-                    {"errors": {"format": "Submitted experts run for non-experts map"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-            if resource.placement_cur is None and data["format"] == 1:
-                return web.json_response(
-                    {"errors": {"format": "Submitted maplist (current version) run for non-experts map"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-            if resource.placement_all is None and data["format"] == 2:
-                return web.json_response(
-                    {"errors": {"format": "Submitted maplist (all versions) run for non-experts map"}},
+                    {"errors": {"format": "That map does not accept completions for that format"}},
                     status=HTTPStatus.BAD_REQUEST,
                 )
 

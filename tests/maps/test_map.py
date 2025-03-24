@@ -27,8 +27,8 @@ class TestGetMaps:
             value_eq_check = {
                 "name": f"Maplist Map 44",
                 "code": f"MLXXXED",
-                "placement_cur": 44,
-                "placement_all": 39,
+                "placement_curver": 44,
+                "placement_allver": 39,
                 "difficulty": 0,
                 "r6_start": "https://drive.google.com/file/d/qWpmWHvTUJMEhyxBNiZTsMJjOHJfLFdY/view",
                 "map_data": None,
@@ -109,8 +109,8 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
         value_eq_check = {
             "name": req_map_data["name"],
             "code": req_map_data["code"],
-            "placement_cur": req_map_data["placement_curver"],
-            "placement_all": req_map_data["placement_allver"],
+            "placement_curver": req_map_data["placement_curver"],
+            "placement_allver": req_map_data["placement_allver"],
             "difficulty": req_map_data["difficulty"],
             "r6_start": req_map_data["r6_start"],
             "aliases": req_map_data["aliases"],
@@ -142,7 +142,7 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
                 f"Maplist placement misordered"
 
     async with btd6ml_test_client.get("/maps/MLXXXEJ") as resp:
-        assert (await resp.json())["placement_cur"] == 51, \
+        assert (await resp.json())["placement_curver"] == 51, \
             "50th map was not pushed off the list"
 
 
@@ -490,9 +490,9 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
     async def assert_map_placements(map_code: str, expected: tuple[int, int, int], mod_type: str):
         async with btd6ml_test_client.get(f"/maps/{map_code}") as resp:
             resp_map_data = await resp.json()
-            assert resp_map_data["placement_cur"] == expected[0], \
+            assert resp_map_data["placement_curver"] == expected[0], \
                 f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
-            assert resp_map_data["placement_all"] == expected[1], \
+            assert resp_map_data["placement_allver"] == expected[1], \
                 f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
             assert resp_map_data["difficulty"] == expected[2], \
                 f"{mod_type} Moderator {'did not change' if mod_type != 'Maplist' else 'changed'} Expert Difficulty"
@@ -611,8 +611,8 @@ class TestEditMaps:
                 ],
                 "map_preview_url": f"https://data.ninjakiwi.com/btd6/maps/map/MLXXXCJ/preview",
                 "verified": True,
-                "placement_all": req_map_data["placement_allver"],
-                "placement_cur": req_map_data["placement_curver"],
+                "placement_allver": req_map_data["placement_allver"],
+                "placement_curver": req_map_data["placement_curver"],
             }
             del value_eq_check["code"]
             del value_eq_check["placement_allver"]
@@ -660,10 +660,10 @@ class TestEditMaps:
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                     resp_map_data = await resp_get.json()
                     assert resp_map_data["deleted_on"] is None, "Map.deleted_on is not None after partial deletion"
-                    assert resp_map_data["placement_cur"] == (None if maplist_first else prev_values[0]), \
-                        "Map.placement_cur is not None after deletion"
-                    assert resp_map_data["placement_all"] == (None if maplist_first else prev_values[1]), \
-                        "Map.placement_all is not None after deletion"
+                    assert resp_map_data["placement_curver"] == (None if maplist_first else prev_values[0]), \
+                        "Map.placement_curver is not None after deletion"
+                    assert resp_map_data["placement_allver"] == (None if maplist_first else prev_values[1]), \
+                        "Map.placement_allver is not None after deletion"
                     assert resp_map_data["difficulty"] == (prev_values[2] if maplist_first else None), \
                         "Map.difficulty changed after deletion by Maplist Mod"
 
@@ -673,8 +673,8 @@ class TestEditMaps:
                 async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                     resp_map_data = await resp_get.json()
                     assert resp_map_data["deleted_on"] is not None, "Map.deleted_on is None after remaining deletion"
-                    assert resp_map_data["placement_cur"] is None, "Map.placement_cur is not None after full deletion"
-                    assert resp_map_data["placement_all"] is None, "Map.placement_all is not None after full deletion"
+                    assert resp_map_data["placement_curver"] is None, "Map.placement_curver is not None after full deletion"
+                    assert resp_map_data["placement_allver"] is None, "Map.placement_allver is not None after full deletion"
                     assert resp_map_data["difficulty"] is None, "Map.difficulty is not None after full deletion"
 
         await delete_gradually("MLXXXDJ", (40, 35, 0), True)
@@ -689,7 +689,7 @@ class TestEditMaps:
                 resp_map_data = await resp_get.json()
                 assert resp_map_data["creators"] == [{"id": str(uid), "role": "Legacy Role", "name": f"usr{uid}"}], \
                     "Legacy map not edited correctly"
-                assert resp_map_data["placement_cur"] == placement, \
+                assert resp_map_data["placement_curver"] == placement, \
                     "Legacy placement was changed"
 
         await mock_auth(perms=DiscordPermRoles.ADMIN)
@@ -763,10 +763,10 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/{valid_codes[0]}") as resp_get:
             resp_map_data = await resp_get.json()
-            assert resp_map_data["placement_cur"] is None, \
-                "Map.placement_cur is not None when added with a large payload"
-            assert resp_map_data["placement_all"] is None, \
-                "Map.placement_all is not None when added with a large payload"
+            assert resp_map_data["placement_curver"] is None, \
+                "Map.placement_curver is not None when added with a large payload"
+            assert resp_map_data["placement_allver"] is None, \
+                "Map.placement_allver is not None when added with a large payload"
 
     async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
         prev_map_data = await resp_get.json()
@@ -775,10 +775,10 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
             resp_map_data = await resp_get.json()
-            assert resp_map_data["placement_cur"] == prev_map_data["placement_cur"], \
-                "Map.placement_cur is not None when added with a large payload"
-            assert resp_map_data["placement_all"] == prev_map_data["placement_all"], \
-                "Map.placement_all is not None when added with a large payload"
+            assert resp_map_data["placement_curver"] == prev_map_data["placement_curver"], \
+                "Map.placement_curver is not None when added with a large payload"
+            assert resp_map_data["placement_allver"] == prev_map_data["placement_allver"], \
+                "Map.placement_allver is not None when added with a large payload"
 
     await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:

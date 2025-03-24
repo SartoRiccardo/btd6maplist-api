@@ -3,7 +3,6 @@ from aiohttp import web
 import src.utils.routedecos
 from src.db.queries.achievement_roles import get_roles, update_ach_roles
 from src.utils.validators import validate_achievement_roles
-from src.utils.formats import is_format_expert, is_format_maplist
 
 
 @src.utils.routedecos.bearer_auth
