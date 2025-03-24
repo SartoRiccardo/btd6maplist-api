@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 import aiohttp
 import os.path
@@ -11,7 +12,6 @@ import src.db.connection
 import src.requests
 from .mocks.DiscordRequestMock import DiscordRequestMock
 from .mocks.NinjaKiwiMock import NinjaKiwiMock
-from .mocks import DiscordPermRoles
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
 from cryptography.hazmat.primitives import hashes, serialization
@@ -97,8 +97,75 @@ async def set_roles():
     return fixture
 
 
+@pytest_asyncio.fixture(scope="function")
+async def add_custom_role():
+    inserted_roles = []
+
+    @src.db.connection.postgres
+    async def fixture(
+            uid: int | str,
+            permissions: dict[int | None, set[str]],
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        if isinstance(uid, str):
+            uid = int(uid)
+
+        async with conn.transaction():
+            role_id = await conn.fetchval(
+                """
+                INSERT INTO roles (name) VALUES ($1) RETURNING id
+                """,
+                "test-role"
+            )
+            print([
+                    (role_id, format_id, permission)
+                    for format_id in permissions
+                    for permission in permissions[format_id]
+                ])
+            await conn.executemany(
+                """
+                INSERT INTO role_format_permissions
+                    (role_id, format_id, permission)
+                VALUES
+                    ($1, $2, $3)
+                """,
+                [
+                    (role_id, format_id, permission)
+                    for format_id in permissions
+                    for permission in permissions[format_id]
+                ]
+            )
+            await conn.execute(
+                """
+                INSERT INTO user_roles
+                    (user_id, role_id)
+                VALUES
+                    ($1, $2)
+                """,
+                uid, role_id
+            )
+            inserted_roles.append(role_id)
+
+    @src.db.connection.postgres
+    async def cleanup(
+            roles: list[int],
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        async with conn.transaction():
+            await conn.execute(
+                """
+                DELETE FROM roles
+                WHERE id = ANY($1::int[])
+                """,
+                roles,
+            )
+
+    yield fixture
+    await cleanup(inserted_roles)
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def mock_auth(mock_discord_api, set_roles):
+async def mock_auth(mock_discord_api, set_roles, add_custom_role):
     CAN_SUBMIT_ROLE_ID = 8
 
     @src.db.connection.postgres
@@ -118,21 +185,28 @@ async def mock_auth(mock_discord_api, set_roles):
 
     async def set_mock(**kwargs) -> None:
         mocker = mock_discord_api(**kwargs)
-        mocked_perms = kwargs.get("perms", 0)
-        perms = {
-            DiscordPermRoles.ADMIN: [4, 5],
-            DiscordPermRoles.MAPLIST_MOD: [4],
-            DiscordPermRoles.EXPLIST_MOD: [5],
-            DiscordPermRoles.NEEDS_RECORDING: [6],
-            DiscordPermRoles.MAPLIST_OWNER: [2],
-            DiscordPermRoles.EXPLIST_OWNER: [3],
-        }
+        if "perms" in kwargs and isinstance(kwargs["perms"], int):
+            pytest.skip("Uses old mock API")
 
-        roles = [] if mocked_perms & DiscordPermRoles.BANNED else [CAN_SUBMIT_ROLE_ID]
-        for perm in perms:
-            if perm & mocked_perms:
-                roles += perms[perm]
-        await set_roles(mocker.user_id, list(set(roles)))
+        # mocked_perms = kwargs.get("perms", 0)
+        # perms = {
+        #     DiscordPermRoles.ADMIN: [4, 5],
+        #     DiscordPermRoles.MAPLIST_MOD: [4],
+        #     DiscordPermRoles.EXPLIST_MOD: [5],
+        #     DiscordPermRoles.NEEDS_RECORDING: [6],
+        #     DiscordPermRoles.MAPLIST_OWNER: [2],
+        #     DiscordPermRoles.EXPLIST_OWNER: [3],
+        # }
+        #
+        # roles = [] if mocked_perms & DiscordPermRoles.BANNED else [CAN_SUBMIT_ROLE_ID]
+        # for perm in perms:
+        #     if perm & mocked_perms:
+        #         roles += perms[perm]
+
+        if kwargs.get("perms", None) is None:
+            await set_roles(mocker.user_id, [CAN_SUBMIT_ROLE_ID])
+        else:
+            await add_custom_role(mocker.user_id, kwargs["perms"])
 
     await reset_roles()
     return set_mock
