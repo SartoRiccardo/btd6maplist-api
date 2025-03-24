@@ -12,6 +12,8 @@ from src.db.models import (
     Role,
     AchievementRole,
     DiscordRole,
+    Permissions,
+    MinimalUser,
 )
 from src.db.queries.subqueries import LeaderboardType, leaderboard_name
 postgres = src.db.connection.postgres
@@ -26,9 +28,9 @@ UserPlacements = tuple[
 
 
 @postgres
-async def get_user_min(id: str, conn=None) -> PartialUser | None:
+async def get_user_min(uid: str, conn=None) -> PartialUser | None:
     """id can be either the Discord ID or the name"""
-    if id.isnumeric():
+    if uid.isnumeric():
         payload = await conn.fetch("""
             SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
@@ -37,13 +39,13 @@ async def get_user_min(id: str, conn=None) -> PartialUser | None:
             SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
             WHERE LOWER(name)=LOWER($2)
-        """, int(id), id)
+        """, int(uid), uid)
     else:
         payload = await conn.fetch("""
             SELECT discord_id, name, nk_oak, has_seen_popup
             FROM users
             WHERE LOWER(name)=LOWER($1)
-        """, id)
+        """, uid)
     if not len(payload):
         return None
 
@@ -339,6 +341,24 @@ async def get_user_placements(uid: str, format: int, conn=None) -> MaplistProfil
 
 
 @postgres
+async def get_minimal_profile(
+        uid: str | int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None
+) -> MinimalUser:
+    puser = await get_user_min(uid, conn=conn)
+    if not puser:
+        return None
+
+    return MinimalUser(
+        puser.id,
+        puser.name,
+        puser.oak,
+        puser.has_seen_popup,
+        await get_user_perms(uid, conn=conn),
+        await get_min_completions_by(uid, conn=conn),
+    )
+
+@postgres
 async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:
     puser = await get_user_min(id, conn=conn)
     if not puser:
@@ -365,16 +385,41 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
 
 
 @postgres
-async def create_user(uid: str, name: str, if_not_exists=True, conn=None) -> bool:
+async def create_user(
+        uid: str | int,
+        name: str,
+        if_not_exists: bool = True,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> bool:
+    if isinstance(uid, str):
+        uid = int(uid)
+
     rows = await conn.execute(
         f"""
-        INSERT INTO users(discord_id, name)
-        VALUES ($1, $2)
+        INSERT INTO users
+            (discord_id, name)
+        VALUES
+            ($1, $2)
         {"ON CONFLICT DO NOTHING" if if_not_exists else ""}
         """,
-        int(uid), name,
+        uid, name,
     )
-    return int(rows.split(" ")[2]) == 1
+    inserted = int(rows.split(" ")[2]) == 1
+
+    if inserted:
+        await conn.execute(
+            """
+            INSERT INTO user_roles
+                (user_id, role_id)
+            SELECT
+                $1, r.id
+            FROM roles r
+            WHERE r.assign_on_create
+            """,
+            uid,
+        )
+
+    return inserted
 
 
 @postgres
@@ -481,7 +526,7 @@ async def get_user_roles(uid: str | int, conn=None) -> list[Role]:
     payload = await conn.fetch(
         """
         SELECT DISTINCT ON (r.id)
-            r.id, r.name, r.edit_maplist, r.edit_experts, r.requires_recording, r.cannot_submit,
+            r.id, r.name,
             ARRAY_AGG(rg.role_can_grant) OVER(PARTITION BY r.id) AS can_grant
         FROM roles r
         LEFT JOIN role_grants rg
@@ -497,10 +542,6 @@ async def get_user_roles(uid: str | int, conn=None) -> list[Role]:
         Role(
             row["id"],
             row["name"],
-            row["edit_maplist"],
-            row["edit_experts"],
-            row["requires_recording"],
-            row["cannot_submit"],
             can_grant=[rl for rl in row["can_grant"] if rl is not None],
         )
         for row in payload
@@ -570,3 +611,27 @@ async def get_user_achievement_roles(uid: str | int, conn=None) -> list[Achievem
         )
         for row in payload
     ]
+
+
+@postgres
+async def get_user_perms(
+        uid: str | int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None
+) -> Permissions:
+    if isinstance(uid, str):
+        uid = int(uid)
+
+    payload = await conn.fetch(
+        """
+        SELECT
+            rfp.format_id, ARRAY_AGG(rfp.permission) AS permissions
+        FROM user_roles ur
+        JOIN role_format_permissions rfp
+            ON ur.role_id = rfp.role_id
+        WHERE ur.user_id = $1
+        GROUP BY rfp.format_id;
+        """,
+        uid
+    )
+
+    return Permissions({row["format_id"]: row["permissions"] for row in payload})

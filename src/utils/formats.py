@@ -1,6 +1,14 @@
 from .misc import MAPLIST_FORMATS
 
 
+format_idxs = {
+    1: "placement_cur",
+    2: "placement_all",
+    51: "difficulty",
+    52: "botb_difficulty",
+}
+
+
 def is_format_maplist(f: int) -> bool:
     return 0 <= f < 50
 

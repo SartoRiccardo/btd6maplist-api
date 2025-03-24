@@ -24,6 +24,8 @@ START_CONFIG = {
     "exp_nogerry_points_high": 0,
     "exp_nogerry_points_true": 0,
     "exp_nogerry_points_extreme": 0,
+    "exp_bb_multi": 1,
+    "exp_lcc_extra": 0,
 }
 MAPLIST_CONFIG = {
     "points_top_map": 10,
@@ -48,6 +50,8 @@ EXPLIST_CONFIG = {
     "exp_nogerry_points_high": 6,
     "exp_nogerry_points_true": 9,
     "exp_nogerry_points_extreme": 41,
+    "exp_bb_multi": 2,
+    "exp_lcc_extra": 1,
 }
 
 

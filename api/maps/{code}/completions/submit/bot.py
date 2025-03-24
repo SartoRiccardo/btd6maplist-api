@@ -26,13 +26,12 @@ async def post(
         files: list[tuple[str, bytes] | None] = None,
         json_data: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        cannot_submit: bool = False,
-        requires_recording: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ) -> web.Response:
-    if cannot_submit:
+    if not permissions.has_in_any("create:map_submission"):
         return web.json_response(
-            {"errors": {"": "You are banned from submitting..."}},
+            {"errors": {"": "You are banned from submitting maps"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
@@ -49,7 +48,14 @@ async def post(
     #         status=HTTPStatus.BAD_REQUEST,
     #     )
 
-    if requires_recording and len(json_data["video_proof_url"]) == 0:
+    if not permissions.has_in_any("create:completion_submission"):
+        return web.json_response(
+            {"errors": {"": "You are banned from submitting completions"}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+        # TODO Remove images inserted in this request
+    elif permissions.has("require:completion_submission:recording", json_data["format"]) \
+            and len(json_data["video_proof_url"]) == 0:
         return web.json_response(
             {"errors": {"video_proof_url": "You must submit a recording"}},
             status=http.HTTPStatus.BAD_REQUEST,

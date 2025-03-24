@@ -9,8 +9,7 @@ from config import MEDIA_BASE_URL
 async def get_completion_request(
         request: web.Request,
         user_id: str,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.modes.Permissions" = None,
         resource: "src.db.models.ListCompletion" = None,
 ) -> dict | web.Response:
     if resource and int(user_id) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
@@ -24,8 +23,7 @@ async def get_completion_request(
             return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
 
         err_resp = validate_completion_perms(
-            is_maplist_mod,
-            is_explist_mod,
+            permissions,
             data["format"],
             resource.format if resource else None,
         )

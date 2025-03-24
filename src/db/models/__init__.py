@@ -2,16 +2,18 @@ import re
 import yaml
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
-from .users import User, PartialUser, MaplistProfile, MaplistMedals
+from .users import User, PartialUser, MaplistProfile, MaplistMedals, MinimalUser
 from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
 from .AchievementRole import DiscordRole, AchievementRole, RoleUpdateAction
 from .Format import Format
+from .Permissions import Permissions
 
 entities = [
     Map,
     PartialMap,
+    MinimalUser,
     PartialExpertMap,
     PartialListMap,
     LCC,

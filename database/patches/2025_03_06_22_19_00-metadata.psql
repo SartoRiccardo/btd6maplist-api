@@ -191,3 +191,223 @@ VALUES
     (52, 'Best of the Best', 1, FALSE, 0),
     (11, 'Nostalgia Pack', 2, FALSE, 1)
 ;
+
+-- Permissions
+ALTER TABLE roles
+    ADD COLUMN assign_on_create BOOLEAN DEFAULT FALSE
+;
+
+CREATE TABLE role_format_permissions (
+    role_id BIGINT NOT NULL,
+    format_id BIGINT,  -- If NULL, applies to all formats
+    permission VARCHAR(255)
+)
+;
+
+-- We're inside a TX
+CREATE TEMP TABLE mod_permissions (permission VARCHAR(255)) ON COMMIT DROP;
+INSERT INTO mod_permissions VALUES
+    ('create:map'),
+    ('edit:map'),
+    ('delete:map'),
+    ('edit:config'),
+    ('create:completion'),
+    ('edit:completion'),
+    ('delete:completion'),
+    ('delete:map_submission'),
+    ('edit:achievement_roles')
+;
+
+INSERT INTO role_format_permissions
+    (role_id, format_id, permission)
+SELECT
+    r.id, 1, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_maplist
+
+UNION ALL
+SELECT
+    r.id, 2, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_maplist
+
+UNION ALL
+SELECT
+    r.id, 51, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_experts
+
+UNION ALL
+SELECT
+    r.id, NULL, 'require:completion_submission:recording'
+FROM roles r
+WHERE r.requires_recording
+;
+
+WITH inserted_roles AS (
+    INSERT INTO roles
+        (name, assign_on_create)
+    VALUES
+        ('Can Submit', TRUE),
+        ('BotB Owner', FALSE),
+        ('BotB Curator', FALSE),
+        ('BotB Verifier', FALSE),
+        ('Nostalgia Owner', FALSE),
+        ('Nostalgia Curator', FALSE),
+        ('Nostalgia Verifier', FALSE)
+    RETURNING id, name
+),
+_grants AS (
+    INSERT INTO role_grants
+        (role_required, role_can_grant)
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM inserted_roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON (ir_has.name = 'BotB Owner' AND ir_can_grant.name IN ('BotB Curator', 'BotB Verifier'))
+        OR (ir_has.name = 'Nostalgia Owner' AND ir_can_grant.name IN ('Nostalgia Curator', 'Nostalgia Verifier'))
+
+    UNION ALL
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON ir_can_grant.name = 'Can Submit'
+        AND (
+            ir_has.id = 1
+            OR ir_has.name LIKE '%Owner'
+            OR ir_has.name LIKE '%Moderator'
+            OR ir_has.name LIKE '%Curator'
+            OR ir_has.name LIKE '%Verifier'
+        )
+    RETURNING role_required  -- Dummy RETURNING to use it in the CTE
+),
+_perms AS (
+    INSERT INTO role_format_permissions
+        (role_id, format_id, permission)
+    SELECT
+        r.id, NULL, p.perm
+    FROM inserted_roles r
+    CROSS JOIN (
+        VALUES
+            ('create:map_submission'),
+            ('create:completion_submission')
+    ) AS p(perm)
+    WHERE r.name = 'Can Submit'
+
+    UNION ALL
+    SELECT
+        r.id, f.id, p.perm
+    FROM inserted_roles r
+    JOIN (
+        VALUES
+            ('Nostalgia', 11),
+            ('BotB', 51)
+    ) as f(name, id)
+        ON r.name LIKE (f.name || '%')
+    JOIN (
+        VALUES
+            ('Curator', 'create:map'),
+            ('Curator', 'edit:map'),
+            ('Curator', 'delete:map'),
+            ('Verifier', 'edit:config'),
+            ('Verifier', 'create:completion'),
+            ('Verifier', 'edit:completion'),
+            ('Verifier', 'delete:completion')
+    ) as p(name, perm)
+        ON r.name LIKE ('%' || p.name)
+        OR r.name LIKE '%Owner'
+    RETURNING role_id  -- Dummy RETURNING to use it in the CTE
+)
+INSERT INTO user_roles
+    (user_id, role_id)
+SELECT DISTINCT ON (u.discord_id)
+    u.discord_id, ir.id
+FROM users u
+LEFT JOIN user_roles ur
+    ON u.discord_id = ur.user_id
+LEFT JOIN roles r
+    ON r.id = ur.role_id
+    AND r.cannot_submit
+JOIN inserted_roles ir
+    ON ir.name = 'Can Submit'
+WHERE r.id IS NULL
+;
+
+DELETE FROM roles WHERE cannot_submit;
+
+-- Technician global perms
+INSERT INTO role_format_permissions
+    (role_id, format_id, permission)
+VALUES
+    (1, NULL, 'delete:map_submission'),
+    (1, NULL, 'edit:achievement_roles'),
+    (1, NULL, 'create:map'),
+    (1, NULL, 'edit:map'),
+    (1, NULL, 'delete:map'),
+    (1, NULL, 'edit:config'),
+    (1, NULL, 'create:completion'),
+    (1, NULL, 'edit:completion'),
+    (1, NULL, 'delete:completion'),
+    (1, NULL, 'create:map_submission'),
+    (1, NULL, 'create:completion_submission')
+;
+
+ALTER TABLE roles
+    DROP COLUMN edit_maplist CASCADE,
+    DROP COLUMN edit_experts CASCADE,
+    DROP COLUMN requires_recording CASCADE,
+    DROP COLUMN cannot_submit CASCADE
+;
+
+-- Format migration
+UPDATE map_submissions SET for_list = 51 WHERE for_list = 1;
+UPDATE map_submissions SET for_list = 1 WHERE for_list = 0;
+ALTER TABLE map_submissions ADD CONSTRAINT fk_formats_1
+    FOREIGN KEY (for_list) REFERENCES formats(id);
+
+-- Config migration
+CREATE TABLE config_formats (
+    config_name VARCHAR(255),
+    format_id INT
+);
+ALTER TABLE config_formats ADD CONSTRAINT fk_formats_1
+    FOREIGN KEY (format_id) REFERENCES formats(id);
+INSERT INTO config_formats
+    (config_name, format_id)
+VALUES
+    ('points_top_map', 1),
+    ('points_bottom_map', 1),
+    ('formula_slope', 1),
+    ('points_extra_lcc', 1),
+    ('points_multi_gerry', 1),
+    ('points_multi_bb', 1),
+    ('decimal_digits', 1),
+    ('map_count', 1),
+    ('current_btd6_ver', 1),
+    ('points_top_map', 2),
+    ('points_bottom_map', 2),
+    ('formula_slope', 2),
+    ('points_extra_lcc', 2),
+    ('points_multi_gerry', 2),
+    ('points_multi_bb', 2),
+    ('decimal_digits', 2),
+    ('map_count', 2),
+    ('current_btd6_ver', 2),
+    ('current_btd6_ver', 51),
+    ('exp_points_casual', 51),
+    ('exp_points_medium', 51),
+    ('exp_points_high', 51),
+    ('exp_points_true', 51),
+    ('exp_points_extreme', 51),
+    ('exp_nogerry_points_casual', 51),
+    ('exp_nogerry_points_medium', 51),
+    ('exp_nogerry_points_high', 51),
+    ('exp_nogerry_points_true', 51),
+    ('exp_nogerry_points_extreme', 51),
+    ('exp_bb_multi', 51),
+    ('exp_lcc_extra', 51)
+;

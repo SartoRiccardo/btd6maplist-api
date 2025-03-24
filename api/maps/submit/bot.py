@@ -17,13 +17,13 @@ from src.utils.files import save_image
 async def post(
         _r: web.Request,
         json_data: dict = None,
-        cannot_submit: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         files: list[tuple[str, bytes] | None] = None,
         **_kwargs,
 ) -> web.Response:
-    if cannot_submit:
+    if not permissions.has_in_any("create:map_submission"):
         return web.json_response(
-            {"errors": {"": "You are banned from submitting..."}},
+            {"errors": {"": "You are banned from submitting maps"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
@@ -34,7 +34,7 @@ async def post(
         return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
     proof_fname, _fp = await save_image(files[0][1], files[0][0].split(".")[-1])
-    hook_url = WEBHOOK_LIST_SUBM if json_data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
+    hook_url = WEBHOOK_LIST_SUBM if json_data["format"] == "list" else WEBHOOK_EXPLIST_SUBM
     embeds = get_mapsubm_embed(json_data, json_data["user"], btd6_map)
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
@@ -48,7 +48,7 @@ async def post(
         json_data["code"],
         json_data["user"]["id"],
         json_data["notes"],
-        list_to_int.index(json_data["type"]),
+        json_data["format"],
         json_data["proposed"],
         f"{MEDIA_BASE_URL}/{proof_fname}",
         edit=(prev_submission is not None),

@@ -9,10 +9,6 @@ HEADERS = {"Authorization": "Bearer test_token"}
 role_schema = {
     "id": int,
     "name": str,
-    "edit_maplist": bool,
-    "edit_experts": bool,
-    "cannot_submit": bool,
-    "requires_recording": bool,
     "can_grant": [int],
 }
 
@@ -181,7 +177,7 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Adding the same role twice returned {resp.status}"
             user_data = await resp_get.json()
-            assert [rl["id"] for rl in user_data["roles"]] == [5], \
+            assert [rl["id"] for rl in user_data["roles"]] == [5, 8], \
                 "Modified roles differ from expected"
 
         body = {
@@ -195,15 +191,15 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Removing the same role twice returned {resp.status}"
             user_data = await resp_get.json()
-            assert len(user_data["roles"]) == 0, \
+            assert len(user_data["roles"]) == 1, \
                 "Modified roles differ from expected"
 
         body = {
             "roles": [
                 {"id": 5, "action": "POST"},
                 {"id": 5, "action": "DELETE"},
-                {"id": 7, "action": "DELETE"},
-                {"id": 7, "action": "POST"},
+                {"id": 8, "action": "DELETE"},
+                {"id": 8, "action": "POST"},
             ],
         }
         async with btd6ml_test_client.patch(f"/users/{user_id}/roles", json=body, headers=HEADERS) as resp, \

@@ -156,6 +156,44 @@ class MaplistMedals:
 
 
 @dataclass
+class MinimalUser(PartialUser):
+    """
+    allOf:
+    - $ref: "#/components/schemas/PartialUser"
+    - type: object
+      properties:
+        permissions:
+          type: array
+          description: A key-value pair of a format ID and a user's permissions on it.
+          items:
+            type: object
+            properties:
+              format:
+                type: integer
+                nullable: true
+                description: The format these perms apply in. `null` if they apply to all formats.
+              permissions:
+                type: array
+                items:
+                  type: string
+    """
+    permissions: "src.db.models.Permissions"
+    completions: list[ListCompletion]
+
+    def to_dict(
+            self,
+            profile: bool = False,
+            with_completions: bool = False,
+    ) -> dict:
+        data = {
+            **super().to_dict(profile=profile),
+            "permissions": self.permissions.to_dict(),
+            "completions": [c.to_profile_dict() for c in self.completions],
+        }
+        return data
+
+
+@dataclass
 class User(PartialUser):
     """
     allOf:

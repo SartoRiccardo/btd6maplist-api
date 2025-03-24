@@ -20,7 +20,7 @@ def submission_payload():
             },
             "code": code,
             "notes": "Some Notes",
-            "type": "list",
+            "format": 1,
             "proposed": 0,
         }
     return generate
@@ -188,7 +188,7 @@ class TestPermissions:
                 f"Submitting a map returns {resp.status}"
 
         data = submission_payload(experts_code)
-        data["type"] = "experts"
+        data["format"] = 51
         data_str = json.dumps(data)
         req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
         async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:

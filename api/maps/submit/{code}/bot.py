@@ -13,8 +13,7 @@ async def delete(
         _r: web.Request,
         resource: "src.db.models.MapSubmission" = None,
         json_data: dict = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     if resource.rejected_by is not None:
@@ -23,14 +22,9 @@ async def delete(
             status=http.HTTPStatus.BAD_REQUEST,
         )
 
-    err_str = None
-    if resource.for_list == 0 and not is_maplist_mod:
-        err_str = "Maplist"
-    elif resource.for_list == 1 and not is_explist_mod:
-        err_str = "Expert List"
-    if err_str:
+    if not permissions.has("delete:map_submission", resource.for_list):
         return web.json_response(
-            {"errors": {"": f"Can't delete a submission to the {err_str} if you're not an {err_str} Mod"}},
+            {"errors": {"": f"You are missing `delete:map_submission` on format {resource.for_list}"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 

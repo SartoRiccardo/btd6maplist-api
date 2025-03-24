@@ -570,20 +570,18 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
 async def transfer_all_completions(
         from_code: str,
         to_code: str,
-        transfer_list_comps: bool = False,
-        transfer_explist_comps: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         conn=None
 ) -> None:
-    if not transfer_list_comps and not transfer_explist_comps:
-        return
-
-    transfer_range = ""
-    if transfer_explist_comps and not transfer_list_comps:
-        transfer_range = "AND cm.format BETWEEN 51 AND 100"
-    elif not transfer_explist_comps and transfer_list_comps:
-        transfer_range = "AND cm.format BETWEEN 1 AND 50"
-
     now = datetime.now()
+    args = [from_code, to_code, now]
+
+    transfer_formats = permissions.formats_where("edit:completion")
+    transfer_formats_filter = ""
+    if None not in transfer_formats:
+        args.append(transfer_formats)
+        transfer_formats_filter = "AND cm.format = ANY($4::int[])"
+
     await conn.execute(
         f"""
         WITH copied_completions AS (
@@ -597,7 +595,7 @@ async def transfer_all_completions(
             WHERE c.map = $1
                 AND cm.deleted_on IS NULL
                 AND cm.new_version IS NULL
-                {transfer_range}
+                {transfer_formats_filter}
             RETURNING id AS new_id, copied_from_id AS old_id
         ),
         copied_completion_metas AS (
@@ -610,7 +608,7 @@ async def transfer_all_completions(
                 ON cm.completion = c.old_id
             WHERE cm.deleted_on IS NULL
                 AND cm.new_version IS NULL
-                {transfer_range}
+                {transfer_formats_filter}
             RETURNING id AS new_id, copied_from_id AS old_id
         ),
         updated_completions AS (
@@ -631,7 +629,7 @@ async def transfer_all_completions(
         JOIN copied_completion_metas ccm
             ON ccm.old_id = cp.run
         """,
-        from_code, to_code, now
+        *args
     )
 
     await link_completions(conn=conn)

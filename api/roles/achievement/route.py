@@ -12,14 +12,13 @@ from src.utils.formats import is_format_expert, is_format_maplist
 @src.utils.routedecos.validate_json_body(validate_achievement_roles)
 async def put(
         _r: web.Request,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         json_body: dict = None,
         **_kwargs,
 ) -> web.Response:
     """
     ---
-    description: Modify Achivement Roles for a specific leaderboard.
+    description: Modify Achivement Roles for a specific leaderboard. Must have edit:achievement_roles.
     tags:
     - Roles
     requestBody:
@@ -62,14 +61,9 @@ async def put(
       "404":
         description: No completion with that ID was found.
     """
-    if is_format_maplist(json_body["lb_format"]) and not is_maplist_mod:
+    if not permissions.has("edit:achievement_roles", json_body["lb_format"]):
         return web.json_response(
-            {"errors": {"lb_format": "You must be a Maplist Moderator"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
-    elif is_format_expert(json_body["lb_format"]) and not is_explist_mod:
-        return web.json_response(
-            {"errors": {"lb_format": "You must be an Expert List Moderator"}},
+            {"errors": {"lb_format": f"You are missing `edit:achievement_roles` on {json_body['lb_format']}"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 

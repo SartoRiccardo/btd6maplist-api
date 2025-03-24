@@ -180,7 +180,7 @@ class TestSubmitMap:
             (-1, "a map with a negative [keypath]"),
             (30, "a map with a [keypath] too large"),
         ]
-        invalid_schema = {None: ["type"]}
+        invalid_schema = {None: ["format", "proposed"]}
         for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 

@@ -15,7 +15,6 @@ from src.utils.embeds import (
     send_map_submission_webhook,
     delete_map_submission_webhook,
 )
-from src.utils.misc import list_to_int
 from src.db.queries.mapsubmissions import (
     add_map_submission,
     get_map_submissions,
@@ -31,12 +30,12 @@ PAGE_ENTRIES = 50
 async def post(
         request: web.Request,
         discord_profile: dict = None,
-        cannot_submit: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ) -> web.Response:
     """
     ---
-    description: Submits a map to the maplist.
+    description: Submits a map to the maplist. Must have create:map_submission
     tags:
     - Submissions
     requestBody:
@@ -57,14 +56,8 @@ async def post(
                     type: string
                     description: Additional notes about the map.
                     nullable: true
-                  type:
-                    type: string
-                    enum:
-                      - 0
-                      - 1
-                    description: |
-                      Which list the map will be submitted on.
-                      `0` for the Maplist and `1` for the Expert List.
+                  format:
+                    $ref: "#/components/schemas/MaplistFormat"
                   proposed:
                     type: integer
                     description: The proposed difficulty/index of the list. 0-6 for list and 0-6 for experts.
@@ -88,9 +81,9 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    if cannot_submit:
+    if not permissions.has_in_any("create:map_submission"):
         return web.json_response(
-            {"errors": {"": "You are banned from submitting..."}},
+            {"errors": {"": "You are banned from submitting maps"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
@@ -113,16 +106,23 @@ async def post(
             proof_fname, _fpath = await save_image(file_contents, proof_ext)
         elif part.name == "data":
             data = await part.json()
+
             if len(errors := await validate_submission(data)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
-            if not data["proposed"] in range(len(propositions[data["type"]])):
+            
+            if not permissions.has("create:map_submission", data["format"]):
+                return web.json_response(
+                    {"errors": {"": "You are banned from submitting maps"}},
+                    status=http.HTTPStatus.FORBIDDEN,
+                )
+            if not data["proposed"] in range(len(propositions[data["format"]])):
                 return web.json_response({"errors": {"proposed": "Out of range"}}, status=HTTPStatus.BAD_REQUEST)
 
             if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
                 return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
 
             embeds = get_mapsubm_embed(data, discord_profile, btd6_map)
-            hook_url = WEBHOOK_LIST_SUBM if data["type"] == "list" else WEBHOOK_EXPLIST_SUBM
+            hook_url = WEBHOOK_LIST_SUBM if data["format"] == "list" else WEBHOOK_EXPLIST_SUBM
 
     if len(embeds) == 0 or data is None or proof_fname is None:
         return web.json_response(
@@ -141,7 +141,7 @@ async def post(
         data["code"],
         discord_profile["id"],
         data["notes"],
-        list_to_int.index(data["type"]),
+        data["format"],
         data["proposed"],
         f"{MEDIA_BASE_URL}/{proof_fname}",
         edit=(prev_submission is not None),

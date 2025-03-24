@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from src.utils.misc import list_to_int
 
 
 @dataclass
@@ -49,7 +48,7 @@ class MapSubmission:
             "code": self.code,
             "submitter": str(self.submitter),
             "subm_notes": self.subm_notes,
-            "type": list_to_int[self.for_list],
+            "format": self.for_list,
             "proposed_diff": self.proposed_diff,
             "rejected_by": str(self.rejected_by) if self.rejected_by else None,
             "completion_proof": self.completion_proof,

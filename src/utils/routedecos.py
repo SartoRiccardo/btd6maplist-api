@@ -9,7 +9,7 @@ from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
 import src.http
-from src.db.queries.users import create_user, get_user_min, get_user_roles
+from src.db.queries.users import create_user, get_user_min, get_user_perms
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from ..requests import discord_api
@@ -48,38 +48,10 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     return wrapper
 
 
-def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
-    """
-    Must be used with `bearer_auth` beforehand.
-    Checks if the user is in the maplist Discord.
-    Adds `maplist_profile` to kwargs if they're there or returns 401.
-    """
-    @wraps(handler)
-    async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
-        if token == "":
-            return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-
-        try:
-            profile = await discord_api().get_maplist_profile(token)
-            return await handler(request, *args, **kwargs, token=token, maplist_profile=profile)
-        except aiohttp.ClientResponseError as exc:
-            if exc.status == http.HTTPStatus.NOT_FOUND:
-                return web.json_response(
-                    {"errors": {"": "You don't seem to be in the maplist discord..."}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
-            else:
-                return web.json_response(
-                    {"errors": {"": "Couldn't verify your Maplist account"}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
-
-    return wrapper
-
-
 def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
     Must be used with `bearer_auth` beforehand.
+    TODO Migrate to JWT and dont call an external service every auth call
     Adds `discord_profile` to kwargs or returns 401.
     """
     @wraps(handler)
@@ -124,8 +96,7 @@ def require_perms(
 ):
     """
     Must be used with `with_discord_profile` or `check_bot_signature` beforehand.
-    Returns 403 if they don't have any perms.
-    Adds `is_admin`, `is_maplist_mod`, `is_explist_mod`, `cannot_submit`, and `requires_recording` to kwargs.
+    Returns 403 if they don't have any perms, adds `permissions` to kwargs othewise.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
@@ -137,21 +108,9 @@ def require_perms(
                 discord_profile = kwargs_caller["json_data"]["user"]
             if discord_profile is None:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-            roles = await get_user_roles(discord_profile["id"])
+            permissions = await get_user_perms(discord_profile["id"])
 
-            is_admin = False
-            is_list_mod = False
-            is_explist_mod = False
-            cannot_submit = False
-            requires_recording = False
-            for role in roles:
-                # is_admin no longer used
-                is_list_mod = is_list_mod or role.edit_maplist
-                is_explist_mod = is_explist_mod or role.edit_experts
-                cannot_submit = cannot_submit or role.cannot_submit
-                requires_recording = requires_recording or role.requires_recording
-
-            if not (is_admin or is_explist_mod or is_list_mod) and throw_on_permless:
+            if not permissions.has_any_perms() and throw_on_permless:
                 return web.json_response(
                     {"errors": {"": "You don't have the necessary permissions to do this"}, "data": {}},
                     status=http.HTTPStatus.FORBIDDEN,
@@ -161,12 +120,7 @@ def require_perms(
                 request,
                 *args,
                 **kwargs_caller,
-                is_admin=is_admin,
-                is_explist_mod=is_explist_mod,
-                is_list_mod=is_list_mod,
-                is_maplist_mod=is_list_mod,  # Alias cause I keep mixing them up
-                cannot_submit=cannot_submit,
-                requires_recording=requires_recording,
+                permissions=permissions,
             )
         return wrapper
     return deco

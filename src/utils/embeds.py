@@ -9,13 +9,14 @@ from ..requests import discord_api
 from config import WEBHOOK_LIST_RUN, WEBHOOK_EXPLIST_RUN, WEBHOOK_LIST_SUBM, WEBHOOK_EXPLIST_SUBM
 
 propositions = {
-    "list": ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
-    "experts": ["Casual", "Casual/Medium", "Medium", "Medium/High", "High", "High/True", "True", "True/Extreme", "Extreme"],
+    1: ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"],
+    51: ["Casual", "Casual/Medium", "Medium", "Medium/High", "High", "High/True", "True", "True/Extreme", "Extreme"],
 }
+propositions[2] = propositions[1]
 
 formats = {
-    1: {"emoji": Emj.curver, "name": "Current"},
-    2: {"emoji": Emj.allver, "name": "Current"},
+    1: {"emoji": Emj.curver, "name": "Maplist"},
+    2: {"emoji": Emj.allver, "name": "Maplist (all versions)"},
     51: {"emoji": Emj.experts, "name": "Expert List"},
 }
 
@@ -47,14 +48,14 @@ def get_mapsubm_embed(
             },
             "fields": [
                 {
-                    "name": f"Proposed {'List Position' if data['type'] == 'list' else 'Difficulty'}",
+                    "name": f"Proposed {'List Position' if data['format'] == 'list' else 'Difficulty'}",
                     "value":
-                        propositions[data["type"]][data["proposed"]]
-                        if data['type'] == 'list' else
-                        (propositions[data['type']][data["proposed"]] + " Expert"),
+                        propositions[data["format"]][data["proposed"]]
+                        if data['format'] == 'list' else
+                        (propositions[data["format"]][data["proposed"]] + " Expert"),
                 },
             ],
-            "color": LIST_CLR if data["type"] == "list" else EXPERTS_CLR
+            "color": LIST_CLR if data["format"] == "list" else EXPERTS_CLR
         },
         {
             "url": f"https://join.btd6.com/Map/{data['code']}",

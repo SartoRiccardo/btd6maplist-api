@@ -211,7 +211,7 @@ def typecheck_submission(body: dict) -> dict:
         "code": str,
         "notes": str | None,
         "proposed": int,
-        "type": str,
+        "format": int,
     }
     check = check_fields(body, check_fields_exists)
     if len(check):
@@ -230,8 +230,8 @@ async def validate_submission(body: dict) -> dict:
             errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
         if len(body["notes"]) == 0:
             body["notes"] = None
-    if body["type"] not in ["list", "experts"]:
-        errors["type"] = f"Must be either `list` or `experts`"
+    if not is_format_valid(body["format"]):
+        errors["format"] = "Must be a valid format"
     return errors
 
 
@@ -370,25 +370,21 @@ async def check_prev_map_submission(
 
 
 def validate_completion_perms(
-        is_maplist_mod: bool,
-        is_explist_mod: bool,
+        permissions: "src.db.models.Permissions",
         new_format: int,
         old_format: int | None = None,
 ) -> web.Response | None:
-    if not is_maplist_mod and (
-            is_format_maplist(new_format) or
-            old_format and is_format_maplist(old_format)):
+    req_perm = "edit:completion" if old_format else "create:completion"
+
+    if not permissions.has(req_perm, new_format):
         return web.json_response(
-            {"errors": {"format": "You must be a Maplist Moderator"}},
+            {"errors": {"format": f"You are missing `{req_perm}` on format `{new_format}`"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    if not is_explist_mod and (
-            is_format_expert(new_format) or
-            old_format and is_format_expert(old_format)
-    ):
+    if old_format is not None and not permissions.has(req_perm, old_format):
         return web.json_response(
-            {"errors": {"format": "You must be an Expert List Moderator"}},
+            {"errors": {"format": f"You are missing `{req_perm}` on format `{old_format}`"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 

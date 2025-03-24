@@ -64,14 +64,12 @@ async def get(request: web.Request):
 async def post(
         request: web.Request,
         discord_profile: dict = None,
-        is_admin: bool = False,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ) -> web.Response:
     """
     ---
-    description: Add a map. Must be a Maplist or Expert List Moderator.
+    description: Add a map. Must have create:map.
     tags:
     - Maps
     requestBody:
@@ -116,13 +114,15 @@ async def post(
         return json_body
 
     errors = {}
-    if not is_admin:
-        if "difficulty" in json_body and json_body["difficulty"] is not None and not is_explist_mod:
-            errors["difficulty"] = "You are not an Expert List moderator"
-        if "placement_allver" in json_body and json_body["placement_allver"] is not None and not is_maplist_mod:
-            errors["placement_allver"] = "You are not a List moderator"
-        if "placement_curver" in json_body and json_body["placement_curver"] is not None and not is_maplist_mod:
-            errors["placement_curver"] = "You are not a List moderator"
+    key_checks = [
+        ("placement_curver", 1),
+        ("placement_allver", 2),
+        ("difficulty", 51),
+        ("botb_difficulty", 52),
+    ]
+    for key, fmt in key_checks:
+        if json_body.get(key, None) is not None and not permissions.has("create:map", fmt):
+            errors[key] = f"You are missing `create:map` on format `{fmt}`"
     if len(errors):
         return web.json_response(
             {"errors": errors, "data": {}},

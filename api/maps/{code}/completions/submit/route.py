@@ -32,13 +32,12 @@ async def post(
         request: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        cannot_submit: bool = False,
-        requires_recording: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ) -> web.Response:
     """
     ---
-    description: Submits a run to the maplist.
+    description: Submits a run to the maplist. Must have create:completion_submission
     tags:
     - Submissions
     requestBody:
@@ -101,9 +100,9 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    if cannot_submit:
+    if not permissions.has_in_any("create:completion_submission"):
         return web.json_response(
-            {"errors": {"": "You are banned from submitting..."}},
+            {"errors": {"": "You are banned from submitting completions"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
@@ -139,7 +138,13 @@ async def post(
             if len(errors := await validate_completion_submission(data, resource)):
                 return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
 
-            if requires_recording and len(data["video_proof_url"]) == 0:
+            if not permissions.has_in_any("create:completion_submission"):
+                return web.json_response(
+                    {"errors": {"": "You are banned from submitting completions"}},
+                    status=http.HTTPStatus.FORBIDDEN,
+                )
+                # TODO Remove images inserted in this request
+            elif permissions.has("require:completion_submission:recording", data["format"]) and len(data["video_proof_url"]) == 0:
                 return web.json_response(
                     {"errors": {"video_proof_url": "You must submit a recording"}},
                     status=http.HTTPStatus.BAD_REQUEST,

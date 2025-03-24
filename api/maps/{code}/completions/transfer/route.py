@@ -33,8 +33,7 @@ async def put(
         _r: web.Request,
         resource: "src.db.models.PartialMap" = None,
         discord_profile: dict = None,
-        is_explist_mod: bool = False,
-        is_list_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         json_body: dict = None,
         **_kwargs,
 ) -> web.Response:
@@ -83,8 +82,7 @@ async def put(
     await transfer_all_completions(
         resource.code,
         json_body["code"],
-        transfer_list_comps=is_list_mod,
-        transfer_explist_comps=is_explist_mod,
+        permissions=permissions,
     )
     asyncio.create_task(
         src.log.log_action("completion", "put", resource.code, json_body["code"], discord_profile["id"])

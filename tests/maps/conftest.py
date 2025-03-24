@@ -4,11 +4,11 @@ import requests
 
 @pytest.fixture
 def map_submission_payload():
-    def generate(code: str, notes: str = None, for_list: int = 0, proposed: int = 0) -> dict:
+    def generate(code: str, notes: str = None, format: int = 1, proposed: int = 0) -> dict:
         return {
             "code": code,
             "notes": notes,
-            "type": "list" if for_list == 0 else "experts",
+            "format": format,
             "proposed": proposed,
         }
     return generate

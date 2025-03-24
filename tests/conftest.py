@@ -79,43 +79,58 @@ async def set_roles():
         if isinstance(uid, str):
             uid = int(uid)
 
-        await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
-        await conn.executemany(
-            """
-            INSERT INTO user_roles
-                (user_id, role_id)
-            VALUES
-                ($1, $2)
-            """,
-            [(uid, role) for role in roles],
-        )
+        async with conn.transaction():
+            await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
+            await conn.execute(
+                """
+                INSERT INTO user_roles
+                    (user_id, role_id)
+                SELECT
+                    $1, r.id
+                FROM users u
+                CROSS JOIN (SELECT UNNEST($2::int[])) r(id)
+                WHERE u.discord_id = $1
+                """,
+                uid, roles,
+            )
 
     return fixture
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def mock_auth(mock_discord_api, set_roles):
+    CAN_SUBMIT_ROLE_ID = 8
+
     @src.db.connection.postgres
     async def reset_roles(conn=None) -> None:
-        await conn.execute("DELETE FROM user_roles")
+        await conn.execute(
+            f"""
+            DELETE FROM user_roles
+            ;
+            INSERT INTO user_roles
+                (user_id, role_id)
+            SELECT
+                discord_id, {CAN_SUBMIT_ROLE_ID}
+            FROM users
+            ;
+            """
+        )
 
     async def set_mock(**kwargs) -> None:
         mocker = mock_discord_api(**kwargs)
-        if "perms" not in kwargs:
-            return
+        mocked_perms = kwargs.get("perms", 0)
         perms = {
             DiscordPermRoles.ADMIN: [4, 5],
             DiscordPermRoles.MAPLIST_MOD: [4],
             DiscordPermRoles.EXPLIST_MOD: [5],
             DiscordPermRoles.NEEDS_RECORDING: [6],
-            DiscordPermRoles.BANNED: [7],
             DiscordPermRoles.MAPLIST_OWNER: [2],
             DiscordPermRoles.EXPLIST_OWNER: [3],
         }
 
-        roles = []
+        roles = [] if mocked_perms & DiscordPermRoles.BANNED else [CAN_SUBMIT_ROLE_ID]
         for perm in perms:
-            if perm & kwargs["perms"]:
+            if perm & mocked_perms:
                 roles += perms[perm]
         await set_roles(mocker.user_id, list(set(roles)))
 

@@ -24,7 +24,7 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
-            "roles": [],
+            "roles": [{"id": 8, "name": "Can Submit"}],
             "achievement_roles": [],
             **profile_overrides,
         }
@@ -42,14 +42,8 @@ class TestGetUsers:
         USER_ID = 33
         await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
         roles = [
-            {
-                "id": 6,
-                "name": "Requires Recordings",
-                "edit_maplist": False,
-                "edit_experts": False,
-                "requires_recording": True,
-                "cannot_submit": False,
-            },
+            {"id": 6, "name": "Requires Recordings"},
+            {"id": 8, "name": "Can Submit"},
         ]
         await validate_user(USER_ID, profile_overrides={
             "roles": roles,

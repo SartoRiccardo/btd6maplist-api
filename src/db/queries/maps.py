@@ -852,12 +852,10 @@ async def delete_map(
         code: str,
         *,
         map_current: PartialMap | None = None,
-        modify_diff: bool = False,
-        modify_pos: bool = False,
-        modify_botb: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         conn=None
 ) -> None:
-    if not (modify_diff or modify_pos or modify_botb):
+    if not permissions.has_any_perms():
         return
 
     if not map_current:
@@ -870,18 +868,25 @@ async def delete_map(
             map_current.difficulty,
             map_current.botb_difficulty,
         ]
-        if modify_pos:
+
+        new_cur_pos = None
+        new_all_pos = None
+        if permissions.has("delete:map", 1):
+            new_cur_pos = (map_current.placement_cur, None)
+        if permissions.has("delete:map", 2):
+            new_all_pos = (map_current.placement_all, None)
+        if new_cur_pos is not None and new_all_pos is not None:
             await update_list_placements(
-                cur_positions=(map_current.placement_cur, None),
-                all_positions=(map_current.placement_all, None),
+                cur_positions=new_cur_pos,
+                all_positions=new_all_pos,
                 ignore_code=code,
                 conn=conn,
             )
             indexes[0] = None
             indexes[1] = None
-        if modify_diff:
+        if permissions.has("delete:map", 51):
             indexes[2] = None
-        if modify_botb:
+        if permissions.has("delete:map", 52):
             indexes[3] = None
 
         meta_id = await conn.fetchval(

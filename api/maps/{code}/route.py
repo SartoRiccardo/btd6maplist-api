@@ -41,13 +41,12 @@ async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         discord_profile: dict = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ):
     """
     ---
-    description: Edit a map. Must be a Maplist or Expert List Moderator.
+    description: Edit a map. Must have edit:map perms.
     tags:
     - Maps
     parameters:
@@ -91,14 +90,15 @@ async def put(
         return json_body
 
     json_body["code"] = resource.code
-    if not is_explist_mod:
-        if "difficulty" in json_body:
-            del json_body["difficulty"]
-    if not is_maplist_mod:
-        if "placement_allver" in json_body:
-            del json_body["placement_allver"]
+    if not permissions.has("edit:map", 1):
         if "placement_curver" in json_body:
             del json_body["placement_curver"]
+    if not permissions.has("edit:map", 2):
+        if "placement_allver" in json_body:
+            del json_body["placement_allver"]
+    if not permissions.has("edit:map", 51):
+        if "difficulty" in json_body:
+            del json_body["difficulty"]
 
     await edit_map(json_body, resource)
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, discord_profile["id"]))
@@ -113,14 +113,13 @@ async def delete(
         _r: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ):
     """
     ---
     description: |
-      Soft deletes a map. Must be a Maplist or Expert List Moderator.
+      Soft deletes a map. Must have delete:map.
       Deleted maps and all their data are kept in the database, but ignored.
     tags:
     - Maps
@@ -143,7 +142,7 @@ async def delete(
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
     if not resource.deleted_on:
-        await delete_map(resource.code, map_current=resource, modify_diff=is_explist_mod, modify_pos=is_maplist_mod)
+        await delete_map(resource.code, map_current=resource, permissions=permissions)
         asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
