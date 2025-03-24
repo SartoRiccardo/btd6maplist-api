@@ -26,6 +26,7 @@ async def get_completion_request(
             permissions,
             data["format"],
             resource.format if resource else None,
+            action="edit" if resource else "create",
         )
         if isinstance(err_resp, web.Response):
             return err_resp

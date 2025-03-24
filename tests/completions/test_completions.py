@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from .CompletionTest import CompletionTest
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -69,14 +69,15 @@ async def test_add(btd6ml_test_client, mock_auth, completion_payload):
         "subm_notes": None,
     }
 
-    await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
+    await mock_auth(perms={51: {Permissions.create.completion}})
     async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_comp_data) as resp:
         assert resp.status == http.HTTPStatus.FORBIDDEN, \
-            f"Trying to add a Maplist-format completion as an Expert mod returns {resp.status}"
-    await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD | DiscordPermRoles.MAPLIST_MOD)
+            f"Adding a completion without having create:completion in that format returns {resp.status}"
+
+    await mock_auth(perms={51: {Permissions.create.completion}, 1: {Permissions.create.completion}})
     async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_comp_data) as resp:
         assert resp.status == http.HTTPStatus.CREATED, \
-            f"Trying to add a Maplist-format completion as an Admin returns {resp.status}"
+            f"Adding a a completion while having create:completion in that format returns {resp.status}"
         async with btd6ml_test_client.get(resp.headers["Location"]) as resp_get:
             resp_data = await resp_get.json()
             expected_value["created_on"] = resp_data["created_on"]
@@ -88,19 +89,15 @@ async def test_add(btd6ml_test_client, mock_auth, completion_payload):
     expected_value["format"] = 51
     expected_value["current_lcc"] = True  # There are no format 51 LCCs
 
-    await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
-    async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_comp_data) as resp:
-        assert resp.status == http.HTTPStatus.FORBIDDEN, \
-            f"Trying to add an Experts-format completion as a Maplist mod returns {resp.status}"
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
-    async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_comp_data) as resp:
+    await mock_auth(perms={None: {Permissions.create.completion}})
+    async with btd6ml_test_client.post("/maps/MLXXXAA/completions", headers=HEADERS, json=req_comp_data) as resp, \
+            btd6ml_test_client.get(resp.headers["Location"]) as resp_get:
         assert resp.status == http.HTTPStatus.CREATED, \
-            f"Trying to add a Maplist-format completion as an Admin returns {resp.status}"
-        async with btd6ml_test_client.get(resp.headers["Location"]) as resp_get:
-            resp_data = await resp_get.json()
-            expected_value["created_on"] = resp_data["created_on"]
-            expected_value["id"] = resp_data["id"]
-            assert expected_value == resp_data
+            f"Adding a completion with create:completion on all formats returns {resp.status}"
+        resp_data = await resp_get.json()
+        expected_value["created_on"] = resp_data["created_on"]
+        expected_value["id"] = resp_data["id"]
+        assert expected_value == resp_data
 
 
 @pytest.mark.completions
@@ -110,7 +107,7 @@ class TestValidateCompletions(CompletionTest):
     async def test_invalid_fields(self, btd6ml_test_client, mock_auth, completion_payload,
                                   assert_state_unchanged):
         """Test adding and editing a completion with invalid fields in the payload"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.verifier()})
         req_completion_data = completion_payload()
 
         async def call_endpoints(
@@ -200,20 +197,9 @@ class TestValidateCompletions(CompletionTest):
             assert_state_unchanged,
             btd6ml_test_client,
             completion_payload,
-            DiscordPermRoles.MAPLIST_MOD,
             endpoint_put="/completions/10",
             endpoint_del="/completions/10",
             endpoint_get="/completions/10",
-        )
-        await self._test_scoped_edit_perms(
-                mock_auth,
-                assert_state_unchanged,
-                btd6ml_test_client,
-                completion_payload,
-                DiscordPermRoles.EXPLIST_MOD,
-                endpoint_put="/completions/17",
-                endpoint_del="/completions/17",
-                endpoint_get="/completions/17",
         )
 
 
@@ -247,7 +233,7 @@ class TestEditCompletion:
             "subm_notes": None,
         }
 
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms={1: {Permissions.edit.completion}})
         async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_data) as resp, \
                 btd6ml_test_client.get("/completions/1") as resp_get:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
@@ -258,7 +244,7 @@ class TestEditCompletion:
     @pytest.mark.delete
     async def test_delete(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test editing a completion, more than once"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.delete.completion}})
         async with btd6ml_test_client.delete("/completions/17", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a completion returns {resp.status}"

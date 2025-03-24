@@ -6,13 +6,13 @@ from itertools import chain
 
 
 class DiscordPermRoles:
-    ADMIN = 2 ** 0
-    MAPLIST_MOD = 2 ** 1
-    EXPLIST_MOD = 2 ** 2
-    BANNED = 2 ** 3
-    NEEDS_RECORDING = 2 ** 4
-    MAPLIST_OWNER = 2 ** 5
-    EXPLIST_OWNER = 2 ** 6
+    ADMIN = 1
+    TECHNICIAN = 1
+    MAPLIST_MOD = 4
+    EXPLIST_MOD = 5
+    MAPLIST_OWNER = 2
+    EXPLIST_OWNER = 3
+    REQUIRES_RECORDING = 6
 
 
 class DiscordRequestMock:

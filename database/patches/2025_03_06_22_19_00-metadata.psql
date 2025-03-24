@@ -245,6 +245,12 @@ SELECT
     r.id, NULL, 'require:completion_submission:recording'
 FROM roles r
 WHERE r.requires_recording
+
+UNION ALL
+SELECT
+    r.id, NULL, 'create:user'
+FROM roles r
+WHERE r.edit_experts OR r.edit_maplist
 ;
 
 WITH inserted_roles AS (
@@ -313,10 +319,12 @@ _perms AS (
             ('Curator', 'create:map'),
             ('Curator', 'edit:map'),
             ('Curator', 'delete:map'),
+            ('Curator', 'create:user'),
             ('Verifier', 'edit:config'),
             ('Verifier', 'create:completion'),
             ('Verifier', 'edit:completion'),
-            ('Verifier', 'delete:completion')
+            ('Verifier', 'delete:completion'),
+            ('Verifier', 'create:user')
     ) as p(name, perm)
         ON r.name LIKE ('%' || p.name)
         OR r.name LIKE '%Owner'
@@ -353,6 +361,7 @@ VALUES
     (1, NULL, 'edit:completion'),
     (1, NULL, 'delete:completion'),
     (1, NULL, 'create:map_submission'),
+    (1, NULL, 'create:user'),
     (1, NULL, 'create:completion_submission')
 ;
 

@@ -29,6 +29,7 @@ async def delete(
     err_resp = validate_completion_perms(
         permissions,
         resource.format,
+        action="delete",
     )
     if isinstance(err_resp, web.Response):
         return err_resp

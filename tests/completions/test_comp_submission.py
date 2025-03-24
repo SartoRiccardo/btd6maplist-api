@@ -1,6 +1,6 @@
 import pytest
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata, fuzz_data, invalidate_field, remove_fields
 from .CompletionTest import CompletionTest
 import config
@@ -200,7 +200,7 @@ class TestValidateCompletion:
                 assert "leftover" in error_info["errors"], \
                     "leftover is not in errors"
 
-            await mock_auth(perms=DiscordPermRoles.NEEDS_RECORDING)
+            await mock_auth(perms={None: Permissions.requires_recording()})
             req_submission = comp_subm_payload()
             req_form = to_formdata(req_submission)
             req_form.add_field("proof_completion", proof_file.open("rb"))
@@ -278,7 +278,7 @@ class TestValidateCompletion:
     async def test_forbidden(self, assert_state_unchanged, mock_auth, btd6ml_test_client):
         """Test a submission from a user banned from submitting"""
         async with assert_state_unchanged("/completions/unapproved"):
-            await mock_auth(perms=DiscordPermRoles.BANNED)
+            await mock_auth(perms={})
             async with btd6ml_test_client.post("/maps/MLXXXAA/completions/submit") as resp:
                 assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                     f"Submitting a completion with no Authorization header returns {resp.status}"
@@ -402,7 +402,7 @@ class TestHandleSubmissions(CompletionTest):
     async def test_accept_submission(self, btd6ml_test_client, mock_auth, completion_payload,
                                      assert_state_unchanged):
         """Test accepting (and editing) a submission"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.completion}})
 
         expected_value = {
             "id": 16,
@@ -445,7 +445,7 @@ class TestHandleSubmissions(CompletionTest):
     async def test_invalid_fields(self, btd6ml_test_client, mock_auth, completion_payload,
                                   assert_state_unchanged):
         """Test adding and editing a completion with invalid fields in the payload"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {Permissions.edit.completion}})
         req_completion_data = completion_payload()
 
         async def call_endpoints(
@@ -517,30 +517,20 @@ class TestHandleSubmissions(CompletionTest):
     @pytest.mark.put
     async def test_scoped_edit_perms(self, btd6ml_test_client, mock_auth, assert_state_unchanged,
                                      completion_payload):
-        """Test Maplist Mods accepting Expert List completions, and vice versa"""
+        """Test users with *:completion perms on a different format accepting a submission they don't have them on."""
         await self._test_scoped_edit_perms(
             mock_auth,
             assert_state_unchanged,
             btd6ml_test_client,
             completion_payload,
-            DiscordPermRoles.MAPLIST_MOD,
             endpoint_put="/completions/11/accept",
             endpoint_get="/completions/11",
-        )
-        await self._test_scoped_edit_perms(
-            mock_auth,
-            assert_state_unchanged,
-            btd6ml_test_client,
-            completion_payload,
-            DiscordPermRoles.EXPLIST_MOD,
-            endpoint_put="/completions/4/accept",
-            endpoint_get="/completions/4",
         )
 
     @pytest.mark.delete
     async def test_reject_submission(self, btd6ml_test_client, mock_auth):
         """Test rejecting a completion submission hard deletes it"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={51: {Permissions.delete.completion}})
         async with btd6ml_test_client.delete("/completions/29", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a completion returns {resp.status}"

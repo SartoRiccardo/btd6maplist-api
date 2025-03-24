@@ -7,11 +7,11 @@ HEADERS = {"Authorization": "Bearer test_token"}
 
 @pytest.mark.users
 class TestAuth:
-    async def test_get_self(self, btd6ml_test_client, mock_auth, calc_user_profile_medals,
-                            calc_usr_placements):
+    async def test_get_self(self, btd6ml_test_client, mock_auth, calc_user_profile_medals, add_role):
         """Test getting one's own profile"""
         USER_ID = 37
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(user_id=USER_ID)
+        await add_role(USER_ID, DiscordPermRoles.MAPLIST_MOD)
 
         expected_created_map_ids = ["MLXXXAG", "MLXXXCJ"]
         expected_created_maps = []
@@ -65,7 +65,8 @@ class TestAuth:
                     "format": None,
                     "permissions": {
                         "create:map_submission",
-                        "create:completion_submission"
+                        "create:completion_submission",
+                        "create:user",
                     },
                 },
             ],

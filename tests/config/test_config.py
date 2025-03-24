@@ -1,7 +1,7 @@
 import pytest
 import http
 from ..testutils import fuzz_data
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 
 HEADERS = {"Authorization": "Bearer test_token"}
 START_CONFIG = {
@@ -66,29 +66,26 @@ async def test_get_config(btd6ml_test_client):
 @pytest.mark.put
 async def test_edit_config(btd6ml_test_client, mock_auth, assert_state_unchanged):
     """Test successfully editing config variable"""
-    async def assert_edit_success(perms: int, config: dict):
-        mod_name = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
+    async def assert_edit_success(perms: dict[int, set[str]], config: dict):
         await mock_auth(perms=perms)
         req_data = {"config": {**START_CONFIG, **config}}
         async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Editing config returned {resp.status}"
             resp_data = await resp.json()
             assert "errors" in resp_data and len(resp_data["errors"]) == 0, \
-                f"Errors present in response when modifying config as {mod_name} Mod"
+                f"Errors present in response when modifying config with a correct payload"
             assert "data" in resp_data and config == resp_data["data"], \
-                f"Modified config vars as {mod_name} Mod differ from expected"
+                f"Modified config vars with perms {perms} differ from expected"
 
-    await assert_edit_success(DiscordPermRoles.MAPLIST_MOD, MAPLIST_CONFIG)
-    await assert_edit_success(DiscordPermRoles.EXPLIST_MOD, EXPLIST_CONFIG)
+    await assert_edit_success({1: {Permissions.edit.config}}, MAPLIST_CONFIG)
+    await assert_edit_success({51: {Permissions.edit.config}}, EXPLIST_CONFIG)
 
 
 @pytest.mark.put
 class TestValidate:
     async def test_edit_config_fail(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test config variables are correctly gated by their perms"""
-        async def assert_edit_fail(perms: int, config: dict):
-            mod_name = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
-            vars_name = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
+        async def assert_edit_fail(perms: dict[int, set[str]], config: dict):
             await mock_auth(perms=perms)
             req_data = {"config": config}
             async with assert_state_unchanged("/config"):
@@ -96,9 +93,9 @@ class TestValidate:
                     assert resp.status == http.HTTPStatus.OK, f"Editing config returned {resp.status}"
                     resp_data = await resp.json()
                     assert "errors" in resp_data and len(resp_data["errors"]) == 0, \
-                        f"Errors present in response when modifying {vars_name} config vars as {mod_name} Mod"
+                        f"Errors present in response when modifying config vars with a correct payload but no perms"
                     assert "data" in resp_data and len(resp_data["data"]) == 0, \
-                        f"Some config vars were returned as {mod_name} Mod editing {vars_name} config vars"
+                        f"Some config vars were returned as perms {perms}"
 
         explist_only = {
             key: EXPLIST_CONFIG[key]
@@ -110,13 +107,13 @@ class TestValidate:
             for key in MAPLIST_CONFIG
             if key not in EXPLIST_CONFIG
         }
-        await assert_edit_fail(DiscordPermRoles.MAPLIST_MOD, explist_only)
-        await assert_edit_fail(DiscordPermRoles.EXPLIST_MOD, maplist_only)
+        await assert_edit_fail({1: {Permissions.edit.config}}, explist_only)
+        await assert_edit_fail({51: {Permissions.edit.config}}, maplist_only)
 
     async def test_extra_fields(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test adding random config var names in the payload"""
         req_data = {"config": {"nonexistent": 3}}
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {Permissions.edit.config}})
         async with assert_state_unchanged("/config"):
             async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:
                 assert resp.status == http.HTTPStatus.BAD_REQUEST, \
@@ -129,7 +126,7 @@ class TestValidate:
 
     async def test_fuzz(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test setting fields to a different datatype, one by one"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {Permissions.edit.config}})
         for req_data, path, dtype in fuzz_data({"config": START_CONFIG}, int_as_float=True):
             async with assert_state_unchanged("/config"):
                 async with btd6ml_test_client.put("/config", headers=HEADERS, json=req_data) as resp:

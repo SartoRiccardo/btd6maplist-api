@@ -2,7 +2,7 @@ import asyncio
 import validators
 from aiohttp import web
 import http
-from typing import Type, Any, get_args
+from typing import Type, Any, get_args, Literal
 import re
 import src.utils.routedecos
 import src.http
@@ -383,8 +383,9 @@ def validate_completion_perms(
         permissions: "src.db.models.Permissions",
         new_format: int,
         old_format: int | None = None,
+        action: Literal["edit", "create", "delete"] = "create",
 ) -> web.Response | None:
-    req_perm = "edit:completion" if old_format else "create:completion"
+    req_perm = f"{action}:completion"
 
     if not permissions.has(req_perm, new_format):
         return web.json_response(

@@ -1,7 +1,7 @@
 import pytest
 import http
 import src.utils.misc
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata
 
 HEADERS = {"Authorization": "Bearer test_client"}
@@ -209,7 +209,7 @@ class TestLeaderboard:
 class TestRecalc:
     async def test_config_recalc(self, btd6ml_test_client, mock_auth):
         """Test the point leaderboards are updated on config var changes"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         req_config = {
             "exp_points_casual": 10,
@@ -277,7 +277,7 @@ class TestRecalc:
     async def test_placement_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the maplist point leaderboard is updated on placement changes"""
         USER_ID = 47
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         async with btd6ml_test_client.get("/maps/1") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Getting a map returned {resp.status}"
@@ -295,7 +295,7 @@ class TestRecalc:
     async def test_diff_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the experts point leaderboard is updated on placement changes"""
         USER_ID = 1
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         async with btd6ml_test_client.get(f"/users/{USER_ID}/completions") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Get a user's completions returned {resp.status}"

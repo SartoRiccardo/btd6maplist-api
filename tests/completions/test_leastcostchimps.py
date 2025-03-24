@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -52,18 +52,18 @@ class TestAddLCC:
         Test adding an LCC with the correct payload, once with a suboptimal LCC and once with an optimal one
         """
         proof_completion = save_image(1)
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.create.completion}})
 
         req_comp_data = completion_payload()
         req_form = to_formdata(req_comp_data)
         req_form.add_field("submission_proof", proof_completion.open("rb"))
-        async with btd6ml_test_client.post("/maps/MLXXXBB/completions", headers=HEADERS, json=req_comp_data) as resp:
+        async with btd6ml_test_client.post("/maps/MLXXXBB/completions", headers=HEADERS, json=req_comp_data) as resp, \
+                btd6ml_test_client.get(resp.headers["Location"]) as resp_get:
             assert resp.status == http.HTTPStatus.CREATED, \
                 f"Adding a completion with a correct payload returns {resp.status}"
-            async with btd6ml_test_client.get(resp.headers["Location"]) as resp_get:
-                comp_data = await resp_get.json()
-                assert not comp_data["current_lcc"], \
-                    "Current LCC is true even if the leftover is lower than others'"
+            comp_data = await resp_get.json()
+            assert not comp_data["current_lcc"], \
+                "Current LCC is true even if the leftover is lower than others'"
 
         req_comp_data["lcc"]["leftover"] = 1_000_000_000
         req_form = to_formdata(req_comp_data)
@@ -79,7 +79,7 @@ class TestAddLCC:
     @pytest.mark.put
     async def test_edit(self, btd6ml_test_client, mock_auth, completion_payload):
         """Test editing an LCC with a correct payload and seeing the flag update"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.completion}})
 
         req_comp_data = completion_payload()
         async with btd6ml_test_client.put("/completions/1", headers=HEADERS, json=req_comp_data) as resp:
@@ -104,7 +104,7 @@ class TestAddLCC:
         """
         Test setting a completion's LCC to null
         """
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {Permissions.edit.completion}})
 
         async with btd6ml_test_client.get("/maps/MLXXXCD") as resp:
             lcc_id = (await resp.json())["lccs"][0]["id"]
@@ -127,7 +127,7 @@ class TestAddLCC:
         LCC_SUBOPT = 374
         LCC_OPT = 372
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.completion}})
 
         async with assert_state_unchanged("/maps/MLXXXEE"):
             req_comp_data = completion_payload()

@@ -1,28 +1,48 @@
 
 
 class Permissions:
+    class edit:
+        config = "edit:config"
+        map = "edit:map"
+        completion = "edit:completion"
+        achievement_roles = "edit:achievement_roles"
+
+    class delete:
+        map = "delete:map"
+        completion = "delete:completion"
+        map_submission = "delete:map_submission"
+
+    class create:
+        map = "create:map"
+        user = "create:user"
+        completion = "create:completion"
+        map_submission = "create:map_submission"
+        completion_submission = "create:completion_submission"
+
     @staticmethod
     def basic() -> set[str]:
         return {
-            "create:map_submission",
-            "create:completion_submission",
+            Permissions.create.map_submission,
+            Permissions.create.completion_submission,
         }
 
     @staticmethod
     def verifier() -> set[str]:
         return Permissions.basic().union({
-            "edit:config",
-            "create:completion",
-            "edit:completion",
-            "delete:completion",
+            Permissions.create.user,
+            Permissions.edit.config,
+            Permissions.create.completion,
+            Permissions.edit.completion,
+            Permissions.delete.completion,
         })
 
     @staticmethod
     def curator() -> set[str]:
         return Permissions.basic().union({
-            "create:map",
-            "edit:map",
-            "delete:map",
+            Permissions.create.user,
+            Permissions.create.map,
+            Permissions.edit.map,
+            Permissions.delete.map,
         })
 
     @staticmethod
@@ -31,4 +51,6 @@ class Permissions:
 
     @staticmethod
     def requires_recording() -> set[str]:
-        return {"require:completion_submission:recording"}
+        return Permissions.basic().union({
+            "require:completion_submission:recording"
+        })

@@ -4,7 +4,7 @@ import pytest
 import pytest_asyncio
 import json
 from ..testutils import fuzz_data
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 
 HEADERS = {"Authorization": "Bearer test_token"}
 
@@ -112,7 +112,7 @@ class TestSubmit:
                                      valid_codes):
         """Test rejecting a map submission"""
         USER_ID = 20
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
+        await mock_auth(user_id=USER_ID, perms={1: {Permissions.delete.map_submission}})
         req_data = bot_user_payload(USER_ID)
         signature = sign_message(valid_codes[self.CODE_IDX] + json.dumps(req_data))
         req_data = {
@@ -163,7 +163,7 @@ class TestPermissions:
     async def test_cannot_submit(self, valid_codes, mock_auth, save_image, submission_formdata, btd6ml_test_client,
                                  submission_payload):
         """Test submitting a map when they're banned from submitting"""
-        await mock_auth(user_id=20, perms=DiscordPermRoles.BANNED)
+        await mock_auth(user_id=20, perms={})
         data_str = json.dumps(submission_payload(valid_codes[6]))
         proof_comp = save_image(2)
         req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
@@ -200,26 +200,21 @@ class TestPermissions:
         signature = sign_message(maplist_code + json.dumps(req_data))
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
-        await mock_auth(user_id=user_id, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=user_id, perms={51: {Permissions.delete.map_submission}})
         async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Deleting a Maplist submission as an Expert mod returns {resp.status}"
+                f"Deleting a submission without delete:map_submission on that format returns {resp.status}"
 
-        await mock_auth(user_id=user_id, perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(user_id=user_id, perms={1: {Permissions.delete.map_submission}})
         async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Deleting a Maplist submission as a Maplist mod returns {resp.status}"
+                f"Deleting a submission with delete:map_submission on that format returns {resp.status}"
 
         req_data = bot_user_payload(user_id)
         signature = sign_message(experts_code + json.dumps(req_data))
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
-        await mock_auth(user_id=user_id, perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.delete(f"/maps/submit/{experts_code}/bot", json=req_data) as resp:
-            assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Deleting an Expert submission as a Maplist mod returns {resp.status}"
-
-        await mock_auth(user_id=user_id, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=user_id, perms={None: {Permissions.delete.map_submission}})
         async with btd6ml_test_client.delete(f"/maps/submit/{experts_code}/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Deleting an Expert submission as an Expert mod returns {resp.status}"
+                f"Deleting a submission with delete:map_submission on all formats returns {resp.status}"

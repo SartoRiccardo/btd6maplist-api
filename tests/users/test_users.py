@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import fuzz_data, remove_fields, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -40,9 +40,8 @@ class TestGetUsers:
     async def test_get_user(self, validate_user, mock_auth):
         """Test getting a user by ID"""
         USER_ID = 33
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        await mock_auth(user_id=USER_ID)
         roles = [
-            {"id": 6, "name": "Requires Recordings"},
             {"id": 8, "name": "Can Submit"},
         ]
         await validate_user(USER_ID, profile_overrides={
@@ -92,7 +91,7 @@ class TestAddUser:
         """Test adding a user with a valid payload"""
         USER_ID = 2000000
         USERNAME = "Test User 2M"
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_data = new_user_payload(USER_ID, USERNAME)
         async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_data) as resp:
@@ -102,7 +101,7 @@ class TestAddUser:
 
     async def test_add_invalid_user(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test adding an invalid user, with duplicate or invalid properties"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_user_data = new_user_payload(8888)
 
@@ -137,7 +136,7 @@ class TestAddUser:
         """Test adding a user with missing properties"""
         USER_ID = 2000001
         USERNAME = "Test User 2M1"
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_usr_data = new_user_payload(USER_ID, USERNAME)
         for req_data, path in remove_fields(req_usr_data):
@@ -149,9 +148,9 @@ class TestAddUser:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" is not in the returned errors"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_auth, new_user_payload, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test setting every field to a different data type, one by one"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {"create:user"}})
         req_usr_data = new_user_payload(2000001, "Test User 2M1")
 
         for req_data, path, sub_value in fuzz_data(req_usr_data):
@@ -270,7 +269,7 @@ class TestEditSelf:
     async def test_edit_invalid(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged,
                                 mock_ninja_kiwi_api):
         """Test editing one's own profile with missing or invalid fields"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth()
 
         req_usr_data = profile_payload("Cool Username")
 

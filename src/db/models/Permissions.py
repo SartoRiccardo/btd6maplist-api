@@ -26,6 +26,9 @@ class Permissions:
             "create:completion",
             "edit:completion",
             "delete:completion",
+            "delete:map_submission",
+            "edit:achievement_roles",
+            "create:user",
         ]
         return any(
             any(

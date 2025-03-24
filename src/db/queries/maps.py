@@ -11,6 +11,7 @@ from src.db.models import (
 )
 from src.db.queries.subqueries import get_int_config
 from src.utils.misc import list_rm_dupe
+from src.utils.formats import format_idxs
 postgres = src.db.connection.postgres
 
 
@@ -869,32 +870,30 @@ async def delete_map(
             map_current.botb_difficulty,
         ]
 
-        new_cur_pos = None
-        new_all_pos = None
-        if permissions.has("delete:map", 1):
-            new_cur_pos = (map_current.placement_curver, None)
-        if permissions.has("delete:map", 2):
-            new_all_pos = (map_current.placement_allver, None)
-        if new_cur_pos is not None and new_all_pos is not None:
+
+        indexes = []
+        for format_id in format_idxs:
+            if permissions.has("delete:map", format_id):
+                indexes.append(None)
+            else:
+                indexes.append(getattr(map_current, format_idxs[format_id].key))
+
+        if indexes[0] is indexes[1] is None:  # Hardcoded should get the indexes dynamically but w/e
             await update_list_placements(
-                cur_positions=new_cur_pos,
-                all_positions=new_all_pos,
+                cur_positions=(map_current.placement_curver, None),
+                all_positions=(map_current.placement_allver, None),
                 ignore_code=code,
                 conn=conn,
             )
-            indexes[0] = None
-            indexes[1] = None
-        if permissions.has("delete:map", 51):
-            indexes[2] = None
-        if permissions.has("delete:map", 52):
-            indexes[3] = None
 
+        fields_to_add = [format_idxs[fid].key for fid in format_idxs]
+        fields_to_add_num = [f"${idx+2}" for idx in range(len(fields_to_add))]
         meta_id = await conn.fetchval(
             f"""
             INSERT INTO map_list_meta
-                (placement_curver, placement_allver, difficulty, botb_difficulty, code, deleted_on, optimal_heros)
+                ({", ".join(fields_to_add)}, code, deleted_on, optimal_heros)
             SELECT
-                $2, $3, $4, $5, $1::varchar(10),
+                {", ".join(fields_to_add_num)}, $1::varchar(10),
                 {"CURRENT_TIMESTAMP" if all([x is None for x in indexes]) else "NULL"},
                 mlm.optimal_heros
             FROM map_list_meta mlm

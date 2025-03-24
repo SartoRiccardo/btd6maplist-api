@@ -4,7 +4,7 @@ import json
 import config
 import aiohttp
 from ..testutils import fuzz_data, invalidate_field
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ class TestHandleSubmissions:
         """Test rejecting a submission with an invalid or missing signature"""
         RUN_ID = 16
         USER_ID = 40
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
+        await mock_auth(user_id=USER_ID, perms={None: Permissions.mod()})
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
 
@@ -55,7 +55,7 @@ class TestHandleSubmissions:
         """Test rejecting a submission"""
         RUN_ID = 16
         USER_ID = 40
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
+        await mock_auth(user_id=USER_ID, perms={1: {Permissions.delete.completion}})
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -74,7 +74,7 @@ class TestHandleSubmissions:
         """Test rejecting a submission"""
         RUN_ID = 15
         USER_ID = 40
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.ADMIN)
+        await mock_auth(user_id=USER_ID, perms={51: {Permissions.delete.completion}})
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -110,7 +110,7 @@ class TestHandleSubmissions:
         """Test accepting a submission, more than once"""
         RUN_ID = 11
         USER_ID = 40
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={51: {Permissions.edit.completion}})
         data = bot_user_payload(USER_ID)
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
@@ -144,29 +144,24 @@ class TestHandleSubmissions:
         signature = sign_message(f"{run_id}{data_str}".encode())
         payload = {"data": data_str, "signature": signature}
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={51: {Permissions.edit.completion}})
         async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Accepting a Maplist completion as an Expert mod returns {resp.status}"
+                f"Accepting a completion without having edit:completion in that format returns {resp.status}"
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={1: {Permissions.edit.completion}})
         async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Accepting a Maplist completion as a Maplist mod returns {resp.status}"
+                f"Accepting a completion while having edit:completion in that format returns {resp.status}"
 
         run_id = 104
         signature = sign_message(f"{run_id}{data_str}".encode())
         payload = {"data": data_str, "signature": signature}
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
-            assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Accepting an Expert completion as a Maplist mod returns {resp.status}"
-
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={None: {Permissions.edit.completion}})
         async with btd6ml_test_client.put(f"/completions/{run_id}/accept/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Accepting an Expert completion as an Expert mod returns {resp.status}"
+                f"Accepting a completion while having edit:completion in all formats returns {resp.status}"
 
     @pytest.mark.put
     async def test_reject_perms(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message):
@@ -179,29 +174,24 @@ class TestHandleSubmissions:
         signature = sign_message(f"{run_id}{data_str}".encode())
         payload = {"data": data_str, "signature": signature}
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={51: {Permissions.delete.completion}})
         async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Rejecting a Maplist completion as an Expert mod returns {resp.status}"
+                f"Rejecting a completion without having edit:completion in that format returns {resp.status}"
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={1: {Permissions.delete.completion}})
         async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Rejecting a Maplist completion as a Maplist mod returns {resp.status}"
+                f"Rejecting a completion while having edit:completion in that format returns {resp.status}"
 
         run_id = 137
         signature = sign_message(f"{run_id}{data_str}".encode())
         payload = {"data": data_str, "signature": signature}
 
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
-            assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Rejecting an Expert completion as a Maplist mod returns {resp.status}"
-
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(user_id=USER_ID, perms={None: {Permissions.delete.completion}})
         async with btd6ml_test_client.delete(f"/completions/{run_id}/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Rejecting an Expert completion as an Expert mod returns {resp.status}"
+                f"Rejecting a completion while having edit:completion in all formats returns {resp.status}"
 
 
 @pytest.mark.bot
@@ -362,20 +352,20 @@ class TestSubmission:
         images = [(f"proof_completion[{i}]", save_image(i, f"img{i}.png")) for i in range(2)]
         
         req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
-        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.BANNED)
+        await mock_auth(user_id=SUBMITTER_ID, perms={})
         async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Submitting a completion as a banned user returns {resp.status}"
 
         req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
-        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        await mock_auth(user_id=SUBMITTER_ID, perms={None: Permissions.requires_recording()})
         async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
             assert resp.status == http.HTTPStatus.BAD_REQUEST, \
                 f"Submitting a completion as a requires recording user with no video proof returns {resp.status}"
 
         req_subm_data["video_proof_url"].append("https://youtu.be/something")
         req_form = submission_formdata(json.dumps(req_subm_data), images, pre_sign=self.MAP_CODE)
-        await mock_auth(user_id=SUBMITTER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        await mock_auth(user_id=SUBMITTER_ID, perms={None: Permissions.requires_recording()})
         async with btd6ml_test_client.post(f"/maps/{self.MAP_CODE}/completions/submit/bot", data=req_form) as resp:
             assert resp.status == http.HTTPStatus.CREATED, \
                 f"Submitting a completion as a requires recording user video proof returns {resp.status}"
