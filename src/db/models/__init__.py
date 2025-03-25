@@ -1,5 +1,6 @@
 import re
 import yaml
+from .Config import Config
 from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .users import User, PartialUser, MaplistProfile, MaplistMedals, MinimalUser
@@ -11,6 +12,7 @@ from .Format import Format
 from .Permissions import Permissions
 
 entities = [
+    Config,
     Map,
     PartialMap,
     MinimalUser,

@@ -20,7 +20,10 @@ async def get(_r: web.Request):
             schema:
               type: object
     """
-    return web.json_response(await get_config())
+    config = await get_config()
+    return web.json_response({
+        key: config[key].to_dict() for key in config
+    })
 
 
 async def put_validate(body: dict) -> dict:
@@ -37,7 +40,7 @@ async def put_validate(body: dict) -> dict:
             return {key: "Invalid key"}
 
     for key in body["config"]:
-        vtype = type(config[key])
+        vtype = type(config[key].value)
         try:
             body["config"][key] = vtype(body["config"][key])
         except (ValueError, TypeError):
@@ -59,8 +62,8 @@ async def put(
     """
     ---
     description: |
-      Change any number of the config variables. Certain roles have access to change different variables.
-      Must be a Maplist or Expert List Moderator. Changes to variables you don't have access to will be ignored.
+      Change any number of config variables. Must have edit:config on the variables you're editing.
+      Changes to variables you don't have access to will be ignored.
     tags:
     - Config
     requestBody:

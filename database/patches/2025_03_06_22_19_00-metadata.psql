@@ -421,3 +421,45 @@ VALUES
     ('exp_bb_multi', 51),
     ('exp_lcc_extra', 51)
 ;
+
+CREATE TEMP TABLE config_descriptions (
+    config_name VARCHAR(255),
+    config_description VARCHAR(255)
+) ON COMMIT DROP
+;
+
+INSERT INTO config_descriptions
+    (config_name, config_description)
+VALUES
+     ('points_top_map', 'Points for the #1 map'),
+     ('points_bottom_map', 'Points for the last map'),
+     ('formula_slope', 'Formula slope'),
+     ('points_extra_lcc', 'Extra points for LCCs'),
+     ('points_multi_gerry', 'No Optimal Hero point multiplier'),
+     ('points_multi_bb', 'Black Border point multiplier'),
+     ('decimal_digits', 'Decimal digits to round to'),
+     ('map_count', 'Number of maps on the list'),
+     ('current_btd6_ver', 'Current BTD6 version'),
+     ('exp_points_casual', 'Casual Exp completion points'),
+     ('exp_nogerry_points_casual', 'Casual Exp extra'),
+     ('exp_points_medium', 'Medium Exp completion points'),
+     ('exp_nogerry_points_medium', 'Medium Exp extra'),
+     ('exp_points_high', 'High Exp completion points'),
+     ('exp_nogerry_points_high', 'High Exp extra'),
+     ('exp_points_true', 'True Exp completion points'),
+     ('exp_nogerry_points_true', 'True Exp extra'),
+     ('exp_points_extreme', 'Extreme Exp completion points'),
+     ('exp_nogerry_points_extreme', 'Extreme Exp extra'),
+     ('exp_bb_multi', 'Base points multiplier'),
+     ('exp_lcc_extra', 'Extra points')
+;
+
+ALTER TABLE config
+    ADD COLUMN description VARCHAR(255)
+;
+
+UPDATE config c
+SET description = cd.config_description
+FROM config_descriptions cd
+WHERE c.name = cd.config_name
+;

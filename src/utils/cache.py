@@ -10,7 +10,7 @@ def cache_for(seconds: int):
         async def wrapper(*args, **kwargs):
             # TODO also put kwargs in the key but for now I dont need it
             now = datetime.now()
-            if args not in cache[args] or cache[args][1] < now:
+            if args not in cache or cache[args][1] < now:
                 cache[args] = (await func(*args, **kwargs), now + timedelta(seconds=seconds))
             return cache[args][0]
         return wrapper

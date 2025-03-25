@@ -56,14 +56,6 @@ async def post(
             status=http.HTTPStatus.BAD_REQUEST,
         )
 
-    maplist_cfg = await get_config()
-    if resource.difficulty is None and \
-            resource.placement_curver not in range(1, maplist_cfg["map_count"] + 1):
-        return web.json_response(
-            {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
-
     discord_profile = json_data["user"]
     proofs_finfo = await asyncio.gather(*[
         save_image(file[1], file[0].split(".")[-1])

@@ -27,34 +27,34 @@ async def calc_ml_user_points(user_id: int, btd6ml_test_client) -> int:
             bonuses_applied = {"ger": False, "bb": False, "lcc": False}
             points += raw_pts * multiplier
             multiplier = 1
-            if compl["map"]["placement_curver"] in range(1, config["map_count"]+1):
+            if compl["map"]["placement_curver"] in range(1, config["map_count"]["value"]+1):
                 raw_pts = src.utils.misc.point_formula(
                     compl["map"]["placement_curver"],
-                    config["points_bottom_map"],
-                    config["points_top_map"],
-                    config["map_count"],
-                    config["formula_slope"],
+                    config["points_bottom_map"]["value"],
+                    config["points_top_map"]["value"],
+                    config["map_count"]["value"],
+                    config["formula_slope"]["value"],
                 )
-                raw_pts = round(raw_pts, config["decimal_digits"])
+                raw_pts = round(raw_pts, config["decimal_digits"]["value"])
             else:
                 raw_pts = 0
         if compl["current_lcc"] and not bonuses_applied["lcc"]:
-            points += config["points_extra_lcc"]
+            points += config["points_extra_lcc"]["value"]
             bonuses_applied["lcc"] = True
 
         if compl["no_geraldo"] and compl["black_border"]:
-            multiplier = config["points_multi_bb"] * config["points_multi_gerry"]
+            multiplier = config["points_multi_bb"]["value"] * config["points_multi_gerry"]["value"]
             bonuses_applied["ger"] = True
             bonuses_applied["bb"] = True
         elif compl["black_border"] and not bonuses_applied["bb"]:
             if bonuses_applied["ger"]:
-                multiplier += config["points_multi_bb"]
-            multiplier = config["points_multi_bb"]
+                multiplier += config["points_multi_bb"]["value"]
+            multiplier = config["points_multi_bb"]["value"]
             bonuses_applied["bb"] = True
         elif compl["no_geraldo"] and not bonuses_applied["ger"]:
             if bonuses_applied["bb"]:
-                multiplier += config["points_multi_gerry"]
-            multiplier = config["points_multi_gerry"]
+                multiplier += config["points_multi_gerry"]["value"]
+            multiplier = config["points_multi_gerry"]["value"]
             bonuses_applied["ger"] = True
     points += raw_pts * multiplier
 
@@ -82,16 +82,16 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
             continue
         if i == 0 or comp["map"]["code"] != user_comps[i - 1]["map"]["code"]:
             used_multis = {"no_gerry": False, "lcc": False, "bb": False}
-            points += config[config_keys[comp["map"]["difficulty"]]]
+            points += config[config_keys[comp["map"]["difficulty"]]]["value"]
             if comp["no_geraldo"] and not used_multis["no_gerry"]:
                 used_multis["no_gerry"] = True
-                points += config[config_keys_nogerry[comp["map"]["difficulty"]]]
+                points += config[config_keys_nogerry[comp["map"]["difficulty"]]]["value"]
             if comp["black_border"] and not used_multis["bb"]:
                 used_multis["bb"] = True
-                points += config[config_keys[comp["map"]["difficulty"]]] * (config["exp_bb_multi"]-1)
+                points += config[config_keys[comp["map"]["difficulty"]]]["value"] * (config["exp_bb_multi"]["value"]-1)
             if comp["current_lcc"] and not used_multis["lcc"]:
                 used_multis["lcc"] = True
-                points += config["exp_lcc_extra"]
+                points += config["exp_lcc_extra"]["value"]
     return points
 
 

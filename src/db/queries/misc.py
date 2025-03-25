@@ -1,13 +1,15 @@
 import asyncio
 from typing import Any
 import src.db.connection
+from src.db.models import Config
 postgres = src.db.connection.postgres
 
 
-ConfigVars = dict[str, int | float | str]
+ConfigVarsDict = dict[str, int | float | str]
+ConfigVars = dict[str, Config]
 
 
-def typecast_config(payload: list[tuple[str, str, str]]) -> ConfigVars:
+def typecast_config_tuples(payload: list[tuple[str, str, str]]) -> ConfigVarsDict:
     config = {}
     for name, value, type in payload:
         try:
@@ -22,14 +24,35 @@ def typecast_config(payload: list[tuple[str, str, str]]) -> ConfigVars:
     return config
 
 
+def typecast_config(config_vars: ConfigVars) -> ConfigVars:
+    for var_name in config_vars:
+        try:
+            if config_vars[var_name].type.lower() == "int":
+                config_vars[var_name].value = int(config_vars[var_name].value)
+            elif config_vars[var_name].type.lower() == "float":
+                config_vars[var_name].value = float(config_vars[var_name].value)
+        except ValueError:
+            pass
+    return config_vars
+
+
 @postgres
 async def get_config(conn: "asyncpg.pool.PoolConnectionProxy" = None) -> ConfigVars:
-    payload = await conn.fetch("""
-        SELECT name, value, type
-        FROM config
-    """)
+    payload = await conn.fetch(
+        """
+        SELECT DISTINCT ON (c.name)
+            c.name, c.value, c.type, c.description,
+            ARRAY_AGG(cf.format_id) OVER (PARTITION BY c.name) AS formats
+        FROM config c
+        JOIN config_formats cf
+            ON c.name = cf.config_name
+        """
+    )
 
-    return typecast_config(payload)
+    return typecast_config({
+        row["name"]: Config(row["value"], row["formats"], row["type"], row["description"])
+        for row in payload
+    })
 
 
 @postgres
@@ -77,4 +100,4 @@ async def update_config(
             *args
         )
 
-        return typecast_config(payload)
+        return typecast_config_tuples(payload)

@@ -104,14 +104,6 @@ async def post(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    maplist_cfg = await get_config()
-    if resource.difficulty is None and \
-            resource.placement_curver not in range(1, maplist_cfg["map_count"] + 1):
-        return web.json_response(
-            {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
-
     embeds = []
     hook_url = ""
     data = None
@@ -149,11 +141,6 @@ async def post(
                 )
 
             embeds = await get_runsubm_embed(data, discord_profile, resource)
-            if getattr(resource, format_idxs[data["format"]].key) is None:
-                return web.json_response(
-                    {"errors": {"format": "That map does not accept completions for that format"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
 
     proof_fnames = [url for url in proof_fnames if url is not None]
     if not (len(embeds) and len(proof_fnames)):
