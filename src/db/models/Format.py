@@ -30,6 +30,24 @@ class Format:
         type: int
         description: Whether map submissions are open, closed, ...
         enum: ["open", "closed"]
+    ---
+    FullFormat:
+      allOf:
+      - $ref: "#/components/schemas/Format"
+      - type: object
+        properties:
+          run_submission_wh:
+            type: string
+            nullable: true
+            description: The webhook URL to send Discord embed-like information about completion submissions.
+          map_submission_wh:
+            type: string
+            nullable: true
+            description: The webhook URL to send Discord embed-like information about map submissions.
+          emoji:
+            type: string
+            nullable: true
+            description: A Discord emoji.
     """
 
     id: int
@@ -48,4 +66,12 @@ class Format:
             "hidden": self.hidden,
             "run_submission_status": submission_status_to_str.get(self.run_submission_status, "closed"),
             "map_submission_status": submission_status_to_str.get(self.map_submission_status, "closed"),
+        }
+
+    def to_full_dict(self) -> dict:
+        return {
+            **self.to_dict(),
+            "map_submission_wh": self.map_submission_wh,
+            "run_submission_wh": self.run_submission_wh,
+            "emoji": self.emoji,
         }

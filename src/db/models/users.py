@@ -178,6 +178,7 @@ class MinimalUser(PartialUser):
                   type: string
     """
     permissions: "src.db.models.Permissions"
+    roles: list["src.db.models.Role"]
     completions: list[ListCompletion]
 
     def to_dict(
@@ -188,6 +189,7 @@ class MinimalUser(PartialUser):
         data = {
             **super().to_dict(profile=profile),
             "permissions": self.permissions.to_dict(),
+            "roles": [r.to_dict() for r in self.roles],
             "completions": [c.to_profile_dict() for c in self.completions],
         }
         return data

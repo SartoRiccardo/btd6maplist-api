@@ -2,6 +2,15 @@ from functools import lru_cache
 
 list_to_int = ["list", "experts"]
 MAPLIST_FORMATS = [1, 2, 51]
+str_to_map_status = {
+    "closed": 0,
+    "open": 1,
+}
+str_to_comp_status = {
+    "closed": 0,
+    "open": 1,
+    "lcc_only": 2,
+}
 
 
 @lru_cache()

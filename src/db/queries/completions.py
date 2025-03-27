@@ -258,7 +258,7 @@ async def set_completion_meta(
         UNION ALL
         
         SELECT
-            $1::int, $2::bool, $3::bool, $4::int, $5::int, $6::int
+            $1::int, $2::bool, $3::bool, $4::int, $5::int, $6::bigint
             
         LIMIT 1
         RETURNING id

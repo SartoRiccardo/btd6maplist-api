@@ -13,6 +13,7 @@ from src.db.queries.format import get_format
 from src.db.queries.mapsubmissions import get_map_submission
 from src.db.queries.achievement_roles import get_duplicate_ds_roles
 from .formats import format_idxs, FormatStatus
+from .misc import str_to_comp_status, str_to_map_status
 
 
 MAX_TEXT_LEN = 100
@@ -474,3 +475,30 @@ async def validate_achievement_roles(body: dict) -> dict:
             errors[f"roles[{i}].linked_roles[{j}].role_id"] = "This role is already used elsewhere!"
 
     return errors
+
+
+async def validate_format(body: dict) -> dict[str, str]:
+    check_fields_exists = {
+        "hidden": bool,
+        "run_submission_status": str,
+        "map_submission_status": str,
+        "map_submission_wh": str | None,
+        "run_submission_wh": str | None,
+    }
+    check = check_fields(body, check_fields_exists)
+    if len(check):
+        return check
+
+    errors = {}
+    if body["run_submission_status"] not in str_to_comp_status:
+        errors["run_submission_status"] = f"Must be one of the following: [{','.join(str_to_comp_status.keys())}]"
+    else:
+        body["run_submission_status"] = str_to_comp_status[body["run_submission_status"]]
+    if body["map_submission_status"] not in str_to_map_status:
+        errors["map_submission_status"] = f"Must be one of the following: [{','.join(str_to_map_status.keys())}]"
+    else:
+        body["map_submission_status"] = str_to_map_status[body["map_submission_status"]]
+    if body["map_submission_wh"] is not None and not validators.url(body["map_submission_wh"]):
+        errors["map_submission_wh"] = "Must be a valid url"
+    if body["run_submission_wh"] is not None and not validators.url(body["run_submission_wh"]):
+        errors["run_submission_wh"] = "Must be a valid url"

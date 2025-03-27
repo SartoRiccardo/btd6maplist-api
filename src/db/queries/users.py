@@ -358,8 +358,10 @@ async def get_minimal_profile(
         puser.oak,
         puser.has_seen_popup,
         await get_user_perms(uid, conn=conn),
+        await get_user_roles(uid, conn=conn),
         await get_min_completions_by(uid, conn=conn),
     )
+
 
 @postgres
 async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:

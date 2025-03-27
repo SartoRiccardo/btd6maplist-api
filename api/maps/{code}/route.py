@@ -44,7 +44,7 @@ async def put(
         discord_profile: dict = None,
         permissions: "src.db.models.Permissions" = None,
         **_kwargs,
-):
+) -> web.Response:
     """
     ---
     description: Edit a map. Must have edit:map perms.

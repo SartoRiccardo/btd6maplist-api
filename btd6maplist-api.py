@@ -88,7 +88,7 @@ def cors_handler(cors_options, methods):
             headers={
                 "Access-Control-Allow-Origin": request.headers["Origin"],
                 "Access-Control-Allow-Methods": ",".join(methods),
-                "Access-Control-Allow-Headers": "X-Requested-With, Authorization",
+                "Access-Control-Allow-Headers": "X-Requested-With, Authorization, Content-Type",
                 # "Access-Control-Max-Age": "86400",
             }
         )
