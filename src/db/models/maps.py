@@ -3,45 +3,29 @@ from datetime import datetime
 
 
 @dataclass
-class PartialExpertMap:
+class RetroMap:
     """
     type: object
-    properties:
-      name:
-        type: string
-        description: The name of the map.
-      code:
-        type: string
-        description: The code of the map.
-      difficulty:
-        $ref: "#/components/schemas/ExpertDifficulty"
-      verified:
-        type: boolean
-        description: "`true` if the map was verified in the current update."
-      map_preview_url:
-        type: string
-        nullable: true
-        description: URL to the map preview.
     """
-    name: str
-    code: str
-    difficulty: int
-    map_preview_url: str | None
-    verified: bool
+    sort_order: int
+    game_id: int
+    difficulty_id: int
+    subcategory_id: int
+    game_name: str
+    difficulty_name: str
+    subcategory_name: str
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name,
-            "code": self.code,
-            "difficulty": self.difficulty,
-            "map_preview_url": self.map_preview_url if self.map_preview_url else
-                f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
-            "verified": self.verified,
+            "sort_order": self.sort_order,
+            "game": {"id": self.game_id, "name": self.game_name},
+            "difficulty": {"id": self.difficulty_id, "name": self.difficulty_name},
+            "subcategory": {"id": self.subcategory_id, "name": self.subcategory_name},
         }
 
 
 @dataclass
-class PartialListMap:
+class MinimalMap:
     """
     type: object
     properties:
@@ -51,9 +35,9 @@ class PartialListMap:
       code:
         type: string
         description: The map's code.
-      placement:
+      format_idx:
         type: integer
-        description: The map's placement in the list (starts from 1).
+        description: The map's placement in the requested format.
       verified:
         type: boolean
         description: "`true` if the map was verified in the current update."
@@ -64,15 +48,19 @@ class PartialListMap:
     """
     name: str
     code: str
-    placement: int
+    format_idx: int | RetroMap
     verified: bool
     map_preview_url: str | None
 
     def to_dict(self) -> dict:
+        format_value = self.format_idx
+        if isinstance(self.format_idx, RetroMap):
+            format_value = self.format_idx.to_dict()
+
         return {
             "name": self.name,
             "code": self.code,
-            "placement": self.placement,
+            "format_idx": format_value,
             "verified": self.verified,
             "map_preview_url": self.map_preview_url if self.map_preview_url else
                 f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",

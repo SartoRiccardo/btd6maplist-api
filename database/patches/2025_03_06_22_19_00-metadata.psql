@@ -162,15 +162,28 @@ VALUES
     ('exp_lcc_extra', '0', 'int');
 
 -- Nostalgia Pack
+CREATE TABLE retro_games (
+    game_id INT NOT NULL,
+    category_id INT NOT NULL,
+    subcategory_id INT NOT NULL,
+    game_name VARCHAR(32) NOT NULL,
+    category_name VARCHAR(32) NOT NULL,
+    subcategory_name VARCHAR(32),
+    PRIMARY KEY (game_id, category_id, subcategory_id)
+);
+
 CREATE TABLE retro_maps (
     id SERIAL PRIMARY KEY,
-    game INT NOT NULL,
     name VARCHAR(255) NOT NULL,
     sort_order INT NOT NULL,
-    difficulty INT NOT NULL  -- Changes meaning depending on retro_maps.game
+    game_id INT NOT NULL,
+    category_id INT NOT NULL,
+    subcategory_id INT NOT NULL
 );
 ALTER TABLE map_list_meta ADD CONSTRAINT fk_retro_maps_1
     FOREIGN KEY (remake_of) REFERENCES retro_maps(id);
+ALTER TABLE retro_maps ADD CONSTRAINT fk_retro_games_1
+    FOREIGN KEY (game_id, category_id, subcategory_id) REFERENCES retro_games(game_id, category_id, subcategory_id);
 
 -- Format config
 CREATE TABLE formats (

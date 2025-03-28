@@ -1,22 +1,24 @@
 import asyncio
 import src.db.connection
 from src.db.models import (
-    PartialListMap,
-    PartialExpertMap,
+    MinimalMap,
     PartialMap,
     Map,
     LCC,
     ListCompletion,
     PartialUser,
+    RetroMap,
 )
 from src.db.queries.subqueries import get_int_config
 from src.utils.misc import list_rm_dupe
-from src.utils.formats import format_idxs
 postgres = src.db.connection.postgres
 
 
 @postgres
-async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
+async def get_list_maps(
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+        curver: bool = True
+) -> list[MinimalMap]:
     placement_vname = "placement_curver" if curver else "placement_allver"
     payload = await conn.fetch(f"""
         WITH config_vars AS (
@@ -34,7 +36,7 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
         SELECT
             name,
             m.code,
-            vc.map IS NOT NULL,
+            vc.map IS NOT NULL AS is_verified,
             placement_allver,
             placement_curver,
             map_preview_url
@@ -50,13 +52,30 @@ async def get_list_maps(conn=None, curver=True) -> list[PartialListMap]:
         ORDER BY {placement_vname} ASC
     """, )
     return [
-        PartialListMap(row[0], row[1], row[3 + int(curver)], row[2], row[5])
+        MinimalMap(
+            row["name"],
+            row["code"],
+            row[placement_vname],
+            row["is_verified"],
+            row["map_preview_url"],
+        )
         for row in payload
     ]
 
 
 @postgres
-async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
+async def get_maps_by_idx(
+        idx: str = None,
+        filter_val: int | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> list[MinimalMap]:
+    allowed_keys = ["difficulty", "botb_difficulty"]
+    if idx not in allowed_keys:
+        return []
+
+    args = []
+    if filter_val is not None:
+        args.append(filter_val)
     payload = await conn.fetch(
         f"""
         WITH verified_current AS (
@@ -68,27 +87,89 @@ async def get_expert_maps(conn=None) -> list[PartialExpertMap]:
         SELECT
             m.name,
             m.code,
-            mlm.difficulty,
+            mlm.{idx},
             m.map_preview_url,
-            vc.map IS NOT NULL AS verified
+            vc.map IS NOT NULL AS is_verified
         FROM maps m
         JOIN map_list_meta mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
-        WHERE difficulty >= 0
+        WHERE {idx} IS NOT NULL
             AND deleted_on IS NULL
             AND new_version IS NULL
-        """
+            {("AND mlm." + idx + " = $1") if filter_val is not None else ""}
+        """,
+        *args,
     )
 
     return [
-        PartialExpertMap(
+        MinimalMap(
             row["name"],
             row["code"],
-            row["difficulty"],
+            row[idx],
+            row["is_verified"],
             row["map_preview_url"],
-            row["verified"],
+        )
+        for row in payload
+    ]
+
+
+@postgres
+async def get_nostalgia_pack(
+        filter_val: int | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> list[MinimalMap]:
+    payload = await conn.fetch(
+        f"""
+        WITH verified_current AS (
+            SELECT DISTINCT map
+            FROM verifications
+            WHERE version = ({get_int_config("current_btd6_ver")})
+            GROUP BY map
+        )
+        SELECT
+            COALESCE(m.name, rm.name) AS name,
+            m.code,
+            m.map_preview_url,
+            vc.map IS NOT NULL AS is_verified,
+            
+            rm.sort_order,
+            rg.game_id, rg.difficulty_id, rg.subcategory_id,
+            rg.game_name, rg.difficulty_name, rg.subcategory_name
+        FROM maps m
+        JOIN map_list_meta mlm
+            ON mlm.code = m.code
+        LEFT JOIN verified_current vc
+            ON m.code = vc.map
+        RIGHT JOIN retro_maps rm
+            ON rm.id = m.remake_of
+        JOIN retro_games rg
+            ON rm.game_id = rg.game_id
+            AND rm.difficulty_id = rg.difficulty_id
+            AND rm.subcategory_id = rg.subcategory_id
+        WHERE rm.game_id = $1
+            AND deleted_on IS NULL
+            AND new_version IS NULL
+        """,
+        filter_val,
+    )
+
+    return [
+        MinimalMap(
+            row["name"],
+            row["code"],
+            RetroMap(
+                row["sort_order"],
+                row["game_id"],
+                row["difficulty_id"],
+                row["subcategory_id"],
+                row["game_name"],
+                row["difficulty_name"],
+                row["subcategory_name"],
+            ),
+            row["is_verified"],
+            row["map_preview_url"],
         )
         for row in payload
     ]
@@ -857,57 +938,54 @@ async def delete_map(
         code: str,
         *,
         map_current: PartialMap | None = None,
-        permissions: "src.db.models.Permissions" = None,
-        conn=None
+        keys: list[str] = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> None:
-    if not permissions.has_any_perms():
-        return
-
     if not map_current:
         map_current = await get_map(code, partial=True, conn=conn)
 
     async with conn.transaction():
-        indexes = [
-            map_current.placement_curver,
-            map_current.placement_allver,
-            map_current.difficulty,
-            map_current.botb_difficulty,
+        key_order = [
+            "placement_curver",
+            "placement_allver",
+            "difficulty",
+            "botb_difficulty",
+            "remake_of",
         ]
 
-
-        indexes = []
-        for format_id in format_idxs:
-            if permissions.has("delete:map", format_id):
-                indexes.append(None)
-            else:
-                indexes.append(getattr(map_current, format_idxs[format_id].key))
-
-        if indexes[0] is indexes[1] is None:  # Hardcoded should get the indexes dynamically but w/e
-            await update_list_placements(
-                cur_positions=(map_current.placement_curver, None),
-                all_positions=(map_current.placement_allver, None),
-                ignore_code=code,
-                conn=conn,
-            )
-
-        fields_to_add = [format_idxs[fid].key for fid in format_idxs]
-        fields_to_add_num = [f"${idx+2}" for idx in range(len(fields_to_add))]
-        meta_id = await conn.fetchval(
+        meta_id, plc_cur, plc_all = await conn.fetchrow(
             f"""
             INSERT INTO map_list_meta
-                ({", ".join(fields_to_add)}, code, deleted_on, optimal_heros)
+                ({", ".join(key_order)}, code, deleted_on, optimal_heros)
             SELECT
-                {", ".join(fields_to_add_num)}, $1::varchar(10),
-                {"CURRENT_TIMESTAMP" if all([x is None for x in indexes]) else "NULL"},
+                {", ".join([
+                    "NULL" if key in keys else key
+                    for key in key_order
+                ])},
+                $1::varchar(10),
+                CASE WHEN ({" AND ".join([
+                        key + " IS NULL"
+                        for key in key_order
+                        if key not in keys
+                    ])})
+                    THEN CURRENT TIMESTAMP
+                    ELSE NULL
+                END,
                 mlm.optimal_heros
             FROM map_list_meta mlm
             WHERE mlm.new_version IS NULL
                 AND mlm.deleted_on IS NULL
                 AND mlm.code = $1::varchar(10)
-            RETURNING id
+            RETURNING id, placement_allver, placement_curver
             """,
             code,
-            *indexes,
+        )
+
+        await update_list_placements(
+            cur_positions=(map_current.placement_curver, None) if plc_cur is None else None,
+            all_positions=(map_current.placement_allver, None) if plc_all is None else None,
+            ignore_code=code,
+            conn=conn,
         )
 
         await conn.execute(
@@ -924,7 +1002,7 @@ async def delete_map(
 
 
 @postgres
-async def get_legacy_maps(conn=None) -> list[PartialListMap]:
+async def get_legacy_maps(conn=None) -> list[MinimalMap]:
     """
     Gets deleted maps or maps that were pushed off the list.
     A deleted map shows up only if it's not in any list.
@@ -968,7 +1046,7 @@ async def get_legacy_maps(conn=None) -> list[PartialListMap]:
     )
 
     return [
-        PartialListMap(
+        MinimalMap(
             row["name"],
             row["code"],
             row["placement_curver"],

@@ -136,8 +136,16 @@ async def delete(
     if resource.deleted_on:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
-    if not resource.deleted_on:
-        await delete_map(resource.code, map_current=resource, permissions=permissions)
-        asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
+    if not permissions.has_any_perms():
+        return
 
+    fields_values = []
+    for format_id in format_idxs:
+        if permissions.has("delete:map", format_id):
+            fields_values.append((format_idxs[format_id].name, None))
+        else:
+            fields_values.append(getattr(resource, format_idxs[format_id].key))
+
+    await delete_map(resource.code, map_current=resource, changes=fields_values)
+    asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

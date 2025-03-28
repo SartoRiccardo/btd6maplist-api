@@ -1,7 +1,7 @@
 import re
 import yaml
 from .Config import Config
-from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
+from .maps import Map, PartialMap, MinimalMap, RetroMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
 from .users import User, PartialUser, MaplistProfile, MaplistMedals, MinimalUser
 from .Role import Role
@@ -12,12 +12,12 @@ from .Format import Format
 from .Permissions import Permissions
 
 entities = [
+    RetroMap,
     Config,
     Map,
     PartialMap,
     MinimalUser,
-    PartialExpertMap,
-    PartialListMap,
+    MinimalMap,
     LCC,
     ListCompletion,
     ListCompletionWithMeta,
@@ -45,12 +45,14 @@ RequestUserID:
 
 MaplistFormat:
   type: int
-  enum: [1, 2, 51]
+  enum: [1, 2, 51, 52, 11]
   description: >
-    The format a run was played in. Formats 1-50 are for the Maplist, 51-100 are for Expert List.\\n
+    The format a run was played in.\\n
     * `1` - Maplist ~ current version.\\n
     * `2` - Maplist ~ all versions.\\n
-    * `51` - Expert List.
+    * `11` - Nostalgia Pack.\\n
+    * `51` - Expert List.\\n
+    * `52` - Best of the Best.
 
 ExpertDifficulty:
   type: int

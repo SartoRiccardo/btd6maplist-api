@@ -639,4 +639,4 @@ async def get_user_perms(
         uid
     )
 
-    return Permissions({row["format_id"]: row["permissions"] for row in payload})
+    return Permissions({row["format_id"]: list(set(row["permissions"])) for row in payload})

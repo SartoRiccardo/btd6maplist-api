@@ -5,7 +5,7 @@ import http
 import src.http
 import src.log
 from aiohttp import web
-from src.db.queries.maps import get_list_maps, add_map
+from src.db.queries.maps import add_map
 from src.db.queries.format import get_format
 from src.utils.embeds import ACCEPT_CLR
 from src.utils.forms import get_map_form
@@ -16,43 +16,60 @@ from src.db.queries.mapsubmissions import get_map_submission, add_map_submission
 async def get(request: web.Request):
     """
     ---
-    description: Returns a list of maps in The List.
+    description: Returns a list of maps in any maplist.
     tags:
     - Map Lists
     parameters:
     - in: query
-      name: version
+      name: format
       required: false
       schema:
-        type: string
-        enum: [current, all]
-      description: The version of the list to get. Defaults to `current`.
+        $ref: "#/components/schemas/MaplistFormat"
+      description: The version of the list to get. Defaults to `1`.
+    - in: query
+      name: filter
+      required: false
+      schema:
+        type: integer
+      description: |
+        A filter for maps in the format you're requesting. In some formats are required.
+        It changes meaning depending on the format you're requesting.
+        - In the Maplist, it has no effect.
+        - In the Nostalgia Pack, it filters the game. It's required here.
+        - In BoTB/Expert List, it filters the difficulty. It's required in BoTB.
     responses:
       "200":
-        description: Returns an array of `PartialListMap`.
+        description: Returns an array of `MinimalMap`.
         content:
           application/json:
             schema:
               type: array
               items:
-                $ref: "#/components/schemas/PartialListMap"
+                $ref: "#/components/schemas/MinimalMap"
       "400":
-        description: Invalid request, the error will be specified in the `error` key.
+        description: Invalid request.
     """
-    current_version = True
-    if "version" in request.query:
-        version = request.query["version"].lower()
-        if version.lower() == "all":
-            current_version = False
-        elif version != "current":
+    format_id = request.query.get("format", "1")
+    if not format_id.isnumeric():
+        return web.json_response(
+            {"errors": {"format": "Must be numeric"}},
+            status=http.HTTPStatus.BAD_REQUEST,
+        )
+    format_id = int(format_id)
+
+    filter_value = request.query.get("filter", None)
+    if filter_value is not None:
+        if not filter_value.isnumeric():
             return web.json_response(
-                {
-                    "error": 'Allowed values for "ver": ["current", "all"]'
-                },
+                {"errors": {"filter": "Must be numeric"}},
                 status=http.HTTPStatus.BAD_REQUEST,
             )
+        else:
+            filter_value = int(filter_value)
 
-    maps = await get_list_maps(curver=current_version)
+    maps = []
+    if format_id in format_idxs:
+        maps = await format_idxs[format_id].get_maps(filter_value)
     return web.json_response([m.to_dict() for m in maps])
 
 
