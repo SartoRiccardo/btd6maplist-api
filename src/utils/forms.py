@@ -3,6 +3,7 @@ import aiohttp
 import http
 from src.utils.validators import validate_completion, validate_full_map, validate_completion_perms
 from src.utils.files import save_image
+from src.exceptions import ValidationException, GenericErrorException
 from config import MEDIA_BASE_URL
 
 
@@ -11,16 +12,15 @@ async def get_completion_request(
         user_id: str,
         permissions: "src.db.modes.Permissions" = None,
         resource: "src.db.models.ListCompletion" = None,
-) -> dict | web.Response:
+) -> dict:
     if resource and int(user_id) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
-        return web.json_response(
-            {"errors": {"": "Cannot edit or accept your own completion"}},
-            status=http.HTTPStatus.FORBIDDEN
+        raise GenericErrorException(
+            "Cannot edit or accept your own completion",
+            status_code=http.HTTPStatus.FORBIDDEN,
         )
 
-    async def validate_json_part(data: dict) -> web.Response | None:
-        if len(errors := await validate_completion(data)):
-            return web.json_response({"errors": errors}, status=http.HTTPStatus.BAD_REQUEST)
+    async def validate_json_part(data: dict) -> None:
+        await validate_completion(data)
 
         err_resp = validate_completion_perms(
             permissions,
@@ -32,9 +32,9 @@ async def get_completion_request(
             return err_resp
 
         if user_id in data["user_ids"]:
-            return web.json_response(
-                {"errors": {"": "Cannot edit or accept your own completion"}},
-                status=http.HTTPStatus.FORBIDDEN,
+            raise GenericErrorException(
+                "Cannot edit or accept your own completion",
+                status_code=http.HTTPStatus.FORBIDDEN,
             )
 
     subm_proof = None
@@ -50,12 +50,10 @@ async def get_completion_request(
 
             elif part.name == "data":
                 data = await part.json()
-                if (response := await validate_json_part(data)) is not None:
-                    return response
+                await validate_json_part(data)
     elif request.content_type == "application/json":
         data = await request.json()
-        if (response := await validate_json_part(data)) is not None:
-            return response
+        await validate_json_part(data)
 
     data["subm_proof"] = subm_proof
 
@@ -66,18 +64,14 @@ async def get_map_form(
         request: web.Request,
         editing: bool = False,
         check_dup_code: bool = False,
-) -> dict | web.Response:
-    async def validate_json_data(body) -> web.Response | None:
-        valid_errors = await validate_full_map(
+) -> dict:
+    async def validate_json_data(body) -> None:
+        await validate_full_map(
             body,
             check_dup_code=check_dup_code,
             validate_code_exists=not editing,
         )
-        if len(valid_errors):
-            return web.json_response(
-                {"errors": valid_errors},
-                status=http.HTTPStatus.BAD_REQUEST
-            )
+
         if body["map_preview_url"] and body["map_preview_url"].startswith("https://data.ninjakiwi.com"):
             body["map_preview_url"] = None
 
@@ -96,16 +90,14 @@ async def get_map_form(
 
             elif part.name == "data":
                 data = await part.json()
-                if (error_response := await validate_json_data(data)) is not None:
-                    return error_response
+                await validate_json_data(data)
     elif request.content_type == "application/json":
         data = await request.json()
-        if (error_response := await validate_json_data(data)) is not None:
-            return error_response
+        await validate_json_data(data)
     else:
-        return web.json_response(
-            {"errors": {"": "Unsupported Content-Type. Must be application/json or multipart/*"}},
-            status=http.HTTPStatus.BAD_REQUEST,
+        raise GenericErrorException(
+            "Unsupported Content-Type. Must be application/json or multipart/*",
+            status_code=http.HTTPStatus.BAD_REQUEST,
         )
 
     for fname in files:

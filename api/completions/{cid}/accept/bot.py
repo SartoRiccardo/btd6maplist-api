@@ -7,6 +7,7 @@ from src.db.queries.completions import accept_completion
 import src.log
 from src.utils.validators import validate_completion_perms
 from src.utils.embeds import update_run_webhook
+from src.exceptions import GenericErrorException
 
 
 @src.utils.routedecos.check_bot_signature(path_params=["cid"])
@@ -21,10 +22,7 @@ async def put(
 ) -> web.Response:
     """Only sets `accepted_by`"""
     if resource.accepted_by is not None:
-        return web.json_response(
-            {"errors": {"": "This run was already accepted!"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+        raise GenericErrorException("This run was already accepted!", status_code=http.HTTPStatus.BAD_REQUEST)
 
     err_resp = validate_completion_perms(
         permissions,
@@ -36,10 +34,7 @@ async def put(
 
     profile = json_data["user"]
     if int(profile["id"]) in [x if isinstance(x, int) else x.id for x in resource.user_ids]:
-        return web.json_response(
-            {"errors": {"": "Cannot edit or accept your own completion"}},
-            status=http.HTTPStatus.UNAUTHORIZED
-        )
+        raise GenericErrorException("Cannot edit or accept your own completion", status_code=http.HTTPStatus.FORBIDDEN)
 
     await accept_completion(resource.id, int(profile["id"]))
     asyncio.create_task(update_run_webhook(resource))

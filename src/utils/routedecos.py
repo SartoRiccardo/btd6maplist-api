@@ -13,6 +13,7 @@ from src.db.queries.users import create_user, get_user_min, get_user_perms
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from ..requests import discord_api
+from src.exceptions import GenericErrorException, ValidationException
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -23,11 +24,9 @@ def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **
             try:
                 body = json.loads(await request.text())
             except json.decoder.JSONDecodeError:
-                return web.json_response({"errors": {"": "Invalid JSON data"}, "data": {}}, status=400)
+                raise GenericErrorException("Invalid JSON data", status_code=http.HTTPStatus.BAD_REQUEST)
 
-            errors = await validator_function(body, **kwargs_deco)
-            if len(errors):
-                return web.json_response({"errors": errors, "data": {}}, status=400)
+            await validator_function(body, **kwargs_deco)
             return await handler(request, *args, **kwargs_caller, json_body=body)
         return wrapper
     return deco
@@ -39,10 +38,7 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     async def wrapper(request: web.Request, *args, **kwargs):
         if "Authorization" not in request.headers or \
                 not request.headers["Authorization"].startswith("Bearer "):
-            return web.json_response(
-                {"errors": {"": "No token found"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("No token found", status_code=http.HTTPStatus.UNAUTHORIZED)
         token = request.headers["Authorization"][len("Bearer "):]
         return await handler(request, *args, **kwargs, token=token)
     return wrapper
@@ -57,19 +53,13 @@ def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
     @wraps(handler)
     async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
         if token == "":
-            return web.json_response(
-                {"errors": {"": "No Discord token found"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("No Discord token found", status_code=http.HTTPStatus.UNAUTHORIZED)
 
         try:
             profile = await discord_api().get_user_profile(token)
             return await handler(request, *args, **kwargs, token=token, discord_profile=profile)
         except aiohttp.ClientResponseError:
-            return web.json_response(
-                {"errors": {"": "Couldn't verify your Discord account"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("Couldn't verify your Discord account", status_code=http.HTTPStatus.UNAUTHORIZED)
 
     return wrapper
 
@@ -85,7 +75,7 @@ def validate_resource_exists(
         async def wrapper(request: web.Request, *args, **kwargs_caller):
             resource = await exist_check(request.match_info[match_info_key], **kwargs_deco)
             if not resource:
-                return web.Response(status=404)
+                return web.Response(status=http.HTTPStatus.NOT_FOUND)
             return await handler(request, *args, **kwargs_caller, resource=resource)
         return wrapper
     return deco
@@ -111,9 +101,9 @@ def require_perms(
             permissions = await get_user_perms(discord_profile["id"])
 
             if not permissions.has_any_perms() and throw_on_permless:
-                return web.json_response(
-                    {"errors": {"": "You don't have the necessary permissions to do this"}, "data": {}},
-                    status=http.HTTPStatus.FORBIDDEN,
+                raise GenericErrorException(
+                    "You don't have the necessary permissions to do this",
+                    status_code=http.HTTPStatus.FORBIDDEN,
                 )
 
             return await handler(

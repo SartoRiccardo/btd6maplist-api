@@ -5,6 +5,7 @@ import http
 import src.http
 import src.log
 from aiohttp import web
+from src.exceptions import ValidationException
 from src.db.queries.maps import add_map
 from src.db.queries.format import get_format
 from src.utils.embeds import ACCEPT_CLR
@@ -51,19 +52,13 @@ async def get(request: web.Request):
     """
     format_id = request.query.get("format", "1")
     if not format_id.isnumeric():
-        return web.json_response(
-            {"errors": {"format": "Must be numeric"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+        raise ValidationException({"format": "Must be numeric"})
     format_id = int(format_id)
 
     filter_value = request.query.get("filter", None)
     if filter_value is not None:
         if not filter_value.isnumeric():
-            return web.json_response(
-                {"errors": {"filter": "Must be numeric"}},
-                status=http.HTTPStatus.BAD_REQUEST,
-            )
+            raise ValidationException({"filter": "Must be numeric"})
         else:
             filter_value = int(filter_value)
 

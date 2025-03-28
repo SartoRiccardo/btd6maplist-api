@@ -1,7 +1,7 @@
-import functools
 from dataclasses import dataclass
 import src.db.queries.maps
 import src.db.queries.misc
+from src.exceptions import ValidationException
 from src.db.models import MinimalMap
 from collections.abc import Awaitable, Callable
 from src.utils.cache import cache_for
@@ -22,7 +22,7 @@ class FormatInfo:
     validate: Callable[[int], Awaitable[ValidatorReturns]]
     run_requires_recording: Callable[ReqRecArgs, bool]
     can_accept_run: Callable[["src.db.models.PartialMap"], Awaitable[bool]]
-    get_maps: Callable[[int], Awaitable[list[MinimalMap]]]
+    get_maps: Callable[[int | None], Awaitable[list[MinimalMap]]]
 
 
 class FormatValueValidators:
@@ -63,7 +63,7 @@ class KeyChecks:
 class MapGetter:
     @staticmethod
     def maplist(format_id: int = 1):
-        async def getter(_: int):
+        async def getter(_: int | None):
             return await src.db.queries.maps.get_list_maps(curver=format_id == 1)
         return getter
 
@@ -71,13 +71,15 @@ class MapGetter:
     def by_key(key: str, requires_filter: bool = False):
         async def getter(filter_val: int | None):
             if filter_val is None and requires_filter:
-                raise Exception("Requires filter")
+                raise ValidationException({"filter": "Filter is required for this format"})
             return await src.db.queries.maps.get_maps_by_idx(key, filter_val)
         return getter
 
     @staticmethod
     def nostalgia_pack():
-        async def getter(filter_val: int):
+        async def getter(filter_val: int | None):
+            if filter_val is None:
+                raise ValidationException({"filter": "Filter is required for this format"})
             return await src.db.queries.maps.get_nostalgia_pack(filter_val)
         return getter
 
