@@ -100,7 +100,7 @@ def response_on_exception(handler):
     @functools.wraps(handler)
     async def inner(*args, **kwargs) -> web.Response:
         try:
-            await handler(*args, **kwargs)
+            return await handler(*args, **kwargs)
         except ServerException as exc:
             return exc.to_response()
     return inner
@@ -171,7 +171,7 @@ def get_routes(cur_path: None | list = None) -> list:
                 print(f"{routecolor(method.upper())}\t{api_route_str}")
                 handler = cors_route(
                     response_on_exception(
-                        getattr(route, method)
+                        getattr(route, method),
                     ),
                     cors_origins,
                 )
