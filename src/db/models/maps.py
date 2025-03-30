@@ -7,6 +7,9 @@ class RetroMap:
     """
     type: object
     properties:
+      id:
+        type: integer
+        description: The numerical ID of the map.
       name:
         type: string
         description: The map's name.
@@ -23,6 +26,7 @@ class RetroMap:
       subcategory:
         $ref: "#/components/schemas/NamedObject"
     """
+    id: int
     name: str
     sort_order: int
     preview_url: str
@@ -32,10 +36,10 @@ class RetroMap:
     game_name: str
     category_name: str
     subcategory_name: str
-    id: int | None = None
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "name": self.name,
             "sort_order": self.sort_order,
             "preview_url": self.preview_url,
@@ -112,9 +116,11 @@ class PartialMap:
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
       remake_of:
-        type: integer
-        nullable: true
-        description: Which map this is a remake of.
+        oneOf:
+        - type: integer
+          nullable: true
+          description: Which map this is a remake of.
+        - $ref: "#/components/schemas/RetroMap"
       botb_difficulty:
         type: integer
         nullable: true
@@ -146,7 +152,7 @@ class PartialMap:
     placement_allver: int | None
     difficulty: int | None
     botb_difficulty: int | None
-    remake_of: int | None
+    remake_of: int | RetroMap | None
     r6_start: str | None
     map_data: str
     deleted_on: datetime | None
@@ -165,7 +171,7 @@ class PartialMap:
             "placement_curver": self.placement_curver,
             "difficulty": self.difficulty,
             "botb_difficulty": self.botb_difficulty,
-            "remake_of": self.remake_of,
+            "remake_of": self.remake_of.to_dict() if isinstance(self.remake_of, RetroMap) else self.remake_of,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],

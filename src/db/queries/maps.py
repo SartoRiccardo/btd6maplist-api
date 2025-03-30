@@ -134,6 +134,7 @@ async def get_nostalgia_pack(
             m.map_preview_url,
             vc.map IS NOT NULL AS is_verified,
             
+            rm.id AS retro_map_id,
             rm.sort_order, rm.preview_url AS retro_map_preview_url,
             rg.game_id, rg.category_id, rg.subcategory_id,
             rg.game_name, rg.category_name, rg.subcategory_name
@@ -160,6 +161,7 @@ async def get_nostalgia_pack(
             row["name"],
             row["code"],
             RetroMap(
+                row["retro_map_id"],
                 row["name"],
                 row["sort_order"],
                 row["retro_map_preview_url"],
@@ -355,7 +357,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         pl_map["placement_allver"],
         pl_map["difficulty"],
         pl_map["botb_difficulty"],
-        pl_map["remake_of"],
+        None if pl_map["remake_of"] is None else await get_retro_map(pl_map["remake_of"], conn=conn),
         pl_map["r6_start"],
         pl_map["map_data"],
         pl_map["deleted_on"],
@@ -750,46 +752,79 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
         """
     )
 
-    meta_id = await conn.fetchval(
-        f"""
-        INSERT INTO map_list_meta
-            (code, placement_curver, placement_allver, difficulty, botb_difficulty, optimal_heros)
-        
-        SELECT
-            $1::varchar(10),
-            {"$2::int" if "placement_curver" in map_data else "placement_curver"},
-            {"$3::int" if "placement_allver" in map_data else "placement_allver"},
-            {"$4::int" if "difficulty" in map_data else "difficulty"},
-            {"$5::int" if "botb_difficulty" in map_data else "botb_difficulty"},
-            $6
-        FROM map_list_meta
-        WHERE code = $1::varchar(10)
-            AND new_version IS NULL
-            AND deleted_on IS NULL
-        
-        UNION ALL
-        
-        SELECT
-            $1::varchar(10), 
-            $2,
-            $3,
-            $4,
-            $5,
-            $6
-        
-        LIMIT 1
-        RETURNING id
-        """,
-        map_code,
-        map_data.get("placement_curver", None),
-        map_data.get("placement_allver", None),
-        map_data.get("difficulty", None),
-        map_data.get("botb_difficulty", None),
-        ";".join(map_data["optimal_heros"]),
-    )
-
+    if map_data.get("remake_of") and \
+            (prev_remake_of := await get_remake_of_code(map_data.get("remake_of"))):
+        await set_map_list_meta(prev_remake_of, remake_of=None)
+    meta_id = await set_map_list_meta(map_code, **map_data)
     if meta_id:
         await link_new_version(conn=conn)
+
+
+@postgres
+async def get_remake_of_code(
+        retro_map_id: int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> str:
+    map_code = await conn.fetchrow(
+        """
+        SELECT 
+            code
+        FROM map_list_meta
+        WHERE remake_of = $1
+            AND new_version IS NULL
+            AND deleted_on IS NULL
+        """,
+        retro_map_id
+    )
+    return map_code["code"] if map_code else None
+
+
+@postgres
+async def set_map_list_meta(
+        map_code: str,
+        conn: "asyncpg.pool.PoolconnectionProxy" = None,
+        **kwargs
+) -> int:
+    return await conn.fetchval(
+        f"""
+            INSERT INTO map_list_meta
+                (code, optimal_heros, placement_curver, placement_allver, difficulty, botb_difficulty, remake_of)
+
+            SELECT
+                $1::varchar(10),
+                {"$2::text" if "optimal_heros" in kwargs else "optimal_heros"},
+                {"$3::int" if "placement_curver" in kwargs else "placement_curver"},
+                {"$4::int" if "placement_allver" in kwargs else "placement_allver"},
+                {"$5::int" if "difficulty" in kwargs else "difficulty"},
+                {"$6::int" if "botb_difficulty" in kwargs else "botb_difficulty"},
+                {"$7::int" if "remake_of" in kwargs else "remake_of"}
+            FROM map_list_meta
+            WHERE code = $1::varchar(10)
+                AND new_version IS NULL
+                AND deleted_on IS NULL
+
+            UNION ALL
+
+            SELECT
+                $1::varchar(10), 
+                $2,
+                $3,
+                $4,
+                $5,
+                $6,
+                $7
+
+            LIMIT 1
+            RETURNING id
+            """,
+        map_code,
+        ";".join(kwargs.get("optimal_heros", [])),
+        kwargs.get("placement_curver", None),
+        kwargs.get("placement_allver", None),
+        kwargs.get("difficulty", None),
+        kwargs.get("botb_difficulty", None),
+        kwargs.get("remake_of", None),
+    )
 
 
 @postgres
@@ -1076,6 +1111,7 @@ async def get_retro_maps(conn: "asyncpg.pool.PoolConnectionProxy" = None) -> lis
 
     return [
         RetroMap(
+            row["id"],
             row["name"],
             row["sort_order"],
             row["preview_url"],
@@ -1085,7 +1121,6 @@ async def get_retro_maps(conn: "asyncpg.pool.PoolConnectionProxy" = None) -> lis
             row["game_name"],
             row["category_name"],
             row["subcategory_name"],
-            id=row["id"],
         )
         for row in payload
     ]
@@ -1109,6 +1144,7 @@ async def get_retro_map(map_id: int, conn: "asyncpg.pool.PoolConnectionProxy" = 
     )
 
     return None if payload is None else RetroMap(
+        map_id,
         payload["name"],
         payload["sort_order"],
         payload["preview_url"],

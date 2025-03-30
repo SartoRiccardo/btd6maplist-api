@@ -108,7 +108,9 @@ async def post(
             
             if not permissions.has("create:map_submission", data["format"]):
                 raise MissingPermsException("create:map_submission", data["format"])
-            if not data["proposed"] in range(len(format_idxs[data["format"]].proposed_values[1])):
+            proposed_values = format_idxs[data["format"]].proposed_values
+            if isinstance(proposed_values, tuple) and data["proposed"] not in range(len(proposed_values[1])) or \
+                    not await proposed_values(data["proposed"]):
                 raise ValidationException({"proposed": "Out of range"})
 
             if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
