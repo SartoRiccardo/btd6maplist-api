@@ -4,20 +4,20 @@ import http
 import aiohttp.hdrs
 from aiohttp import web
 from src.utils.files import save_image
-from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.validators import validate_map_submission, check_prev_map_submission
 from src.requests import ninja_kiwi_api
 from config import MEDIA_BASE_URL
 from src.utils.embeds import (
     get_mapsubm_embed,
-    propositions,
     send_map_submission_wh,
 )
 from src.db.queries.mapsubmissions import (
     add_map_submission,
     get_map_submissions,
 )
+from src.utils.formats import format_idxs
+from src.exceptions import MissingPermsException, ValidationException, GenericErrorException
 
 PAGE_ENTRIES = 50
 
@@ -94,7 +94,6 @@ async def post(
 
     embeds = []
     data = None
-    hook_url = ""
     proof_fname = None
 
     reader = await request.multipart()
@@ -105,36 +104,25 @@ async def post(
             proof_fname, _fpath = await save_image(file_contents, proof_ext)
         elif part.name == "data":
             data = await part.json()
-
-            if len(errors := await validate_map_submission(data)):
-                return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+            await validate_map_submission(data)
             
             if not permissions.has("create:map_submission", data["format"]):
-                return web.json_response(
-                    {"errors": {"": "You are banned from submitting maps"}},
-                    status=http.HTTPStatus.FORBIDDEN,
-                )
-            if not data["proposed"] in range(len(propositions[data["format"]])):
-                return web.json_response({"errors": {"proposed": "Out of range"}}, status=HTTPStatus.BAD_REQUEST)
+                raise MissingPermsException("create:map_submission", data["format"])
+            if not data["proposed"] in range(len(format_idxs[data["format"]].proposed_values[1])):
+                raise ValidationException({"proposed": "Out of range"})
 
             if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
-                return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
+                raise ValidationException({"code": "That map doesn't exist"})
 
             embeds = await get_mapsubm_embed(data, discord_profile, btd6_map)
 
     if len(embeds) == 0 or data is None or proof_fname is None:
-        return web.json_response(
-            {"errors": "Missing either data or proof_completion"},
-            status=HTTPStatus.BAD_REQUEST,
-        )
+        raise GenericErrorException("Missing either data or proof_completion")
 
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
 
-    prev_submission = await check_prev_map_submission(data["code"], discord_profile["id"])
-    if isinstance(prev_submission, web.Response):
-        return prev_submission
-
+    prev_submission = await check_prev_map_submission(data["code"], data["format"], discord_profile["id"])
     await add_map_submission(
         data["code"],
         discord_profile["id"],

@@ -7,6 +7,9 @@ class RetroMap:
     """
     type: object
     properties:
+      name:
+        type: string
+        description: The map's name.
       sort_order:
         type: integer
         description: The index of the resource within its (game, category, subcategory) tuple.
@@ -20,6 +23,7 @@ class RetroMap:
       subcategory:
         $ref: "#/components/schemas/NamedObject"
     """
+    name: str
     sort_order: int
     preview_url: str
     game_id: int
@@ -28,9 +32,11 @@ class RetroMap:
     game_name: str
     category_name: str
     subcategory_name: str
+    id: int | None = None
 
     def to_dict(self) -> dict:
         return {
+            "name": self.name,
             "sort_order": self.sort_order,
             "preview_url": self.preview_url,
             "game": {"id": self.game_id, "name": self.game_name},

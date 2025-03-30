@@ -16,10 +16,8 @@ class MapSubmission:
         type: string
         nullable: true
         description: Additional notes provided in the submission.
-      type:
-        type: string
-        enum: ["experts", "list"]
-        description: The list the submission is for.
+      format:
+        $ref: "#/components/schemas/MaplistFormat"
       proposed_difficulty:
         type: string
         description: The proposed difficulty
@@ -36,7 +34,7 @@ class MapSubmission:
     code: str
     submitter: int
     subm_notes: str | None
-    for_list: int
+    format_id: int
     proposed_diff: int
     rejected_by: int | None
     created_on: datetime
@@ -48,7 +46,7 @@ class MapSubmission:
             "code": self.code,
             "submitter": str(self.submitter),
             "subm_notes": self.subm_notes,
-            "format": self.for_list,
+            "format": self.format_id,
             "proposed_diff": self.proposed_diff,
             "rejected_by": str(self.rejected_by) if self.rejected_by else None,
             "completion_proof": self.completion_proof,

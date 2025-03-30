@@ -477,3 +477,11 @@ SET description = cd.config_description
 FROM config_descriptions cd
 WHERE c.name = cd.config_name
 ;
+
+-- Map submissions
+
+DROP INDEX map_submissions_uq_code;
+ALTER TABLE map_submissions RENAME COLUMN for_list TO format_id;
+CREATE UNIQUE INDEX map_submissions_uq_code
+  ON map_submissions (code, format_id)
+  WHERE rejected_by IS NULL;

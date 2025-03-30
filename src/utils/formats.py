@@ -23,6 +23,7 @@ class FormatInfo:
     run_requires_recording: Callable[ReqRecArgs, bool]
     can_accept_run: Callable[["src.db.models.PartialMap"], Awaitable[bool]]
     get_maps: Callable[[int | None], Awaitable[list[MinimalMap]]]
+    proposed_values: tuple[str, list[str]] | Callable[[int], Awaitable[str, str]]
 
 
 class FormatValueValidators:
@@ -84,6 +85,15 @@ class MapGetter:
         return getter
 
 
+class GetProposed:
+    @staticmethod
+    async def nostalgia_pack(proposed: int) -> tuple[str, str]:
+        remade_map = await src.db.queries.maps.get_retro_map(proposed)
+        if remade_map is None:
+            raise ValidationException({"proposed": "There is no retro map with that ID"})
+        return "Remake", remade_map.name
+
+
 format_idxs = {
     1: FormatInfo(
         "placement_curver",
@@ -91,6 +101,7 @@ format_idxs = {
         lambda on_map, bb, noh, lcc: bb or lcc or noh,
         KeyChecks.within_map_count("placement_curver"),
         MapGetter.maplist(1),
+        ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
     ),
     2: FormatInfo(
         "placement_allver",
@@ -98,6 +109,7 @@ format_idxs = {
         lambda on_map, bb, noh, lcc: bb or lcc or noh,
         KeyChecks.within_map_count("placement_allver"),
         MapGetter.maplist(2),
+        ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
     ),
     11: FormatInfo(
         "remake_of",
@@ -105,6 +117,7 @@ format_idxs = {
         lambda on_map, bb, noh, lcc: False,
         KeyChecks.key_is_not_null("remake_of"),
         MapGetter.nostalgia_pack(),
+        GetProposed.nostalgia_pack,
     ),
     51: FormatInfo(
         "difficulty",
@@ -112,6 +125,8 @@ format_idxs = {
         lambda on_map, bb, noh, lcc: bb or lcc or noh and not (0 <= on_map.difficulty <= 2),
         KeyChecks.key_is_not_null("difficulty"),
         MapGetter.by_key("difficulty"),
+        ("Difficulty", ["Casual Expert", "Casual/Medium Expert", "Medium Expert", "Medium/High Expert", "High Expert",
+                        "High/True Expert", "True Expert", "True/Extreme Expert", "Extreme Expert"]),
     ),
     52: FormatInfo(
         "botb_difficulty",
@@ -119,6 +134,7 @@ format_idxs = {
         lambda on_map, bb, noh, lcc: False,
         KeyChecks.key_is_not_null("botb_difficulty"),
         MapGetter.by_key("botb_difficulty", requires_filter=True),
+        ("Difficulty", ["Beginner", "Intermediate", "Advanced", "Expert/Extreme"])
     ),
 }
 

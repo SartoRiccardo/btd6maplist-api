@@ -22,7 +22,7 @@ async def put(
 ) -> web.Response:
     """Only sets `accepted_by`"""
     if resource.accepted_by is not None:
-        raise GenericErrorException("This run was already accepted!", status_code=http.HTTPStatus.BAD_REQUEST)
+        raise GenericErrorException("This run was already accepted!")
 
     err_resp = validate_completion_perms(
         permissions,

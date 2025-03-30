@@ -7,10 +7,11 @@ from src.db.queries.mapsubmissions import reject_submission, get_map_submission
 from src.utils.forms import get_map_form
 from src.utils.embeds import update_map_submission_wh
 import src.utils.routedecos
+from src.exceptions import MissingPermsException, ValidationException
 
 
 @src.utils.routedecos.bearer_auth
-@src.utils.routedecos.validate_resource_exists(get_map_submission, "code")
+@src.utils.routedecos.validate_resource_exists(get_map_submission, "code", "format_id")
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.require_perms()
 async def delete(
@@ -23,7 +24,7 @@ async def delete(
     """
     ---
     description: |
-      Soft deletes a map submission. Must be a Maplist or Expert List Moderator.
+      Soft deletes a map submission. Must have delete:map_submission permissions.
     tags:
     - Submissions
     parameters:
@@ -45,14 +46,15 @@ async def delete(
     """
     if resource.rejected_by:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
+
+    if not permissions.has("delete:map_submission", resource.format_id):
+        raise MissingPermsException("delete:map_submission", resource.format_id)
+
     code = request.match_info["code"]
+    format_id = request.match_info["format_id"]
+    if not format_id.isnumeric():
+        raise ValidationException({"format_id": "Must be numeric"})
 
-    if not permissions.has("delete:map_submission", resource.for_list):
-        return web.json_response(
-            {"errors": {"": f"You are missing `delete:map_submission` on format {resource.for_list}"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
-
-    await reject_submission(code, discord_profile["id"])
+    await reject_submission(code, format_id, discord_profile["id"])
     asyncio.create_task(update_map_submission_wh(resource, fail=True))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

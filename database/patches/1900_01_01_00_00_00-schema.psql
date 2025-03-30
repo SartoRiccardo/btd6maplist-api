@@ -158,7 +158,7 @@ CREATE TABLE map_submissions (
   code VARCHAR(10) NOT NULL,
   submitter BIGINT NOT NULL,
   subm_notes TEXT,
-  for_list INT NOT NULL, -- 0: Maplist, 1: Experts
+  for_list INT NOT NULL,
   proposed INT NOT NULL,
   rejected_by BIGINT,
   created_on TIMESTAMP DEFAULT NOW(),

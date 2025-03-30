@@ -160,6 +160,7 @@ async def get_nostalgia_pack(
             row["name"],
             row["code"],
             RetroMap(
+                row["name"],
                 row["sort_order"],
                 row["retro_map_preview_url"],
                 row["game_id"],
@@ -1056,3 +1057,65 @@ async def get_legacy_maps(conn=None) -> list[MinimalMap]:
         )
         for row in payload
     ]
+
+
+@postgres
+async def get_retro_maps(conn: "asyncpg.pool.PoolConnectionProxy" = None) -> list[RetroMap]:
+    payload = await conn.fetch(
+        """
+        SELECT
+            rm.name, rm.id, rm.sort_order, rm.preview_url, rm.game_id, rm.category_id, rm.subcategory_id,
+            rg.game_name, rg.category_name, rg.subcategory_name
+        FROM retro_maps rm
+        JOIN retro_games rg
+            ON rm.game_id = rg.game_id
+            AND rm.category_id = rg.category_id
+            AND rm.subcategory_id = rg.subcategory_id
+        """,
+    )
+
+    return [
+        RetroMap(
+            row["name"],
+            row["sort_order"],
+            row["preview_url"],
+            row["game_id"],
+            row["category_id"],
+            row["subcategory_id"],
+            row["game_name"],
+            row["category_name"],
+            row["subcategory_name"],
+            id=row["id"],
+        )
+        for row in payload
+    ]
+
+
+@postgres
+async def get_retro_map(map_id: int, conn: "asyncpg.pool.PoolConnectionProxy" = None) -> RetroMap | None:
+    payload = await conn.fetchrow(
+        """
+        SELECT
+            rm.name, rm.id, rm.sort_order, rm.preview_url, rm.game_id, rm.category_id, rm.subcategory_id,
+            rg.game_name, rg.category_name, rg.subcategory_name
+        FROM retro_maps rm
+        JOIN retro_games rg
+            ON rm.game_id = rg.game_id
+            AND rm.category_id = rg.category_id
+            AND rm.subcategory_id = rg.subcategory_id
+        WHERE id = $1
+        """,
+        map_id
+    )
+
+    return None if payload is None else RetroMap(
+        payload["name"],
+        payload["sort_order"],
+        payload["preview_url"],
+        payload["game_id"],
+        payload["category_id"],
+        payload["subcategory_id"],
+        payload["game_name"],
+        payload["category_name"],
+        payload["subcategory_name"],
+    )

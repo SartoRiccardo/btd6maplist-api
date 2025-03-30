@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import src.utils.formats
 
 
 submission_status_to_str = {
@@ -30,6 +31,15 @@ class Format:
         type: int
         description: Whether map submissions are open, closed, ...
         enum: ["open", "closed"]
+      proposed_difficulties:
+        type: array
+        description: |
+          What difficulties can be proposed by the map submitters. If it's null,
+          it's something dynamic that you have to fetch on the fly (e.g. retro maps
+          for the Nostalgia Pack).
+        items:
+          type: string
+        nullable: true
     ---
     FullFormat:
       allOf:
@@ -49,7 +59,6 @@ class Format:
             nullable: true
             description: A Discord emoji.
     """
-
     id: int
     name: str
     map_submission_wh: str | None
@@ -60,12 +69,17 @@ class Format:
     emoji: str | None
 
     def to_dict(self) -> dict:
+        proposed_values = None
+        if self.id in src.utils.formats.format_idxs and \
+                isinstance(src.utils.formats.format_idxs[self.id].proposed_values, tuple):
+            proposed_values = src.utils.formats.format_idxs[self.id].proposed_values[1]
         return {
             "id": self.id,
             "name": self.name,
             "hidden": self.hidden,
             "run_submission_status": submission_status_to_str.get(self.run_submission_status, "closed"),
             "map_submission_status": submission_status_to_str.get(self.map_submission_status, "closed"),
+            "proposed_difficulties": proposed_values,
         }
 
     def to_full_dict(self) -> dict:

@@ -1,23 +1,17 @@
 import json
 import aiohttp
 from src.db.queries.completions import add_completion_wh_payload
-from src.db.queries.mapsubmissions import add_map_submission_wh
+from src.db.queries.mapsubmissions import add_map_submission_wh, get_map_submissions_on
 from src.db.queries.format import get_format
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
 import src.http
 from ..requests import discord_api
-
-propositions = {
-    1: ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
-    51: ("Difficulty", ["Casual Expert", "Casual/Medium Expert", "Medium Expert", "Medium/High Expert", "High Expert",
-                        "High/True Expert", "True Expert", "True/Extreme Expert", "Extreme Expert"]),
-    52: ("Difficulty", ["Beginner", "Intermediate", "Advanced", "Expert/Extreme"])
-}
-propositions[2] = propositions[1]
+from .formats import format_idxs
+from src.exceptions import ValidationException
 
 
-PENDING_CLR = LIST_CLR = EXPERTS_CLR = 0x1e88e5
+PENDING_CLR = 0x1e88e5
 FAIL_CLR = 0xb71c1c
 ACCEPT_CLR = 0x43a047
 
@@ -33,14 +27,17 @@ async def get_mapsubm_embed(
         btd6_map: dict,
 ) -> list[dict]:
     field_proposed = None
-    if data["format"] == 11:
-        # Get map from db
-        pass
-    elif data["format"] in propositions:
-        prop_name, prop_labels = propositions[data["format"]]
+    if data["format"] in format_idxs:
+        if isinstance(format_idxs[data["format"]].proposed_values, tuple):
+            prop_name, prop_labels = format_idxs[data["format"]].proposed_values
+            if not (0 <= data["proposed"] < len(prop_labels)):
+                raise ValidationException({"proposed": "Out of range"})
+            prop_label = prop_labels[data["proposed"]]
+        else:
+            prop_name, prop_label = await format_idxs[data["format"]].proposed_values(data["proposed"])
         field_proposed = {
             "name": f"Proposed {prop_name}",
-            "value": prop_labels[data["proposed"]],
+            "value": prop_label[data["proposed"]],
         }
 
     embeds = [
@@ -51,7 +48,7 @@ async def get_mapsubm_embed(
                 "name": discord_profile["username"],
                 "icon_url": get_avatar_url(discord_profile),
             },
-            "color": LIST_CLR if data["format"] == "list" else EXPERTS_CLR
+            "color": PENDING_CLR
         },
         {
             "url": f"https://join.btd6.com/Map/{data['code']}",
@@ -144,7 +141,7 @@ async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail:
     if mapsubm.wh_data is None:
         return
 
-    list_format = await get_format(mapsubm.for_list)
+    list_format = await get_format(mapsubm.format_id)
     hook_url = list_format.map_submission_wh if list_format else None
     if hook_url is None:
         return
@@ -163,7 +160,7 @@ async def send_map_submission_wh(
         wh_data: dict,
 ) -> None:
     if prev_submission and prev_submission.wh_data:
-        old_list_format = await get_format(prev_submission.for_list)
+        old_list_format = await get_format(prev_submission.format_id)
         old_hook_url = old_list_format.map_submission_wh if old_list_format else None
         await discord_api().delete_webhook(old_hook_url, prev_submission.wh_data.split(";")[0])
 
@@ -178,3 +175,28 @@ async def send_map_submission_wh(
 
     msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
     await add_map_submission_wh(map_code, f"{msg_id};{wh_data_str}")
+
+
+async def update_map_submission_wh(map_code: str, map_data: dict) -> None:
+    new_formats = [
+        format_id
+        for format_id in format_idxs
+        if map_data.get(format_idxs[format_id].key) is not None
+    ]
+
+    submissions = await get_map_submissions_on(map_code, new_formats)
+    for subm in submissions:
+        if subm is None or subm.wh_data is None:
+            return
+
+        list_format = await get_format(subm.format_id)
+        hook_url = list_format.map_submission_wh if list_format else None
+        if hook_url is None:
+            return
+
+        msg_id, wh_data = subm.wh_data.split(";", 1)
+        wh_data = json.loads(wh_data)
+        wh_data["embeds"][0]["color"] = ACCEPT_CLR
+        async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
+            if resp.ok:
+                await add_map_submission_wh(map_code, None)

@@ -66,14 +66,15 @@ def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Res
 
 def validate_resource_exists(
         exist_check: Callable[[Any], Awaitable[Any]],
-        match_info_key: str,
+        *match_info_key: str,
         **kwargs_deco
 ):
     """Adds `resource` to kwargs or returns 404."""
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs_caller):
-            resource = await exist_check(request.match_info[match_info_key], **kwargs_deco)
+            args_get = [request.match_info[key] for key in match_info_key]
+            resource = await exist_check(*args_get, **kwargs_deco)
             if not resource:
                 return web.Response(status=http.HTTPStatus.NOT_FOUND)
             return await handler(request, *args, **kwargs_caller, resource=resource)

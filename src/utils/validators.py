@@ -1,7 +1,6 @@
 import asyncio
 import validators
 from aiohttp import web
-import http
 from typing import Type, Any, get_args, Literal
 import re
 import src.utils.routedecos
@@ -12,7 +11,7 @@ from src.db.queries.users import get_user_min
 from src.db.queries.format import get_format
 from src.db.queries.mapsubmissions import get_map_submission
 from src.db.queries.achievement_roles import get_duplicate_ds_roles
-from src.exceptions import ValidationException, MissingPermsException
+from src.exceptions import ValidationException, MissingPermsException, GenericErrorException
 from .formats import format_idxs, FormatStatus
 from .misc import str_to_comp_status, str_to_map_status
 
@@ -369,14 +368,18 @@ async def validate_discord_user(body: dict) -> None:
 
 async def check_prev_map_submission(
         code: str,
-        submitter: str
-) -> MapSubmission | web.Response | None:
-    prev_submission = await get_map_submission(code)
+        format_id: int,
+        submitter: str | int,
+) -> MapSubmission | None:
+    if isinstance(submitter, str):
+        submitter = int(submitter)
+
+    prev_submission = await get_map_submission(code, format_id)
     if prev_submission is not None:
-        if prev_submission.rejected_by:
-            raise ValidationException({"": "That map was already rejected!"})
-        elif prev_submission.submitter != int(submitter):
-            raise ValidationException({"": "Someone else already submitted this map!"})
+        # if prev_submission.rejected_by:
+        #     raise GenericErrorException("That map was already rejected!")
+        if prev_submission.submitter != submitter:
+            raise GenericErrorException("Someone else already submitted this map!")
     return prev_submission
 
 
@@ -385,7 +388,7 @@ def validate_completion_perms(
         new_format: int,
         old_format: int | None = None,
         action: Literal["edit", "create", "delete"] = "create",
-) -> web.Response | None:
+) -> None:
     req_perm = f"{action}:completion"
 
     if not permissions.has(req_perm, new_format):
