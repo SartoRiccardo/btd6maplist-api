@@ -6,20 +6,35 @@ from datetime import datetime
 class RetroMap:
     """
     type: object
+    properties:
+      sort_order:
+        type: integer
+        description: The index of the resource within its (game, category, subcategory) tuple.
+      preview_url:
+        type: string
+        description: An image URL to a small preview of the original map.
+      game:
+        $ref: "#/components/schemas/NamedObject"
+      category:
+        $ref: "#/components/schemas/NamedObject"
+      subcategory:
+        $ref: "#/components/schemas/NamedObject"
     """
     sort_order: int
+    preview_url: str
     game_id: int
-    difficulty_id: int
+    category_id: int
     subcategory_id: int
     game_name: str
-    difficulty_name: str
+    category_name: str
     subcategory_name: str
 
     def to_dict(self) -> dict:
         return {
             "sort_order": self.sort_order,
+            "preview_url": self.preview_url,
             "game": {"id": self.game_id, "name": self.game_name},
-            "difficulty": {"id": self.difficulty_id, "name": self.difficulty_name},
+            "category": {"id": self.category_id, "name": self.category_name},
             "subcategory": {"id": self.subcategory_id, "name": self.subcategory_name},
         }
 
@@ -36,8 +51,10 @@ class MinimalMap:
         type: string
         description: The map's code.
       format_idx:
-        type: integer
-        description: The map's placement in the requested format.
+        oneOf:
+        - type: integer
+          description: The map's placement in the requested format.
+        - $ref: "#/components/schemas/RetroMap"
       verified:
         type: boolean
         description: "`true` if the map was verified in the current update."

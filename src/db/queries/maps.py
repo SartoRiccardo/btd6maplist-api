@@ -129,24 +129,24 @@ async def get_nostalgia_pack(
             GROUP BY map
         )
         SELECT
-            COALESCE(m.name, rm.name) AS name,
+            rm.name,
             m.code,
             m.map_preview_url,
             vc.map IS NOT NULL AS is_verified,
             
-            rm.sort_order,
-            rg.game_id, rg.difficulty_id, rg.subcategory_id,
-            rg.game_name, rg.difficulty_name, rg.subcategory_name
+            rm.sort_order, rm.preview_url AS retro_map_preview_url,
+            rg.game_id, rg.category_id, rg.subcategory_id,
+            rg.game_name, rg.category_name, rg.subcategory_name
         FROM maps m
         JOIN map_list_meta mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
         RIGHT JOIN retro_maps rm
-            ON rm.id = m.remake_of
+            ON rm.id = mlm.remake_of
         JOIN retro_games rg
             ON rm.game_id = rg.game_id
-            AND rm.difficulty_id = rg.difficulty_id
+            AND rm.category_id = rg.category_id
             AND rm.subcategory_id = rg.subcategory_id
         WHERE rm.game_id = $1
             AND deleted_on IS NULL
@@ -161,11 +161,12 @@ async def get_nostalgia_pack(
             row["code"],
             RetroMap(
                 row["sort_order"],
+                row["retro_map_preview_url"],
                 row["game_id"],
-                row["difficulty_id"],
+                row["category_id"],
                 row["subcategory_id"],
                 row["game_name"],
-                row["difficulty_name"],
+                row["category_name"],
                 row["subcategory_name"],
             ),
             row["is_verified"],

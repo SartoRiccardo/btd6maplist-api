@@ -176,6 +176,7 @@ CREATE TABLE retro_maps (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     sort_order INT NOT NULL,
+    preview_url TEXT NOT NULL,
     game_id INT NOT NULL,
     category_id INT NOT NULL,
     subcategory_id INT NOT NULL

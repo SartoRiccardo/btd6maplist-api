@@ -35,6 +35,15 @@ entities = [
 ]
 
 swagger_definitions_str = """
+NamedObject:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+      nullable: true
+      
 DiscordID:
   type: string
   description: an user's Discord ID. Is numeric.
