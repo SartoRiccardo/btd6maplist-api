@@ -177,7 +177,7 @@ async def send_map_submission_wh(
     await add_map_submission_wh(map_code, f"{msg_id};{wh_data_str}")
 
 
-async def update_map_submission_wh(map_code: str, map_data: dict) -> None:
+async def map_change_update_map_submission_wh(map_code: str, map_data: dict) -> None:
     new_formats = [
         format_id
         for format_id in format_idxs

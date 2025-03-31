@@ -6,7 +6,7 @@ import src.log
 from aiohttp import web
 from src.exceptions import ValidationException
 from src.db.queries.maps import add_map
-from src.utils.embeds import update_map_submission_wh
+from src.utils.embeds import map_change_update_map_submission_wh
 from src.utils.forms import get_map_form
 from src.utils.formats import format_idxs
 from src.exceptions import MissingPermsException
@@ -130,6 +130,6 @@ async def post(
         raise MissingPermsException("create:map", missing_perms_on)
 
     await add_map(json_body)
-    asyncio.create_task(update_map_submission_wh(json_body["code"], json_body))
+    asyncio.create_task(map_change_update_map_submission_wh(json_body["code"], json_body))
     asyncio.create_task(src.log.log_action("map", "post", None, json_body, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.CREATED)

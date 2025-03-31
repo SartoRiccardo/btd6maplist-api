@@ -202,12 +202,16 @@ class User(PartialUser):
     - $ref: "#/components/schemas/PartialUser"
     - type: object
       properties:
-        current:
-          $ref: "#/components/schemas/MaplistProfile"
-        all:
-          $ref: "#/components/schemas/MaplistProfile"
-        experts:
-          $ref: "#/components/schemas/MaplistProfile"
+        list_stats:
+          type: array
+          description: The user's stats in some lists
+          items:
+            type: object
+            properties:
+              format_id:
+                $ref: "#/components/schemas/MaplistFormat"
+              stats:
+                $ref: "#/components/schemas/MaplistProfile"
         created_maps:
           type: array
           items:
@@ -228,9 +232,7 @@ class User(PartialUser):
       - $ref: "#/components/schemas/Profile"
       - $ref: "#/components/schemas/User"
     """
-    maplist_cur: MaplistProfile
-    maplist_all: MaplistProfile
-    expert_plc: MaplistProfile
+    list_stats: dict[int, MaplistProfile]
     created_maps: list["src.db.models.maps.PartialMap"]
     completions: list[ListCompletion]
     medals: MaplistMedals
@@ -244,11 +246,10 @@ class User(PartialUser):
     ) -> dict:
         data = {
             **super().to_dict(profile=profile),
-            "maplist": {
-                "current": self.maplist_cur.to_dict(),
-                "all": self.maplist_all.to_dict(),
-                "experts": self.expert_plc.to_dict(),
-            },
+            "list_stats": [
+                {"format_id": format_id, "stats": self.list_stats[format_id].to_dict()}
+                for format_id in self.list_stats
+            ],
             "created_maps": [m.to_dict() for m in self.created_maps],
             "medals": self.medals.to_dict(),
             "roles": [r.to_dict() for r in self.roles],

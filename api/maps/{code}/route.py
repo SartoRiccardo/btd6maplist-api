@@ -5,7 +5,7 @@ import src.log
 from src.db.queries.maps import get_map, edit_map, delete_map
 from src.utils.forms import get_map_form
 from src.utils.formats import format_idxs
-from src.utils.embeds import update_map_submission_wh
+from src.utils.embeds import map_change_update_map_submission_wh
 import src.utils.routedecos
 
 
@@ -97,7 +97,7 @@ async def put(
             del json_body[format_idxs[format_id].key]
 
     await edit_map(json_body, resource)
-    asyncio.create_task(update_map_submission_wh(resource.code, json_body))
+    asyncio.create_task(map_change_update_map_submission_wh(resource.code, json_body))
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 

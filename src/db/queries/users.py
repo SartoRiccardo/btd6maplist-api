@@ -378,9 +378,10 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         puser.name,
         puser.oak,
         puser.has_seen_popup,
-        await get_user_placements(id, 1, conn=conn),
-        await get_user_placements(id, 2, conn=conn),
-        await get_user_placements(id, 51, conn=conn),
+        {
+            format_id: await get_user_placements(id, format_id, conn=conn)
+            for format_id in [1, 2, 51]
+        },
         await get_maps_created_by(id, conn=conn),
         comps,
         await get_user_medals(id, conn=conn),

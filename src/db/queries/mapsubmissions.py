@@ -64,10 +64,13 @@ async def add_map_submission_wh(
 @postgres
 async def get_map_submission(
         code: str,
-        format_id: int,
+        format_id: int | str,
         not_deleted: bool = True,
         conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> MapSubmission | None:
+    if isinstance(format_id, str):
+        format_id = int(format_id)
+
     result = await get_map_submissions_on(
         code,
         [format_id],
@@ -130,6 +133,7 @@ async def get_map_submissions(
         FROM map_submissions ms
         LEFT JOIN map_list_meta m
             ON ms.code = m.code
+            AND m.created_on > ms.created_on
             -- This should be done dynamically but it would require refactoring
             -- map_list_meta again to be (format_id INT FK, idx_value INT, new_version, created_on, deleted_on).
             AND (
@@ -140,8 +144,6 @@ async def get_map_submissions(
                 OR ms.format_id = 52 AND m.botb_difficulty IS NULL
             )
         WHERE m.code IS NULL
-            AND m.deleted_on IS NULL
-            AND m.new_version IS NULL
             {"AND ms.rejected_by IS NULL" if omit_rejected else ""}
         ORDER BY ms.created_on DESC
         LIMIT $1

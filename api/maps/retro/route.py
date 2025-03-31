@@ -1,18 +1,8 @@
-import asyncio
-import src.utils.routedecos
-import http
-import src.http
-import src.log
 from aiohttp import web
-from src.exceptions import ValidationException
 from src.db.queries.maps import get_retro_maps
-from src.utils.embeds import update_map_submission_wh
-from src.utils.forms import get_map_form
-from src.utils.formats import format_idxs
-from src.exceptions import MissingPermsException
 
 
-async def get(request: web.Request):
+async def get(_r: web.Request) -> web.Response:
     """
     ---
     description: Returns a list of retro maps.
@@ -20,13 +10,14 @@ async def get(request: web.Request):
     - Map Lists
     responses:
       "200":
-        description: Returns an array of `MinimalMap`.
+        description: |
+          An object where each key is a game name, each value is another object
+          where each key is a category name, where each value is a list of
+          NamedResource.
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/MinimalMap"
+              type: object
       "400":
         description: Invalid request.
     """
