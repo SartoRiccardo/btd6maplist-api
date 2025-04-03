@@ -15,4 +15,4 @@ class MissingPermsException(ServerException):
             error_msg += f" on formats {','.join(format)}"
         else:
             error_msg += " on any format"
-        super().__init__({"format": error_msg}, status_code=http.HTTPStatus.BAD_REQUEST)
+        super().__init__({"format": error_msg}, status_code=http.HTTPStatus.FORBIDDEN)

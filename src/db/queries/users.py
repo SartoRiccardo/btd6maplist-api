@@ -32,17 +32,19 @@ async def get_user_min(uid: str, conn=None) -> PartialUser | None:
     """id can be either the Discord ID or the name"""
     if uid.isnumeric():
         payload = await conn.fetch("""
-            SELECT discord_id, name, nk_oak, has_seen_popup
+            SELECT discord_id, name, nk_oak, has_seen_popup, is_banned
             FROM users
             WHERE discord_id=$1
-            UNION
-            SELECT discord_id, name, nk_oak, has_seen_popup
+            
+            UNION ALL
+            
+            SELECT discord_id, name, nk_oak, has_seen_popup, is_banned
             FROM users
             WHERE LOWER(name)=LOWER($2)
         """, int(uid), uid)
     else:
         payload = await conn.fetch("""
-            SELECT discord_id, name, nk_oak, has_seen_popup
+            SELECT discord_id, name, nk_oak, has_seen_popup, is_banned
             FROM users
             WHERE LOWER(name)=LOWER($1)
         """, uid)
@@ -51,7 +53,11 @@ async def get_user_min(uid: str, conn=None) -> PartialUser | None:
 
     pl_user = payload[0]
     return PartialUser(
-        int(pl_user[0]), pl_user[1], pl_user[2], pl_user[3]
+        int(pl_user["discord_id"]),
+        pl_user["name"],
+        pl_user["nk_oak"],
+        pl_user["has_seen_popup"],
+        pl_user["is_banned"],
     )
 
 
@@ -357,6 +363,7 @@ async def get_minimal_profile(
         puser.name,
         puser.oak,
         puser.has_seen_popup,
+        puser.is_banned,
         await get_user_perms(uid, conn=conn),
         await get_user_roles(uid, conn=conn),
         await get_min_completions_by(uid, conn=conn),
@@ -378,6 +385,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
         puser.name,
         puser.oak,
         puser.has_seen_popup,
+        puser.is_banned,
         {
             format_id: await get_user_placements(id, format_id, conn=conn)
             for format_id in [1, 2, 51]
@@ -540,6 +548,7 @@ async def get_user_roles(uid: str | int, conn=None) -> list[Role]:
         JOIN user_roles ur
             ON r.id = ur.role_id
         WHERE ur.user_id = $1
+            AND NOT r.internal
         """,
         uid
     )
@@ -635,9 +644,71 @@ async def get_user_perms(
         JOIN role_format_permissions rfp
             ON ur.role_id = rfp.role_id
         WHERE ur.user_id = $1
-        GROUP BY rfp.format_id;
+        GROUP BY rfp.format_id
         """,
         uid
     )
 
     return Permissions({row["format_id"]: list(set(row["permissions"])) for row in payload})
+
+
+@postgres
+async def ban_user(
+        uid: str | int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> None:
+    if isinstance(uid, str):
+        uid = int(uid)
+
+    async with conn.transaction():
+        await conn.execute(
+            """
+            UPDATE users
+            SET
+                name = 'user-' || $1,
+                is_banned = TRUE
+            WHERE discord_id = $1
+            """,
+            uid,
+        )
+
+        await conn.execute(
+            """
+            DELETE FROM user_roles ur
+            WHERE user_id = $1
+            """,
+            uid,
+        )
+
+
+@postgres
+async def unban_user(
+        uid: str | int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> None:
+    if isinstance(uid, str):
+        uid = int(uid)
+
+    async with conn.transaction():
+        await conn.execute(
+            """
+            UPDATE users
+            SET
+                is_banned = FALSE
+            WHERE discord_id = $1
+            """,
+            uid,
+        )
+
+        await conn.execute(
+            """
+            INSERT INTO user_roles
+                (user_id, role_id)
+            SELECT
+                $1, r.id
+            FROM roles r
+            WHERE r.assign_on_create
+            ON CONFLICT DO NOTHING
+            """,
+            uid,
+        )

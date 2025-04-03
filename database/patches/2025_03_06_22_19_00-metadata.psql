@@ -263,8 +263,13 @@ WHERE r.requires_recording
 
 UNION ALL
 SELECT
-    r.id, NULL, 'create:user'
+    r.id, NULL, p.perm
 FROM roles r
+CROSS JOIN (
+    VALUES
+        ('create:user'),
+        ('ban:user')
+) AS p(perm)
 WHERE r.edit_experts OR r.edit_maplist
 ;
 
@@ -280,31 +285,6 @@ WITH inserted_roles AS (
         ('Nostalgia Curator', FALSE),
         ('Nostalgia Verifier', FALSE)
     RETURNING id, name
-),
-_grants AS (
-    INSERT INTO role_grants
-        (role_required, role_can_grant)
-    SELECT
-        ir_has.id, ir_can_grant.id
-    FROM inserted_roles ir_has
-    JOIN inserted_roles ir_can_grant
-        ON (ir_has.name = 'BotB Owner' AND ir_can_grant.name IN ('BotB Curator', 'BotB Verifier'))
-        OR (ir_has.name = 'Nostalgia Owner' AND ir_can_grant.name IN ('Nostalgia Curator', 'Nostalgia Verifier'))
-
-    UNION ALL
-    SELECT
-        ir_has.id, ir_can_grant.id
-    FROM roles ir_has
-    JOIN inserted_roles ir_can_grant
-        ON ir_can_grant.name = 'Can Submit'
-        AND (
-            ir_has.id = 1
-            OR ir_has.name LIKE '%Owner'
-            OR ir_has.name LIKE '%Moderator'
-            OR ir_has.name LIKE '%Curator'
-            OR ir_has.name LIKE '%Verifier'
-        )
-    RETURNING role_required  -- Dummy RETURNING to use it in the CTE
 ),
 _perms AS (
     INSERT INTO role_format_permissions
@@ -335,15 +315,42 @@ _perms AS (
             ('Curator', 'edit:map'),
             ('Curator', 'delete:map'),
             ('Curator', 'create:user'),
+            ('Curator', 'ban:user'),
             ('Verifier', 'edit:config'),
             ('Verifier', 'create:completion'),
             ('Verifier', 'edit:completion'),
             ('Verifier', 'delete:completion'),
-            ('Verifier', 'create:user')
+            ('Verifier', 'create:user'),
+            ('Verifier', 'ban:user')
     ) as p(name, perm)
         ON r.name LIKE ('%' || p.name)
         OR r.name LIKE '%Owner'
     RETURNING role_id  -- Dummy RETURNING to use it in the CTE
+),
+_grants AS (
+    INSERT INTO role_grants
+        (role_required, role_can_grant)
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM inserted_roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON (ir_has.name = 'BotB Owner' AND ir_can_grant.name IN ('BotB Curator', 'BotB Verifier'))
+        OR (ir_has.name = 'Nostalgia Owner' AND ir_can_grant.name IN ('Nostalgia Curator', 'Nostalgia Verifier'))
+
+    UNION ALL
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON ir_can_grant.name = 'Can Submit'
+        AND (
+            ir_has.id = 1
+            OR ir_has.name LIKE '%Owner'
+            OR ir_has.name LIKE '%Moderator'
+            OR ir_has.name LIKE '%Curator'
+            OR ir_has.name LIKE '%Verifier'
+        )
+    RETURNING role_required  -- Dummy RETURNING to use it in the CTE
 )
 INSERT INTO user_roles
     (user_id, role_id)
@@ -377,6 +384,8 @@ VALUES
     (1, NULL, 'delete:completion'),
     (1, NULL, 'create:map_submission'),
     (1, NULL, 'create:user'),
+    (1, NULL, 'edit:self'),
+    (1, NULL, 'ban:user'),
     (1, NULL, 'create:completion_submission')
 ;
 
@@ -385,6 +394,32 @@ ALTER TABLE roles
     DROP COLUMN edit_experts CASCADE,
     DROP COLUMN requires_recording CASCADE,
     DROP COLUMN cannot_submit CASCADE
+;
+ALTER TABLE roles
+    ADD COLUMN internal BOOLEAN DEFAULT FALSE
+;
+
+WITH inserted AS (
+    INSERT INTO roles
+        (name, internal, assign_on_create)
+    VALUES
+        ('Basic Perms', TRUE, TRUE)
+    RETURNING id
+),
+_perms AS (
+    INSERT INTO role_format_permissions
+        (role_id, format_id, permission)
+    SELECT
+        inserted.id, NULL, 'edit:self'
+    FROM inserted
+    RETURNING role_id
+)
+INSERT INTO user_roles
+    (user_id, role_id)
+SELECT
+    u.discord_id, i.id
+FROM users u
+CROSS JOIN inserted i
 ;
 
 -- Format migration
@@ -485,3 +520,8 @@ ALTER TABLE map_submissions RENAME COLUMN for_list TO format_id;
 CREATE UNIQUE INDEX map_submissions_uq_code
   ON map_submissions (code, format_id)
   WHERE rejected_by IS NULL;
+
+
+-- User bans
+
+ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT FALSE;

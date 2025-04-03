@@ -15,6 +15,7 @@ async def get_roles(conn=None):
         FROM roles r
         LEFT JOIN role_grants rg
             ON r.id = rg.role_required
+        WHERE NOT r.internal
         """
     )
 

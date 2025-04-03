@@ -382,7 +382,7 @@ def parse_runs_payload(
         usr_list = run["user_ids"]
         if full_usr_info:
             usr_list = [
-                PartialUser(run["user_ids"][i], run["user_names"][i], None, False)
+                PartialUser(run["user_ids"][i], run["user_names"][i], None, False, False)
                 for i in range(len(usr_list))
             ]
         usr_list = list_rm_dupe(usr_list, preserve_order=False)

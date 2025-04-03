@@ -1,11 +1,12 @@
 import http
 import re
 from aiohttp import web
-from src.db.queries.users import edit_user, get_user_min
+from src.db.queries.users import edit_user, get_user_min, get_user_perms
 from src.utils.validators import check_fields
 from src.requests import ninja_kiwi_api
 import src.utils.routedecos
 import string
+from src.exceptions import MissingPermsException
 
 
 NAME_MAX_LEN = 100
@@ -94,6 +95,10 @@ async def put(
       "401":
         description: Your token is missing, or invalid.
     """
+    permissions = await get_user_perms(discord_profile["id"])
+    if not permissions.has_in_any("edit:self"):
+        raise MissingPermsException("edit:self")
+
     if (other := await get_user_min(json_body["name"])) is not None and \
             str(other.id) != discord_profile["id"]:
         return web.json_response(

@@ -13,6 +13,9 @@ class PartialUser:
       name:
         type: string
         description: The user's name.
+      is_banned:
+        type: boolean
+        description: Whether the user's banned.
     ---
     Profile:
       allOf:
@@ -44,6 +47,7 @@ class PartialUser:
     name: str
     oak: str | None
     has_seen_popup: bool
+    is_banned: bool
 
     def __eq__(self, other):
         if isinstance(other, PartialUser):
@@ -63,6 +67,7 @@ class PartialUser:
         return {
             "id": str(self.id),
             "name": self.name,
+            "is_banned": self.is_banned,
             **extra_fields,
         }
 

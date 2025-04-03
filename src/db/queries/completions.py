@@ -129,7 +129,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         run_id,
         run["map"],
         list_rm_dupe([
-            PartialUser(run["user_ids"][i], run["user_names"][i], None, False)
+            PartialUser(run["user_ids"][i], run["user_names"][i], None, False, False)
             for i in range(len(run["user_ids"]))
         ], preserve_order=False),
         run["black_border"],
