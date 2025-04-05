@@ -137,11 +137,11 @@ async def get_map_submissions(
             -- This should be done dynamically but it would require refactoring
             -- map_list_meta again to be (format_id INT FK, idx_value INT, new_version, created_on, deleted_on).
             AND (
-                ms.format_id = 1 AND m.placement_curver IS NULL
-                OR ms.format_id = 2 AND m.placement_allver IS NULL
-                OR ms.format_id = 11 AND m.remake_of IS NULL
-                OR ms.format_id = 51 AND m.difficulty IS NULL
-                OR ms.format_id = 52 AND m.botb_difficulty IS NULL
+                ms.format_id = 1 AND m.placement_curver IS NOT NULL
+                OR ms.format_id = 2 AND m.placement_allver IS NOT NULL
+                OR ms.format_id = 11 AND m.remake_of IS NOT NULL
+                OR ms.format_id = 51 AND m.difficulty IS NOT NULL
+                OR ms.format_id = 52 AND m.botb_difficulty IS NOT NULL
             )
         WHERE m.code IS NULL
             {"AND ms.rejected_by IS NULL" if omit_rejected else ""}

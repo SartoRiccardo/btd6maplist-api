@@ -989,6 +989,13 @@ async def delete_map(
             "botb_difficulty",
             "remake_of",
         ]
+        unchanged = [key for key in key_order if key not in keys]
+        print(" AND ".join([
+                        key + " IS NULL"
+                        for key in unchanged
+                    ]) if len(unchanged) else "TRUE"
+            )
+        print(keys)
 
         meta_id, plc_cur, plc_all = await conn.fetchrow(
             f"""
@@ -1002,10 +1009,9 @@ async def delete_map(
                 $1::varchar(10),
                 CASE WHEN ({" AND ".join([
                         key + " IS NULL"
-                        for key in key_order
-                        if key not in keys
-                    ])})
-                    THEN CURRENT TIMESTAMP
+                        for key in unchanged
+                    ]) if len(unchanged) else "TRUE"})
+                    THEN CURRENT_TIMESTAMP
                     ELSE NULL
                 END,
                 mlm.optimal_heros

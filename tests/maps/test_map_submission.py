@@ -254,7 +254,7 @@ class TestHandleSubmissions:
     async def test_reject_submission(self, btd6ml_test_client, mock_auth):
         """Test rejecting a map submission"""
         await mock_auth(perms={51: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBJ", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBJ/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Rejecting a submission returned {resp.status}"
             async with btd6ml_test_client.get("/maps/submit") as resp_get:
@@ -289,7 +289,7 @@ class TestHandleSubmissions:
                 prev_created_on = resp_data["submissions"][0]["created_on"]
 
         await mock_auth(perms={None: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{TEST_CODE}", headers=HEADERS) as resp, \
+        async with btd6ml_test_client.delete(f"/maps/submit/{TEST_CODE}/formats/1", headers=HEADERS) as resp, \
                 btd6ml_test_client.get("/maps/submit") as resp_get:
             assert resp.status == http.HTTPStatus.NO_CONTENT, f"Deleting a submission returned {resp.status}"
             resp_data = await resp_get.json()
@@ -317,22 +317,22 @@ class TestHandleSubmissions:
         Test rejecting a map submission without having the perms to do so.
         List mods shouldn't reject a map submitted to the expert list, and vice versa.
         """
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH") as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map submission with no headers returns {resp.status}"
 
         await mock_auth(unauthorized=True)
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map submission with an invalid token returns {resp.status}"
 
         await mock_auth()
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map submission without perms returns {resp.status}"
 
         await mock_auth(perms={1: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map submission without having delete:map_submission on that format returns {resp.status}"
 

@@ -26,7 +26,8 @@ def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **
             except json.decoder.JSONDecodeError:
                 raise GenericErrorException("Invalid JSON data", status_code=http.HTTPStatus.BAD_REQUEST)
 
-            await validator_function(body, **kwargs_deco)
+            if (errors := await validator_function(body, **kwargs_deco)):
+                raise ValidationException(errors)
             return await handler(request, *args, **kwargs_caller, json_body=body)
         return wrapper
     return deco

@@ -88,6 +88,7 @@ def User(user_id: int) -> str:
         name,
         nullify(None),
         True,
+        False,
     ))
 
 
@@ -282,19 +283,23 @@ class Completion:
 @dataclass
 class RetroMap:
     id: int
-    game: int
     name: str
     sort_order: int
+    game: int
     difficulty: int
+    subcategory: int
 
     def dump_retro_map(self) -> str:
         return SEPARATOR.join(stringify(
             self.id,
-            self.game,
             self.name,
             self.sort_order,
+            '',
+            self.game,
             self.difficulty,
+            self.subcategory,
         ))
+
 
 @dataclass
 class AchievementRole:
@@ -390,7 +395,7 @@ def random_map_submissions() -> list[MapSubmission]:
                 1,
                 0,
                 2 if i % 2 == 0 else None,
-                start_timestamp - i*3600,
+                start_timestamp - (i + 1)*3600,
                 rand_images.choice(images),
                 None,
             )
@@ -777,10 +782,11 @@ def gen_retro_maps() -> list[RetroMap]:
         maps.append(
             RetroMap(
                 i,
-                i//50+1,
                 f"Track BTD{i//50+1}",
                 i % 30,
+                i//50+1,
                 i // 20,
+                i // 30,
             )
         )
     return maps
@@ -817,11 +823,21 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_map() for x in maps
         ))
-    with open(bpath / "12_retro_maps.csv", "w") as fout:
+    with open(bpath / "12_retro_games.csv", "w") as fout:
+        retro_games = {}
+        for x in retro_maps:
+            key = x.game, x.difficulty, x.subcategory
+            if key not in retro_games:
+                retro_games[key] = (f"game{x.game}", f"diff{x.difficulty}", f"sub{x.subcategory}")
+        fout.write("\n".join(
+            SEPARATOR.join(stringify(*key, *retro_games[key]))
+            for key in retro_games
+        ))
+    with open(bpath / "13_retro_maps.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_retro_map() for x in retro_maps
         ))
-    with open(bpath / "13_map_list_meta.csv", "w") as fout:
+    with open(bpath / "14_map_list_meta.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_map_meta() for x in maps
         ))

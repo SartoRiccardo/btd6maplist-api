@@ -9,6 +9,7 @@ from config import MEDIA_BASE_URL
 from src.utils.embeds import get_mapsubm_embed, send_map_submission_wh
 from src.db.queries.mapsubmissions import add_map_submission
 from src.utils.files import save_image
+from src.exceptions import ValidationException
 
 
 @src.utils.routedecos.check_bot_signature(files=["proof_completion"])
@@ -26,11 +27,10 @@ async def post(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    if len(errors := await validate_map_submission(json_data)):
-        return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+    await validate_map_submission(json_data)
 
     if (btd6_map := await ninja_kiwi_api().get_btd6_map(json_data["code"])) is None:
-        return web.json_response({"errors": {"code": "That map doesn't exist"}}, status=HTTPStatus.BAD_REQUEST)
+        raise ValidationException({"code": "That map doesn't exist"})
 
     proof_fname, _fp = await save_image(files[0][1], files[0][0].split(".")[-1])
     embeds = await get_mapsubm_embed(json_data, json_data["user"], btd6_map)
@@ -38,10 +38,7 @@ async def post(
     embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
 
-    prev_submission = await check_prev_map_submission(json_data["code"], json_data["user"]["id"])
-    if isinstance(prev_submission, web.Response):
-        return prev_submission
-
+    prev_submission = await check_prev_map_submission(json_data["code"], json_data["format"], json_data["user"]["id"])
     await add_map_submission(
         json_data["code"],
         json_data["user"]["id"],

@@ -13,9 +13,6 @@ class PartialUser:
       name:
         type: string
         description: The user's name.
-      is_banned:
-        type: boolean
-        description: Whether the user's banned.
     ---
     Profile:
       allOf:
@@ -67,7 +64,6 @@ class PartialUser:
         return {
             "id": str(self.id),
             "name": self.name,
-            "is_banned": self.is_banned,
             **extra_fields,
         }
 
@@ -206,6 +202,9 @@ class User(PartialUser):
     allOf:
     - $ref: "#/components/schemas/PartialUser"
     - type: object
+      is_banned:
+        type: boolean
+        description: Whether the user's banned.
       properties:
         list_stats:
           type: array
@@ -251,6 +250,7 @@ class User(PartialUser):
     ) -> dict:
         data = {
             **super().to_dict(profile=profile),
+            "is_banned": self.is_banned,
             "list_stats": [
                 {"format_id": format_id, "stats": self.list_stats[format_id].to_dict()}
                 for format_id in self.list_stats

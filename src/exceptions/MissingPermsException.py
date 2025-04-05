@@ -12,7 +12,7 @@ class MissingPermsException(ServerException):
 
         error_msg = f"You are missing {','.join(perms)}"
         if format is not None:
-            error_msg += f" on formats {','.join(format)}"
+            error_msg += f" on formats {','.join([str(x) for x in format])}"
         else:
             error_msg += " on any format"
         super().__init__({"format": error_msg}, status_code=http.HTTPStatus.FORBIDDEN)

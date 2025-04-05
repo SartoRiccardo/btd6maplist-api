@@ -138,7 +138,7 @@ class TestSubmit:
             "data": json.dumps(req_data),
             "signature": signature,
         }
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a map with a correct payload returns {resp.status}"
             async with btd6ml_test_client.get("/maps/submit") as resp_get:
@@ -153,7 +153,7 @@ class TestSubmit:
         await mock_auth()
         req_data = bot_user_payload(20)
         req_data = {"data": json.dumps(req_data)}
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map without a signature returns {resp.status}"
 
@@ -165,7 +165,7 @@ class TestSubmit:
             }),
             "signature": signature,
         }
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map with an invalid signature returns {resp.status}"
 
@@ -220,12 +220,12 @@ class TestPermissions:
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
         await mock_auth(user_id=user_id, perms={51: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/formats/1/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a submission without delete:map_submission on that format returns {resp.status}"
 
         await mock_auth(user_id=user_id, perms={1: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/formats/1/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a submission with delete:map_submission on that format returns {resp.status}"
 
@@ -234,6 +234,6 @@ class TestPermissions:
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
         await mock_auth(user_id=user_id, perms={None: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{experts_code}/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/{experts_code}/formats/51/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a submission with delete:map_submission on all formats returns {resp.status}"

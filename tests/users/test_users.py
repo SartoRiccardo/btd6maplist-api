@@ -19,13 +19,14 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
         expected_profile = {
             "id": str(user_id),
             "name": name,
-            "maplist": await calc_usr_placements(user_id),
+            "list_stats": await calc_usr_placements(user_id),
             "medals": expected_medals,
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
             "roles": [{"id": 8, "name": "Can Submit"}],
             "achievement_roles": [],
+            "is_banned": False,
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
@@ -186,7 +187,7 @@ class TestEditSelf:
         """Test editing one's own profile"""
         USER_ID = 33
         USERNAME = "New Name 33"
-        await mock_auth(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms={None: Permissions.basic()})
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(USERNAME, oak="oak_test123")
 
@@ -194,6 +195,7 @@ class TestEditSelf:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Editing a profile with a correct payload returns {resp.status}"
             extra = {
+                "roles": [{"id": 16, "name": "test-role"}],
                 "avatarURL":
                     "https://static-api.nkstatic.com/appdocs/4/assets/opendata/a5d32db006cb5d8d535a14494320fc92_ProfileAvatar26.png",
                 "bannerURL":
@@ -225,11 +227,10 @@ class TestEditSelf:
             }
             await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
-    async def test_edit_leave_name(self, btd6ml_test_client, mock_auth, profile_payload, mock_ninja_kiwi_api,
-                                   assert_state_unchanged):
+    async def test_edit_leave_name(self, btd6ml_test_client, mock_auth, profile_payload, mock_ninja_kiwi_api):
         """Test editing one's own profile while leaving the name unchanged"""
         USER_ID = 29
-        await mock_auth(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms={None: Permissions.basic()})
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(f"usr{USER_ID}", oak="oak_test123")
 
@@ -239,7 +240,7 @@ class TestEditSelf:
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_auth, profile_payload,
                                        assert_state_unchanged):
         """Test editing one's own profile with missing fields"""
-        await mock_auth(user_id=33)
+        await mock_auth(user_id=33, perms={None: Permissions.basic()})
         req_usr_data = profile_payload("Newer Name 33")
 
         for req_data, path in remove_fields(req_usr_data):
@@ -253,7 +254,7 @@ class TestEditSelf:
 
     async def test_fuzz(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        await mock_auth(user_id=33)
+        await mock_auth(user_id=33, perms={None: Permissions.basic()})
         req_usr_data = profile_payload("Newer Name 33")
         extra_expected = {"oak": [str]}
 
@@ -269,7 +270,7 @@ class TestEditSelf:
     async def test_edit_invalid(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged,
                                 mock_ninja_kiwi_api):
         """Test editing one's own profile with missing or invalid fields"""
-        await mock_auth()
+        await mock_auth(perms={None: Permissions.basic()})
 
         req_usr_data = profile_payload("Cool Username")
 

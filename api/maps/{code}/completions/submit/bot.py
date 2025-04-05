@@ -9,10 +9,10 @@ from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
 from src.utils.formats import format_idxs
 from src.db.queries.maps import get_map
-from src.db.queries.misc import get_config
 from src.db.queries.completions import submit_run
 from config import MEDIA_BASE_URL, WEB_BASE_URL
 from src.utils.embeds import get_runsubm_embed, send_run_webhook
+from src.exceptions import ValidationException, MissingPermsException
 
 MAX_FILES = 4
 compl_files = [f"proof_completion[{n}]" for n in range(MAX_FILES)]
@@ -35,26 +35,16 @@ async def post(
             status=http.HTTPStatus.FORBIDDEN,
         )
 
-    if len(errors := await validate_completion_submission(json_data, resource)):
-        return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+    await validate_completion_submission(json_data, resource)
     if getattr(resource, format_idxs[json_data["format"]].key) is None:
-        return web.json_response(
-            {"errors": {"format": "That map does not accept completions for that format"}},
-            status=HTTPStatus.BAD_REQUEST,
-        )
+        raise ValidationException({"format": "That map does not accept completions for that format"})
 
     if not permissions.has_in_any("create:completion_submission"):
-        return web.json_response(
-            {"errors": {"": "You are banned from submitting completions"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
         # TODO Remove images inserted in this request
+        raise MissingPermsException("create:completion_submission")
     elif permissions.has("require:completion_submission:recording", json_data["format"]) \
             and len(json_data["video_proof_url"]) == 0:
-        return web.json_response(
-            {"errors": {"video_proof_url": "You must submit a recording"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+        raise ValidationException({"video_proof_url": "You must submit a recording"})
 
     discord_profile = json_data["user"]
     proofs_finfo = await asyncio.gather(*[

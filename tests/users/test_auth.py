@@ -64,10 +64,21 @@ class TestAuth:
                 {
                     "format": None,
                     "permissions": {
+                        "ban:user",
                         "create:map_submission",
                         "create:completion_submission",
                         "create:user",
                     },
+                },
+            ],
+            "roles": [
+                {
+                    "id": 4,
+                    "name": "Maplist Moderator",
+                },
+                {
+                    "id": 8,
+                    "name": "Can Submit",
                 },
             ],
         }
@@ -113,13 +124,14 @@ class TestAuth:
         expected_maplist_profile = {
             "id": str(USER_ID),
             "name": USERNAME,
-            "maplist": await calc_usr_placements(None),
+            "list_stats": await calc_usr_placements(None),
             "medals": {"black_border": 0, "no_geraldo": 0, "lccs": 0, "wins": 0},
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
             "roles": [{"id": 8, "name": "Can Submit"}],
             "achievement_roles": [],
+            "is_banned": False,
         }
         async with btd6ml_test_client.get(f"/users/{USER_ID}") as resp:
             assert resp.status == http.HTTPStatus.OK, \

@@ -57,7 +57,7 @@ async def search(
         payload = await conn.fetch(
             """
             SELECT
-                discord_id, name, is_banned
+                discord_id, name, is_banned,
                 SIMILARITY(name, $1) AS simil
             FROM users
             WHERE SIMILARITY(name, $1) > 0.1

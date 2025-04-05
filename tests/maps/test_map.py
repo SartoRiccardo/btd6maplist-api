@@ -138,7 +138,7 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
             f"Maplist length after add: {len(maplist)}"
 
         for i in range(len(maplist)):
-            assert maplist[i]["placement"] == i+1, \
+            assert maplist[i]["format_idx"] == i+1, \
                 f"Maplist placement misordered"
 
     async with btd6ml_test_client.get("/maps/MLXXXEJ") as resp:
@@ -510,7 +510,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
     # Maplist Mods
     await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator()})
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+        assert resp.status == http.HTTPStatus.FORBIDDEN, \
             f"POST /maps/{test_code} returned {resp.status}"
 
     async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
@@ -520,7 +520,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
     # Expert Mods
     await mock_auth(perms={51: Permissions.curator()})
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+        assert resp.status == http.HTTPStatus.FORBIDDEN, \
             f"POST /maps/{test_code} returned {resp.status}"
 
     async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:

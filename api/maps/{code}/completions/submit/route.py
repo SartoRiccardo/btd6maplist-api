@@ -125,8 +125,7 @@ async def post(
 
         elif part.name == "data":
             data = await part.json()
-            if len(errors := await validate_completion_submission(data, resource)):
-                return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+            await validate_completion_submission(data, resource)
 
             if not permissions.has_in_any("create:completion_submission"):
                 return web.json_response(

@@ -6,6 +6,7 @@ class Permissions:
         map = "edit:map"
         completion = "edit:completion"
         achievement_roles = "edit:achievement_roles"
+        self = "edit:self"
 
     class delete:
         map = "delete:map"
@@ -19,9 +20,13 @@ class Permissions:
         map_submission = "create:map_submission"
         completion_submission = "create:completion_submission"
 
+    class misc:
+        ban_user = "ban:user"
+
     @staticmethod
     def basic() -> set[str]:
         return {
+            Permissions.edit.self,
             Permissions.create.map_submission,
             Permissions.create.completion_submission,
         }
@@ -34,6 +39,7 @@ class Permissions:
             Permissions.create.completion,
             Permissions.edit.completion,
             Permissions.delete.completion,
+            Permissions.misc.ban_user,
         })
 
     @staticmethod
@@ -43,6 +49,7 @@ class Permissions:
             Permissions.create.map,
             Permissions.edit.map,
             Permissions.delete.map,
+            Permissions.misc.ban_user,
         })
 
     @staticmethod

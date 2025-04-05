@@ -251,9 +251,10 @@ async def validate_completion_submission(
         "current_lcc": bool,
         "video_proof_url": [str],
     }
-    check_fields(body, check_fields_exists)
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
-    errors = {}
     if len(body["video_proof_url"]) > MAX_PROOF_URL:
         errors[f"video_proof_url"] = f"Can submit up to {MAX_PROOF_URL} URLs"
     else:
@@ -306,15 +307,17 @@ async def validate_completion(body: dict) -> None:
         "user_ids": [str],
         "lcc": dict | None,
     }
-    check_fields(body, check_fields_exists)
-
-    errors = {}
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
     if body["lcc"] is not None:
         check_lcc_exists = {
             "leftover": int,
         }
-        check_fields(body["lcc"], check_lcc_exists, path=".lcc")
+        errors = check_fields(body["lcc"], check_lcc_exists, path=".lcc")
+        if errors:
+            raise ValidationException(errors)
 
         if 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
@@ -347,7 +350,9 @@ async def validate_discord_user(body: dict) -> None:
         "discord_id": str,
         "name": str,
     }
-    check_fields(body, check_fields_exists)
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
     errors = {}
 
