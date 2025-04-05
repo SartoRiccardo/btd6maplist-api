@@ -3,11 +3,10 @@ from aiohttp import web, FormData
 import asyncio
 import json
 import src.http
-from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.utils.formats import format_idxs
+from src.utils.formats.formatinfo import format_info
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import MEDIA_BASE_URL, WEB_BASE_URL
@@ -36,7 +35,7 @@ async def post(
         )
 
     await validate_completion_submission(json_data, resource)
-    if getattr(resource, format_idxs[json_data["format"]].key) is None:
+    if getattr(resource, format_info[json_data["format"]].key) is None:
         raise ValidationException({"format": "That map does not accept completions for that format"})
 
     if not permissions.has_in_any("create:completion_submission"):

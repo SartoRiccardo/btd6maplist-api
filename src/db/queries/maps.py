@@ -11,6 +11,7 @@ from src.db.models import (
 )
 from src.db.queries.subqueries import get_int_config
 from src.utils.misc import list_rm_dupe
+from src.utils.formats.formats import format_keys
 postgres = src.db.connection.postgres
 
 
@@ -516,6 +517,28 @@ async def map_exists(code, conn=None) -> bool:
 
 
 @postgres
+async def map_exists_in_format(
+        map_code: str,
+        format_id: int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None
+) -> bool:
+    result = await conn.execute(
+        f"""
+        SELECT m.code
+        FROM maps m
+        JOIN map_list_meta mlm
+            ON mlm.code = m.code
+        WHERE m.code = $1
+            AND mlm.{format_keys[format_id]} IS NOT NULL
+            AND mlm.new_version IS NULL
+            AND mlm.deleted_on IS NULL
+        """,
+        map_code
+    )
+    return int(result[len("SELECT "):]) > 0
+
+
+@postgres
 async def alias_exists(alias: str, conn=None) -> bool:
     result = await conn.execute(
         """
@@ -982,20 +1005,8 @@ async def delete_map(
         map_current = await get_map(code, partial=True, conn=conn)
 
     async with conn.transaction():
-        key_order = [
-            "placement_curver",
-            "placement_allver",
-            "difficulty",
-            "botb_difficulty",
-            "remake_of",
-        ]
+        key_order = [format_keys[k] for k in format_keys]
         unchanged = [key for key in key_order if key not in keys]
-        print(" AND ".join([
-                        key + " IS NULL"
-                        for key in unchanged
-                    ]) if len(unchanged) else "TRUE"
-            )
-        print(keys)
 
         meta_id, plc_cur, plc_all = await conn.fetchrow(
             f"""

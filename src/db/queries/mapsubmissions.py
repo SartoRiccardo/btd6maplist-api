@@ -1,5 +1,6 @@
 import asyncio
 import src.db.connection
+from src.utils.formats.formats import format_keys
 from src.db.models import (
     MapSubmission,
 )
@@ -71,50 +72,13 @@ async def get_map_submission(
     if isinstance(format_id, str):
         format_id = int(format_id)
 
-    result = await get_map_submissions_on(
-        code,
-        [format_id],
-        not_deleted=not_deleted,
+    _total, result = await get_map_submissions(
+        on_code=code,
+        on_formats=[format_id],
+        omit_rejected=not_deleted,
         conn=conn,
     )
     return None if len(result) == 0 else result[0]
-
-
-@postgres
-async def get_map_submissions_on(
-        code: str,
-        format_ids: list[int],
-        not_deleted: bool = True,
-        conn: "asyncpg.pool.PoolConnectionProxy" = None,
-) -> list[MapSubmission]:
-    payload = await conn.fetch(
-        f"""
-        SELECT
-            submitter, subm_notes, format_id, proposed, rejected_by,
-            created_on, completion_proof, wh_data 
-        FROM map_submissions
-        WHERE code = $1
-            AND format_id = ANY($2::int[])
-            {"AND rejected_by IS NULL" if not_deleted else ""}
-        ORDER BY created_on DESC
-        """,
-        code, format_ids
-    )
-
-    return [
-        MapSubmission(
-            code,
-            row["submitter"],
-            row["subm_notes"],
-            row["format_id"],
-            row["proposed"],
-            row["rejected_by"],
-            row["created_on"],
-            row["completion_proof"],
-            row["wh_data"],
-        )
-        for row in payload
-    ]
 
 
 @postgres
@@ -122,8 +86,30 @@ async def get_map_submissions(
         omit_rejected: bool = True,
         idx_start: int = 0,
         amount: int = 50,
-        conn=None,
+        on_code: str = None,
+        on_formats: list[int] = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> tuple[int, list[MapSubmission]]:
+    join_clause = " OR ".join([
+        f"ms.format_id = {format_id} AND m.{format_keys[format_id]} IS NOT NULL"
+        for format_id in format_keys
+    ])
+
+    args = [amount, idx_start]
+    pg_idx = 3
+
+    filter_code = ""
+    if on_code is not None:
+        args.append(on_code)
+        filter_code = f"AND ms.code = ${pg_idx}"
+        pg_idx += 1
+
+    filter_formats = ""
+    if on_formats is not None:
+        args.append(on_formats)
+        filter_formats = f"AND ms.format_id = ANY(${pg_idx}::int[])"
+        pg_idx += 1
+
     payload = await conn.fetch(
         f"""
         SELECT
@@ -136,20 +122,16 @@ async def get_map_submissions(
             AND m.created_on > ms.created_on
             -- This should be done dynamically but it would require refactoring
             -- map_list_meta again to be (format_id INT FK, idx_value INT, new_version, created_on, deleted_on).
-            AND (
-                ms.format_id = 1 AND m.placement_curver IS NOT NULL
-                OR ms.format_id = 2 AND m.placement_allver IS NOT NULL
-                OR ms.format_id = 11 AND m.remake_of IS NOT NULL
-                OR ms.format_id = 51 AND m.difficulty IS NOT NULL
-                OR ms.format_id = 52 AND m.botb_difficulty IS NOT NULL
-            )
+            AND ({join_clause})
         WHERE m.code IS NULL
             {"AND ms.rejected_by IS NULL" if omit_rejected else ""}
+            {filter_code}
+            {filter_formats}
         ORDER BY ms.created_on DESC
         LIMIT $1
         OFFSET $2
         """,
-        amount, idx_start
+        *args,
     )
     submissions = [
         MapSubmission(

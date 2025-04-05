@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-import src.utils.formats
+import src.utils.formats.formatinfo
 
 
 @dataclass
@@ -49,7 +49,7 @@ class MapSubmission:
     wh_data: str | None
 
     def to_dict(self) -> dict:
-        diff_names = src.utils.formats.format_idxs[self.format_id].proposed_values
+        diff_names = src.utils.formats.formatinfo.format_info[self.format_id].proposed_values
         diff_name = None
         if isinstance(diff_names, tuple) and 0 <= self.proposed_diff < len(diff_names[1]):
             diff_name = diff_names[1][self.proposed_diff]

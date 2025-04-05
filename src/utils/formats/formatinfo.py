@@ -1,3 +1,4 @@
+from .formats import format_keys
 from dataclasses import dataclass
 import src.db.queries.maps
 import src.db.queries.misc
@@ -94,9 +95,9 @@ class GetProposed:
         return "Remake", remade_map.name
 
 
-format_idxs = {
+format_info = {
     1: FormatInfo(
-        "placement_curver",
+        format_keys[1],
         FormatValueValidators.placement_curver,
         lambda on_map, bb, noh, lcc: bb or lcc or noh,
         KeyChecks.within_map_count("placement_curver"),
@@ -104,7 +105,7 @@ format_idxs = {
         ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
     ),
     2: FormatInfo(
-        "placement_allver",
+        format_keys[2],
         FormatValueValidators.placement_curver,
         lambda on_map, bb, noh, lcc: bb or lcc or noh,
         KeyChecks.within_map_count("placement_allver"),
@@ -112,7 +113,7 @@ format_idxs = {
         ("List Position", ["Top 3", "Top 10", "#11 ~ 20", "#21 ~ 30", "#31 ~ 40", "#41 ~ 50"]),
     ),
     11: FormatInfo(
-        "remake_of",
+        format_keys[11],
         FormatValueValidators.np_map,
         lambda on_map, bb, noh, lcc: False,
         KeyChecks.key_is_not_null("remake_of"),
@@ -120,7 +121,7 @@ format_idxs = {
         GetProposed.nostalgia_pack,
     ),
     51: FormatInfo(
-        "difficulty",
+        format_keys[51],
         FormatValueValidators.difficulty,
         lambda on_map, bb, noh, lcc: bb or lcc or noh and not (0 <= on_map.difficulty <= 2),
         KeyChecks.key_is_not_null("difficulty"),
@@ -129,7 +130,7 @@ format_idxs = {
                         "High/True Expert", "True Expert", "True/Extreme Expert", "Extreme Expert"]),
     ),
     52: FormatInfo(
-        "botb_difficulty",
+        format_keys[52],
         FormatValueValidators.difficulty,
         lambda on_map, bb, noh, lcc: False,
         KeyChecks.key_is_not_null("botb_difficulty"),
@@ -137,6 +138,9 @@ format_idxs = {
         ("Difficulty", ["Beginner", "Intermediate", "Advanced", "Expert/Extreme"])
     ),
 }
+
+if len(format_info.keys()) != len(format_keys.keys()):
+    raise NotImplementedError()
 
 
 @cache_for(60)

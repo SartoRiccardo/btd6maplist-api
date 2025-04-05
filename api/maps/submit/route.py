@@ -16,7 +16,7 @@ from src.db.queries.mapsubmissions import (
     add_map_submission,
     get_map_submissions,
 )
-from src.utils.formats import format_idxs
+from src.utils.formats.formatinfo import format_info
 from src.exceptions import MissingPermsException, ValidationException, GenericErrorException
 
 PAGE_ENTRIES = 50
@@ -108,7 +108,7 @@ async def post(
             
             if not permissions.has("create:map_submission", data["format"]):
                 raise MissingPermsException("create:map_submission", data["format"])
-            proposed_values = format_idxs[data["format"]].proposed_values
+            proposed_values = format_info[data["format"]].proposed_values
             if isinstance(proposed_values, tuple) and data["proposed"] not in range(len(proposed_values[1])) or \
                     not isinstance(proposed_values, tuple) and not await proposed_values(data["proposed"]):
                 raise ValidationException({"proposed": "Out of range"})

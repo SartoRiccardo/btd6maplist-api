@@ -517,9 +517,6 @@ WHERE c.name = cd.config_name
 
 DROP INDEX map_submissions_uq_code;
 ALTER TABLE map_submissions RENAME COLUMN for_list TO format_id;
-CREATE UNIQUE INDEX map_submissions_uq_code
-  ON map_submissions (code, format_id)
-  WHERE rejected_by IS NULL;
 
 
 -- User bans

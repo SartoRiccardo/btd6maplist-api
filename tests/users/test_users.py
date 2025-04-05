@@ -237,6 +237,14 @@ class TestEditSelf:
         async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.OK
 
+    async def test_edit_forbidden(self, mock_auth, btd6ml_test_client, profile_payload, assert_state_unchanged):
+        """Test calling the endpoint without the necessary permissions"""
+        await mock_auth(user_id=33)
+        async with assert_state_unchanged("/users/33"), \
+                btd6ml_test_client.put("/users/@me", headers=HEADERS, json=profile_payload("Newer Name 33")) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Editing oneself without edit:self returns {resp.status}"
+
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_auth, profile_payload,
                                        assert_state_unchanged):
         """Test editing one's own profile with missing fields"""

@@ -1,13 +1,13 @@
 import json
 import aiohttp
 from src.db.queries.completions import add_completion_wh_payload
-from src.db.queries.mapsubmissions import add_map_submission_wh, get_map_submissions_on
+from src.db.queries.mapsubmissions import add_map_submission_wh, get_map_submissions
 from src.db.queries.format import get_format
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
 import src.http
 from ..requests import discord_api
-from .formats import format_idxs
+from src.utils.formats.formatinfo import format_info
 from src.exceptions import ValidationException
 
 
@@ -27,14 +27,14 @@ async def get_mapsubm_embed(
         btd6_map: dict,
 ) -> list[dict]:
     field_proposed = None
-    if data["format"] in format_idxs:
-        if isinstance(format_idxs[data["format"]].proposed_values, tuple):
-            prop_name, prop_labels = format_idxs[data["format"]].proposed_values
+    if data["format"] in format_info:
+        if isinstance(format_info[data["format"]].proposed_values, tuple):
+            prop_name, prop_labels = format_info[data["format"]].proposed_values
             if not (0 <= data["proposed"] < len(prop_labels)):
                 raise ValidationException({"proposed": "Out of range"})
             prop_label = prop_labels[data["proposed"]]
         else:
-            prop_name, prop_label = await format_idxs[data["format"]].proposed_values(data["proposed"])
+            prop_name, prop_label = await format_info[data["format"]].proposed_values(data["proposed"])
         field_proposed = {
             "name": f"Proposed {prop_name}",
             "value": prop_label[data["proposed"]],
@@ -180,11 +180,11 @@ async def send_map_submission_wh(
 async def map_change_update_map_submission_wh(map_code: str, map_data: dict) -> None:
     new_formats = [
         format_id
-        for format_id in format_idxs
-        if map_data.get(format_idxs[format_id].key) is not None
+        for format_id in format_info
+        if map_data.get(format_info[format_id].key) is not None
     ]
 
-    submissions = await get_map_submissions_on(map_code, new_formats)
+    submissions = await get_map_submissions(on_code=map_code, on_formats=new_formats)
     for subm in submissions:
         if subm is None or subm.wh_data is None:
             return

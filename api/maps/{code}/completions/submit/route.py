@@ -8,8 +8,6 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.utils.formats import format_idxs
-from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import (

@@ -8,7 +8,7 @@ from src.exceptions import ValidationException
 from src.db.queries.maps import add_map
 from src.utils.embeds import map_change_update_map_submission_wh
 from src.utils.forms import get_map_form
-from src.utils.formats import format_idxs
+from src.utils.formats.formatinfo import format_info
 from src.exceptions import MissingPermsException
 
 
@@ -61,8 +61,8 @@ async def get(request: web.Request):
             filter_value = int(filter_value)
 
     maps = []
-    if format_id in format_idxs:
-        maps = await format_idxs[format_id].get_maps(filter_value)
+    if format_id in format_info:
+        maps = await format_info[format_id].get_maps(filter_value)
     return web.json_response([m.to_dict() for m in maps])
 
 
@@ -122,8 +122,8 @@ async def post(
         return json_body
 
     missing_perms_on = []
-    for format_id in format_idxs:
-        if json_body.get(format_idxs[format_id].key, None) is not None \
+    for format_id in format_info:
+        if json_body.get(format_info[format_id].key, None) is not None \
                 and not permissions.has("create:map", format_id):
             missing_perms_on.append(format_id)
     if len(missing_perms_on):

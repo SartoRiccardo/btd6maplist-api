@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-import src.utils.formats
+import src.utils.formats.formatinfo
 
 
 submission_status_to_str = {
@@ -70,9 +70,9 @@ class Format:
 
     def to_dict(self) -> dict:
         proposed_values = None
-        if self.id in src.utils.formats.format_idxs and \
-                isinstance(src.utils.formats.format_idxs[self.id].proposed_values, tuple):
-            proposed_values = src.utils.formats.format_idxs[self.id].proposed_values[1]
+        if self.id in src.utils.formats.formatinfo.format_info and \
+                isinstance(src.utils.formats.formatinfo.format_info[self.id].proposed_values, tuple):
+            proposed_values = src.utils.formats.formatinfo.format_info[self.id].proposed_values[1]
         return {
             "id": self.id,
             "name": self.name,

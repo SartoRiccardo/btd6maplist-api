@@ -1,18 +1,17 @@
 import asyncio
 import validators
-from aiohttp import web
 from typing import Type, Any, get_args, Literal
 import re
 import src.utils.routedecos
 import src.http
 from src.db.models import MapSubmission
-from src.db.queries.maps import map_exists, alias_exists, get_map
+from src.db.queries.maps import map_exists, alias_exists, get_map, map_exists_in_format
 from src.db.queries.users import get_user_min
 from src.db.queries.format import get_format
 from src.db.queries.mapsubmissions import get_map_submission
 from src.db.queries.achievement_roles import get_duplicate_ds_roles
 from src.exceptions import ValidationException, MissingPermsException, GenericErrorException
-from .formats import format_idxs, FormatStatus
+from src.utils.formats.formatinfo import format_info, FormatStatus
 from .misc import str_to_comp_status, str_to_map_status
 
 
@@ -83,8 +82,8 @@ def typecheck_full_map(body: dict) -> None:
         "optimal_heros": [str],
         "map_preview_url": str | None,
     }
-    for format_id in format_idxs:
-        check_fields_exists[format_idxs[format_id].key] = int | None
+    for format_id in format_info:
+        check_fields_exists[format_info[format_id].key] = int | None
     check = check_fields(body, check_fields_exists)
 
     if check:
@@ -175,17 +174,17 @@ async def validate_full_map(
             body["verifiers"][i]["id"] = str(usr.id)
 
     one_format_set = False
-    for format_id in format_idxs:
-        if body[format_idxs[format_id].key] is not None:
+    for format_id in format_info:
+        if body[format_info[format_id].key] is not None:
             one_format_set = True
-            is_valid, error_msg, should_delete = await format_idxs[format_id].validate(body[format_idxs[format_id].key])
+            is_valid, error_msg, should_delete = await format_info[format_id].validate(body[format_info[format_id].key])
             if not is_valid:
-                errors[format_idxs[format_id].key] = error_msg
+                errors[format_info[format_id].key] = error_msg
             if should_delete:
-                del body[format_idxs[format_id].key]
+                del body[format_info[format_id].key]
     if not one_format_set:
-        for format_id in format_idxs:
-            errors[format_idxs[format_id].key] = "At least one of these must be not null"
+        for format_id in format_info:
+            errors[format_info[format_id].key] = "At least one of these must be not null"
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
@@ -224,11 +223,12 @@ async def validate_map_submission(body: dict) -> None:
     list_format = await get_format(body["format"])
     if list_format is None:
         errors["format"] = "Format does not exist"
-    elif list_format.map_submission_status == FormatStatus.CLOSED:
-        errors["format"] = "Format is currently not accepting submissions"
+    else:
+        if list_format.map_submission_status == FormatStatus.CLOSED:
+            errors["format"] = "Format is currently not accepting submissions"
+        if await map_exists_in_format(body["code"], body["format"]):
+            raise ValidationException({"code": "Map already exists"})
 
-    if await map_exists(body["code"]):
-        raise ValidationException({"code": "Map already exists"})
     if body["notes"]:
         if len(body["notes"]) > MAX_LONG_TEXT_LEN:
             errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
@@ -272,10 +272,10 @@ async def validate_completion_submission(
     elif list_format.run_submission_status == FormatStatus.LCC_ONLY and not body["current_lcc"]:
         errors["format"] = "This format only accepts LCC completion submissions"
         errors["current_lcc"] = "Must be true for this format"
-    elif not await format_idxs[body["format"]].can_accept_run(on_map):
+    elif not await format_info[body["format"]].can_accept_run(on_map):
         errors["format"] = "This map doesn't accept completions on that format"
     else:
-        requires_recording = format_idxs[body["format"]].run_requires_recording(
+        requires_recording = format_info[body["format"]].run_requires_recording(
             on_map,
             body["black_border"],
             body["no_geraldo"],

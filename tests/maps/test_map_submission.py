@@ -2,21 +2,41 @@ import asyncio
 import http
 import math
 import json
-import pathlib
 import pytest
-import requests
 from ..mocks import Permissions
 from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
 
-def to_subm_formdata(subm_data: dict, img_url: str, tmp_path: pathlib.Path):
-    form_data = to_formdata(subm_data)
-    path = tmp_path / "proof_completion.png"
-    path.write_bytes(requests.get(img_url).content)
-    form_data.add_field("proof_completion", path.open("rb"))
-    return form_data
+@pytest.fixture
+def assert_implicit_accept(btd6ml_test_client, submit_test_map, mock_auth, map_payload, assert_submission):
+    async def function(
+            test_code: str = None,
+            exists: tuple[bool, bool] = None,
+            changes: tuple[list[tuple[str, int]], list[tuple[str, int]]] = None,
+    ) -> None:
+        should_exist_post, should_exist_put = exists
+        changes_post, changes_put = changes
+
+        await submit_test_map(test_code)
+
+        await mock_auth(user_id=5, perms={None: Permissions.curator()})
+        map_data = map_payload(test_code)
+        for key, value in changes_post:
+            map_data[key] = value
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Adding map with correct payload returns {resp.status}"
+            await assert_submission(test_code, exists=should_exist_post)
+
+        for key, value in changes_put:
+            map_data[key] = value
+        async with btd6ml_test_client.put(f"/maps/{test_code}", headers=HEADERS, data=to_formdata(map_data)) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Editing a map with correct payload returns {resp.status}"
+            await assert_submission(test_code, exists=should_exist_put)
+    return function
 
 
 @pytest.mark.get
@@ -336,33 +356,54 @@ class TestHandleSubmissions:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map submission without having delete:map_submission on that format returns {resp.status}"
 
-    async def test_implicit_accept(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
-                                   map_payload, tmp_path):
-        """Test seeing a submission disappears after the map is added to the database."""
-        await mock_auth()
+    async def test_implicit_accept_add(self, assert_implicit_accept, valid_codes):
+        """Test seeing a submission disappears after the map is added."""
+        await assert_implicit_accept(
+            test_code=valid_codes[0],
+            exists=(False, False),
+            changes=(
+                [("placement_curver", 1)],
+                [("placement_curver", None), ("difficulty", 1)]
+            ),
+        )
 
-        test_code = valid_codes[0]
-        req_data = map_submission_payload(test_code)
-        form_data = to_subm_formdata(req_data, "https://dummyimage.com/400x300/00ff00/000", tmp_path)
-        async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Valid submission returned {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] == test_code, \
-                    "Latest submission differs from expected"
+    async def test_implicit_accept_edit(self, assert_implicit_accept, valid_codes):
+        """Test seeing a submission disappears after the map is edited."""
+        await assert_implicit_accept(
+            test_code=valid_codes[1],
+            exists=(True, False),
+            changes=(
+                [("difficulty", 1)],
+                [("difficulty", None), ("placement_curver", 1)]
+            ),
+        )
 
-        await mock_auth(user_id=5, perms={1: Permissions.curator()})
+    async def test_implicit_not_accept(self, assert_implicit_accept, valid_codes):
+        """Test a submission staying there if it wasn't added to its requested formats."""
+        await assert_implicit_accept(
+            test_code=valid_codes[2],
+            exists=(True, True),
+            changes=(
+                [("difficulty", 1)],
+                [("botb_difficulty", 4)]
+            ),
+        )
+
+    async def test_resubmit(self, btd6ml_test_client, mock_auth, valid_codes, map_payload, submit_test_map,
+                            assert_submission):
+        """Test resubmitting a map that was taken off a format."""
+        test_code = valid_codes[3]
+        await submit_test_map(test_code)
+
+        await mock_auth(user_id=5, perms={None: Permissions.curator()})
         map_data = map_payload(test_code)
         map_data["placement_curver"] = 1
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Adding map with correct payload returns {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != test_code, \
-                    "Latest submission is still the recently added map"
-            async with btd6ml_test_client.get("/maps/submit?pending=all") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != test_code, \
-                    "Latest submission is still the recently added map, when showing all submissions"
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp_post, \
+                btd6ml_test_client.delete(f"/maps/{test_code}", headers=HEADERS) as resp_del:
+            assert resp_post.status == http.HTTPStatus.CREATED, \
+                f"Adding map with correct payload returns {resp_post.status}"
+            assert resp_del.status == http.HTTPStatus.NO_CONTENT, \
+                f"Adding map with correct payload returns {resp_del.status}"
+            await assert_submission(test_code, exists=False)
+
+        await submit_test_map(test_code)
