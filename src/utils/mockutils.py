@@ -17,7 +17,7 @@ async def set_user_roles(token: str, conn=None) -> None:
 
       You can combine the two types: edit:config/+!mod/51
     """
-    match = re.match(r"mock_discord_(\d+)_(.+)", token)
+    match = re.match(r"mock_discord_(\d+)_(.*)", token)
     if match is None:
         return
 
@@ -35,7 +35,7 @@ async def set_user_roles(token: str, conn=None) -> None:
 
             for format_id in ids:
                 permissions.setdefault(format_id, set()).update(perm_set)
-        else:
+        elif len(segment):
             # Specific permission
             perm_type, _, rest = segment.partition(":")
             resource_type, _, id_list = rest.partition("/")
