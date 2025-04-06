@@ -12,11 +12,12 @@ import src.utils.routedecos
 async def post(
         _r: web.Request,
         json_body: dict = None,
+        permissions: "src.db.modules.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """
     ---
-    description: Manually inserts a new user. Must be a moderator.
+    description: Manually inserts a new user. Must have create:user.
     tags:
     - Users
     requestBody:
@@ -45,6 +46,12 @@ async def post(
       "403":
         description: You don't have the permissions to do this
     """
+    if not permissions.has("create:user", None):
+        return web.json_response(
+            {"errors": {"": "You are missing `create:user` permissions."}},
+            status=http.HTTPStatus.FORBIDDEN,
+        )
+
     success = await create_user(json_body["discord_id"], json_body["name"])
     if success:
         return web.Response(status=http.HTTPStatus.CREATED)

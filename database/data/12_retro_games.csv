@@ -1,0 +1,14 @@
+1	0	0	game1	diff0	sub0
+1	1	0	game1	diff1	sub0
+1	1	1	game1	diff1	sub1
+1	2	1	game1	diff2	sub1
+2	2	1	game2	diff2	sub1
+2	3	2	game2	diff3	sub2
+2	4	2	game2	diff4	sub2
+2	4	3	game2	diff4	sub3
+3	5	3	game3	diff5	sub3
+3	6	4	game3	diff6	sub4
+3	7	4	game3	diff7	sub4
+4	7	5	game4	diff7	sub5
+4	8	5	game4	diff8	sub5
+4	9	6	game4	diff9	sub6

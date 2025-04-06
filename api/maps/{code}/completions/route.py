@@ -89,15 +89,13 @@ async def post(
         request: web.Request,
         discord_profile: dict = None,
         resource: "src.db.model.PartialMap" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """
     ---
     description: |
-      Add a completion. Must be a Maplist and/or Expert List Moderator,
-      depending on the completion's `format`s.
+      Add a completion. Must have create:completion perms.
     tags:
     - Completions
     parameters:
@@ -154,8 +152,7 @@ async def post(
     data = await get_completion_request(
         request,
         discord_profile["id"],
-        is_maplist_mod=is_maplist_mod,
-        is_explist_mod=is_explist_mod,
+        permissions=permissions,
     )
     if isinstance(data, web.Response):
         return data

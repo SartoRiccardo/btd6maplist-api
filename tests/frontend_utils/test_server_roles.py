@@ -1,6 +1,6 @@
 import http
 import pytest
-from ..mocks import MemberMock, GuildMock, RoleMock, DiscordPermRoles
+from ..mocks import MemberMock, GuildMock, RoleMock, Permissions
 
 HEADERS = {"Authorization": "Bearer test_token"}
 
@@ -50,7 +50,11 @@ class TestGetServerRoles:
             5: [r.id for r in roles[:-1]],
         }
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN, bot_guilds=bot_guilds, user_guilds=user_guilds)
+        await mock_auth(
+            perms={1: Permissions.mod()},
+            bot_guilds=bot_guilds,
+            user_guilds=user_guilds
+        )
         async with btd6ml_test_client.get("/server-roles", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Getting /server-roles with a valid token returns {resp.status}"

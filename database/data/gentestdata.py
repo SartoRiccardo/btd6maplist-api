@@ -74,6 +74,10 @@ def rm_nulls(l: list[Any | None]) -> list:
     return [x for x in l if x is not None]
 
 
+def difficultify(diff: int) -> str:
+    return nullify(None if diff == -1 else diff)
+
+
 def User(user_id: int, username: str = None) -> str:
     if username is None:
         name = f"usr{user_id}"
@@ -87,6 +91,7 @@ def User(user_id: int, username: str = None) -> str:
         name,
         nullify(None),
         True,
+        False,
     ))
 
 
@@ -115,19 +120,29 @@ class Map:
     verifications: list[tuple[str, int]]
     map_data_compatibility: list[tuple[int, int]]
     aliases: list[str]
+    # New fields
+    botb_difficulty: int | None = None
+    remake_of: int | None = None
 
     def dump_map(self) -> str:
         return SEPARATOR.join(stringify(
-            self.id,
             self.code,
             self.name,
-            self.placement_cur,
-            self.placement_all,
-            self.difficulty,
             nullify(self.r6_start),
             nullify(None),
-            ";".join(self.optimal_heros),
             nullify(self.map_preview_url),
+        ))
+
+    def dump_map_meta(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.id,
+            self.code,
+            difficultify(self.placement_cur),
+            difficultify(self.placement_all),
+            difficultify(self.difficulty),
+            ";".join(self.optimal_heros),
+            difficultify(self.botb_difficulty),
+            difficultify(self.remake_of),
             dateify(self.created_on),
             dateify(self.deleted_on),
             nullify(self.new_version),
@@ -136,28 +151,28 @@ class Map:
     def dump_aliases(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, alias)
+                stringify(alias, self.code)
             ) for alias in self.aliases
         )
 
     def dump_add_codes(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(code, descr, self.id)
+                stringify(code, descr, self.code)
             ) for code, descr in self.additional_codes
         )
 
     def dump_verifications(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, user_id, nullify(version))
+                stringify(user_id, nullify(version), self.code)
             ) for user_id, version in self.verifications
         )
 
     def dump_creators(self) -> str:
         return "\n".join(
             SEPARATOR.join(
-                stringify(self.id, user_id, nullify(role))
+                stringify(user_id, nullify(role), self.code)
             ) for user_id, role in self.creators
         )
 
@@ -220,10 +235,24 @@ class Completion:
     subm_proof_img: list[str]
     subm_proof_vid: list[str]
 
+    @property
+    def comp_meta_id(self):
+        return self.id + (-1 if self.id % 2 == 0 else 1)
+
     def dump_completion(self) -> str:
         return SEPARATOR.join(stringify(
             self.id,
             self.map.code,
+            dateify(self.created_on),
+            self.subm_notes,
+            self.subm_wh_payload,
+            None,  # Copied from ID
+        ))
+
+    def dump_completion_meta(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.comp_meta_id,
+            self.id,
             self.black_border,
             self.no_geraldo,
             self.lcc.id if self.lcc else None,
@@ -232,13 +261,12 @@ class Completion:
             self.new_version,
             self.accepted_by,
             self.format,
-            self.subm_notes,
-            self.subm_wh_payload,
+            None,  # Copied from ID
         ))
 
     def dump_players(self) -> str:
         return "\n".join(
-            SEPARATOR.join(stringify(self.id, user_id))
+            SEPARATOR.join(stringify(user_id, self.comp_meta_id))
             for user_id in self.players
         )
 
@@ -256,6 +284,28 @@ class Completion:
 
 
 @dataclass
+class RetroMap:
+    id: int
+    name: str
+    sort_order: int
+    game: int
+    difficulty: int
+    subcategory: int
+
+    def dump_retro_map(self) -> str:
+        return SEPARATOR.join(stringify(
+            self.id,
+            self.name,
+            self.sort_order,
+            '',
+            self.game,
+            self.difficulty,
+            self.subcategory,
+        ))
+
+
+@dataclass
+
 class AchievementRole:
     lb_format: int
     lb_type: str
@@ -337,7 +387,7 @@ def random_map_submissions() -> list[MapSubmission]:
                 f"SUBX{num_to_letters(i)}",
                 ((i // 3) % USER_COUNT)+1,
                 None if i < 40 else f"Submission notes for map {i}",
-                (i // 4) % 2,
+                1 if (i // 4) % 2 == 0 else 51,
                 (i // 5) % 7,
                 rand_rejector.randint(1, USER_COUNT+1) if (i+7) % 13 == 0 else None,
                 start_timestamp + i*3600 * (-1 if i % 23 == 0 else 1),
@@ -351,10 +401,10 @@ def random_map_submissions() -> list[MapSubmission]:
                 f"MLXX{num_to_letters(i)}",
                 1,
                 None,
-                0,
+                1,
                 0,
                 2 if i % 2 == 0 else None,
-                start_timestamp - i*3600,
+                start_timestamp - (i + 1)*3600,
                 rand_images.choice(images),
                 None,
             )
@@ -424,6 +474,7 @@ def random_maps() -> tuple[int, list[Map]]:
                 None if plc < 40 else f"@{plc-39}",
                 None if plc < 45 or plc > 50 else f"deleted_maplist_map_{plc-45}",
             ]),
+            remake_of=(plc//11 + 1) if plc % 11 == 0 else None,
         ))
         map_uid += 1
 
@@ -709,6 +760,47 @@ def gen_misc_completions(comp_uid: int = 1, lcc_uid: int = 1) -> tuple[int, int,
     return comp_uid+len(comps), lcc_uid, comps
 
 
+def gen_round_completions(comp_uid: int) -> tuple[int, list[Completion]]:
+    if comp_uid % 2 == 0:
+        return comp_uid+1, [
+            Completion(
+                comp_uid,
+                MapKey("MLXXXEJ"),
+                True,
+                True,
+                start_timestamp + 1,
+                None,
+                3,
+                None if lcc_uid % 3 == 0 else 3,
+                1,
+                None,
+                None,
+                LCC(lcc_uid, lcc_uid * 1000),
+                [19, 40, 41],
+                [],
+                [],
+            ),
+        ]
+    return comp_uid, []
+
+
+def gen_retro_maps() -> list[RetroMap]:
+    amount = 200
+    maps = []
+    for i in range(1, amount):
+        maps.append(
+            RetroMap(
+                i,
+                f"Track BTD{i//50+1}",
+                i % 30,
+                i//50+1,
+                i // 20,
+                i // 30,
+            )
+        )
+    return maps
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -722,16 +814,43 @@ if __name__ == '__main__':
     comp_uid, lcc_uid, completions_lccs = gen_extra_lccs(maps[0], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_lb = gen_lb_completions(maps[37], comp_uid=comp_uid, lcc_uid=lcc_uid)
     comp_uid, lcc_uid, completions_misc = gen_misc_completions(comp_uid=comp_uid, lcc_uid=lcc_uid)
-    completions += completions_rec + completions_pro + completions_lccs + completions_lb + completions_misc
+    comp_uid, completions_round = gen_round_completions(comp_uid=comp_uid)
+    completions += completions_rec + \
+                   completions_pro + \
+                   completions_lccs + \
+                   completions_lb + \
+                   completions_misc + \
+                   completions_round
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps
+    retro_maps = gen_retro_maps()
+
+    achievement_roles = random_achivement_roles()
 
     achievement_roles = random_achivement_roles()
 
     with open(bpath / "01_maps.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_map() for x in maps
+        ))
+    with open(bpath / "12_retro_games.csv", "w") as fout:
+        retro_games = {}
+        for x in retro_maps:
+            key = x.game, x.difficulty, x.subcategory
+            if key not in retro_games:
+                retro_games[key] = (f"game{x.game}", f"diff{x.difficulty}", f"sub{x.subcategory}")
+        fout.write("\n".join(
+            SEPARATOR.join(stringify(*key, *retro_games[key]))
+            for key in retro_games
+        ))
+    with open(bpath / "13_retro_maps.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_retro_map() for x in retro_maps
+        ))
+    with open(bpath / "14_map_list_meta.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_map_meta() for x in maps
         ))
     with open(bpath / "02_users.csv", "w") as fout:
         fout.write("\n".join(
@@ -771,11 +890,11 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_submission() for x in map_submissions
         ))
-    with open(bpath / "20_list_completions.csv", "w") as fout:
+    with open(bpath / "20_completions.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_completion() for x in completions
         ))
-    with open(bpath / "21_listcomp_players.csv", "w") as fout:
+    with open(bpath / "23_comp_players.csv", "w") as fout:
         fout.write("\n".join(
             x.dump_players() for x in completions
         ))
@@ -783,6 +902,10 @@ if __name__ == '__main__':
         fout.write("\n".join(
             x.dump_proofs() for x in completions
             if len(x.subm_proof_img) + len(x.subm_proof_vid)
+        ))
+    with open(bpath / "21_completions_meta.csv", "w") as fout:
+        fout.write("\n".join(
+            x.dump_completion_meta() for x in completions
         ))
     with open(bpath / "08_leastcostchimps.csv", "w") as fout:
         fout.write("\n".join(

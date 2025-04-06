@@ -1,7 +1,7 @@
 import pytest
 import http
 import src.utils.misc
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata
 
 HEADERS = {"Authorization": "Bearer test_client"}
@@ -27,34 +27,34 @@ async def calc_ml_user_points(user_id: int, btd6ml_test_client) -> int:
             bonuses_applied = {"ger": False, "bb": False, "lcc": False}
             points += raw_pts * multiplier
             multiplier = 1
-            if compl["map"]["placement_cur"] in range(1, config["map_count"]+1):
+            if compl["map"]["placement_curver"] in range(1, config["map_count"]["value"]+1):
                 raw_pts = src.utils.misc.point_formula(
-                    compl["map"]["placement_cur"],
-                    config["points_bottom_map"],
-                    config["points_top_map"],
-                    config["map_count"],
-                    config["formula_slope"],
+                    compl["map"]["placement_curver"],
+                    config["points_bottom_map"]["value"],
+                    config["points_top_map"]["value"],
+                    config["map_count"]["value"],
+                    config["formula_slope"]["value"],
                 )
-                raw_pts = round(raw_pts, config["decimal_digits"])
+                raw_pts = round(raw_pts, config["decimal_digits"]["value"])
             else:
                 raw_pts = 0
         if compl["current_lcc"] and not bonuses_applied["lcc"]:
-            points += config["points_extra_lcc"]
+            points += config["points_extra_lcc"]["value"]
             bonuses_applied["lcc"] = True
 
         if compl["no_geraldo"] and compl["black_border"]:
-            multiplier = config["points_multi_bb"] * config["points_multi_gerry"]
+            multiplier = config["points_multi_bb"]["value"] * config["points_multi_gerry"]["value"]
             bonuses_applied["ger"] = True
             bonuses_applied["bb"] = True
         elif compl["black_border"] and not bonuses_applied["bb"]:
             if bonuses_applied["ger"]:
-                multiplier += config["points_multi_bb"]
-            multiplier = config["points_multi_bb"]
+                multiplier += config["points_multi_bb"]["value"]
+            multiplier = config["points_multi_bb"]["value"]
             bonuses_applied["bb"] = True
         elif compl["no_geraldo"] and not bonuses_applied["ger"]:
             if bonuses_applied["bb"]:
-                multiplier += config["points_multi_gerry"]
-            multiplier = config["points_multi_gerry"]
+                multiplier += config["points_multi_gerry"]["value"]
+            multiplier = config["points_multi_gerry"]["value"]
             bonuses_applied["ger"] = True
     points += raw_pts * multiplier
 
@@ -68,7 +68,7 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     async with btd6ml_test_client.get(f"/users/{user_id}/completions?formats=1,51") as resp:
         user_comps = sorted(
             (await resp.json())["completions"],
-            key=lambda x: (x["map"]["code"], x["no_geraldo"]),
+            key=lambda x: x["map"]["code"],
             reverse=True,
         )
 
@@ -76,13 +76,22 @@ async def calc_exp_user_points(user_id: int, btd6ml_test_client) -> int:
     config_keys_nogerry = ["exp_nogerry_points_casual", "exp_nogerry_points_medium", "exp_nogerry_points_high",
            "exp_nogerry_points_true", "exp_nogerry_points_extreme"]
     points = 0
+    used_multis = {"no_gerry": False, "lcc": False, "bb": False}
     for i, comp in enumerate(user_comps):
-        if comp["map"]["difficulty"] == -1:
+        if comp["map"]["difficulty"] is None:
             continue
         if i == 0 or comp["map"]["code"] != user_comps[i - 1]["map"]["code"]:
-            points += config[config_keys[comp["map"]["difficulty"]]]
-            if comp["no_geraldo"]:
-                points += config[config_keys_nogerry[comp["map"]["difficulty"]]]
+            used_multis = {"no_gerry": False, "lcc": False, "bb": False}
+            points += config[config_keys[comp["map"]["difficulty"]]]["value"]
+            if comp["no_geraldo"] and not used_multis["no_gerry"]:
+                used_multis["no_gerry"] = True
+                points += config[config_keys_nogerry[comp["map"]["difficulty"]]]["value"]
+            if comp["black_border"] and not used_multis["bb"]:
+                used_multis["bb"] = True
+                points += config[config_keys[comp["map"]["difficulty"]]]["value"] * (config["exp_bb_multi"]["value"]-1)
+            if comp["current_lcc"] and not used_multis["lcc"]:
+                used_multis["lcc"] = True
+                points += config["exp_lcc_extra"]["value"]
     return points
 
 
@@ -90,7 +99,7 @@ async def calc_completion_count(
         user_id: int,
         formats: list[int],
         btd6ml_test_client,
-        req_field: str = "placement_cur",
+        req_field: str = "placement_curver",
         count_key: str = "current_lcc",
 ) -> int:
     async with btd6ml_test_client.get(
@@ -103,9 +112,9 @@ async def calc_completion_count(
         )
     comp_count = 0
     for i, comp in enumerate(user_comps):
-        if req_field == "placement_cur" and comp["map"]["placement_cur"] not in range(1, 50):
+        if req_field == "placement_curver" and comp["map"]["placement_curver"] not in range(1, 50):
             continue
-        elif req_field == "difficulty" and comp["map"]["difficulty"] == -1:
+        elif req_field == "difficulty" and comp["map"]["difficulty"] is None:
             continue
 
         if comp[count_key] and (i == 0 or user_comps[i - 1]["map"]["code"] != comp["map"]["code"]):
@@ -200,7 +209,7 @@ class TestLeaderboard:
 class TestRecalc:
     async def test_config_recalc(self, btd6ml_test_client, mock_auth):
         """Test the point leaderboards are updated on config var changes"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         req_config = {
             "exp_points_casual": 10,
@@ -208,6 +217,13 @@ class TestRecalc:
             "exp_points_high": 32,
             "exp_points_true": 43,
             "exp_points_extreme": 54,
+            "exp_nogerry_points_casual": 2,
+            "exp_nogerry_points_medium": 3,
+            "exp_nogerry_points_high": 4,
+            "exp_nogerry_points_true": 5,
+            "exp_nogerry_points_extreme": 6,
+            "exp_bb_multi": 3,
+            "exp_lcc_extra": 6,
 
             "points_top_map": 200,
             "points_bottom_map": 1,
@@ -219,15 +235,13 @@ class TestRecalc:
         }
         async with btd6ml_test_client.put("/config", headers=HEADERS, json={"config": req_config}) as resp:
             assert resp.status == http.HTTPStatus.OK, f"Editing config returned {resp.status}"
-            import pprint
-            pprint.pprint(await resp.json())
 
         user_id = 47
         points = await calc_ml_user_points(user_id, btd6ml_test_client)
         assert await get_lb_score(user_id, 1, "points", btd6ml_test_client) == points, \
             "Maplist user points differ from expected"
 
-        user_id = 1
+        user_id = 39
         points = await calc_exp_user_points(user_id, btd6ml_test_client)
         assert await get_lb_score(user_id, 51, "points", btd6ml_test_client) == points, \
             "Experts user points differ from expected"
@@ -263,7 +277,7 @@ class TestRecalc:
     async def test_placement_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the maplist point leaderboard is updated on placement changes"""
         USER_ID = 47
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         async with btd6ml_test_client.get("/maps/1") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Getting a map returned {resp.status}"
@@ -281,12 +295,12 @@ class TestRecalc:
     async def test_diff_change_recalc(self, btd6ml_test_client, mock_auth, map_payload):
         """Test the experts point leaderboard is updated on placement changes"""
         USER_ID = 1
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
 
         async with btd6ml_test_client.get(f"/users/{USER_ID}/completions") as resp:
             assert resp.status == http.HTTPStatus.OK, f"Get a user's completions returned {resp.status}"
             for compl in (await resp.json())["completions"]:
-                if compl["map"]["difficulty"] != -1:
+                if compl["map"]["difficulty"] is not None:
                     map_code = compl["map"]["code"]
 
         req_data = map_payload(map_code)

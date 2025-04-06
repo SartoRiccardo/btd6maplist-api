@@ -5,28 +5,6 @@ from src.db.queries.misc import get_config, update_config
 import src.utils.routedecos
 import src.log
 
-var_perms = {
-    "points_top_map": (True, False),
-    "points_bottom_map": (True, False),
-    "formula_slope": (True, False),
-    "points_extra_lcc": (True, False),
-    "points_multi_gerry": (True, False),
-    "points_multi_bb": (True, False),
-    "decimal_digits": (True, False),
-    "map_count": (True, False),
-    "current_btd6_ver": (True, True),
-    "exp_points_casual": (False, True),
-    "exp_points_medium": (False, True),
-    "exp_points_high": (False, True),
-    "exp_points_true": (False, True),
-    "exp_points_extreme": (False, True),
-    "exp_nogerry_points_casual": (False, True),
-    "exp_nogerry_points_medium": (False, True),
-    "exp_nogerry_points_high": (False, True),
-    "exp_nogerry_points_true": (False, True),
-    "exp_nogerry_points_extreme": (False, True),
-}
-
 
 async def get(_r: web.Request):
     """
@@ -42,7 +20,10 @@ async def get(_r: web.Request):
             schema:
               type: object
     """
-    return web.json_response(await get_config())
+    config = await get_config()
+    return web.json_response({
+        key: config[key].to_dict() for key in config
+    })
 
 
 async def put_validate(body: dict) -> dict:
@@ -51,14 +32,15 @@ async def put_validate(body: dict) -> dict:
     if not isinstance(body["config"], dict):
         return {"config": "Must be of type object"}
 
-    for key in body["config"]:
-        if key not in var_perms:
-            return {key: "Invalid key"}
-
     errors = {}
     config = await get_config()
+
     for key in body["config"]:
-        vtype = type(config[key])
+        if key not in config:
+            return {key: "Invalid key"}
+
+    for key in body["config"]:
+        vtype = type(config[key].value)
         try:
             body["config"][key] = vtype(body["config"][key])
         except (ValueError, TypeError):
@@ -74,16 +56,14 @@ async def put(
         _r: web.Request,
         json_body: dict = None,
         discord_profile: dict = None,
-        is_admin: bool = False,
-        is_list_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ):
     """
     ---
     description: |
-      Change any number of the config variables. Certain roles have access to change different variables.
-      Must be a Maplist or Expert List Moderator. Changes to variables you don't have access to will be ignored.
+      Change any number of config variables. Must have edit:config on the variables you're editing.
+      Changes to variables you don't have access to will be ignored.
     tags:
     - Config
     requestBody:
@@ -125,16 +105,9 @@ async def put(
                     $ref: "#/components/schemas/ConfigVar"
                   example: []
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
     """
 
-    if not is_admin:
-        cvar_keys = list(json_body["config"].keys())
-        for key in cvar_keys:
-            check_ml_mod, check_exp_mod = var_perms[key]
-            if not (check_ml_mod and is_list_mod or check_exp_mod and is_explist_mod):
-                del json_body["config"][key]
-
-    await update_config(json_body["config"])
+    changed_vars = await update_config(json_body["config"], permissions.formats_where("edit:config"))
     asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], discord_profile["id"]))
-    return web.json_response({"errors": {}, "data": json_body["config"]})
+    return web.json_response({"errors": {}, "data": changed_vars})

@@ -1,5 +1,5 @@
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import invalidate_field, fuzz_data, remove_fields
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -44,7 +44,7 @@ class CompletionTest:
         if endpoint_get_put is None:
             endpoint_get_put = endpoint_put
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
         req_comp_data = completion_payload()
         extra_expected = {
             "lcc": [None],
@@ -82,7 +82,7 @@ class CompletionTest:
         if endpoint_get_put is None:
             endpoint_get_put = endpoint_put
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.mod()})
         req_comp_data = completion_payload()
 
         for req_data, path in remove_fields(req_comp_data):
@@ -180,7 +180,7 @@ class CompletionTest:
         if endpoint_put_own:
             async with assert_state_unchanged(endpoint_get_own) as completion_og:
                 completed_by = completion_og["users"][0]["id"]
-                await mock_auth(perms=DiscordPermRoles.ADMIN, user_id=completed_by)
+                await mock_auth(perms={None: Permissions.mod()}, user_id=completed_by)
 
                 req_data = completion_payload()
                 req_data["user_ids"] = ["1"]
@@ -215,29 +215,25 @@ class CompletionTest:
             assert_state_unchanged,
             btd6ml_test_client,
             completion_payload,
-            perms: int,
             endpoint_put: str = None,
             endpoint_del: str = None,
             endpoint_get: str = None,
     ):
-        mod_name_str = "Maplist" if perms & DiscordPermRoles.MAPLIST_MOD else "Expert"
-        comp_name_str = "Expert" if perms & DiscordPermRoles.MAPLIST_MOD else "Maplist"
-
-        await mock_auth(perms=perms)
         async with assert_state_unchanged(endpoint_get) as completion:
+            await mock_auth(perms={52: {"delete:completion"}})
             if endpoint_del:
                 async with btd6ml_test_client.delete(endpoint_del, headers=HEADERS) as resp:
                     assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                        f"Deleting a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+                        f"Deleting a completion without delete:completion in that format returns {resp.status}"
 
+            await mock_auth(perms={52: {"edit:completion"}})
             req_data = completion_payload()
-            async with btd6ml_test_client.put(endpoint_put, headers=HEADERS,
-                                              json=req_data) as resp:
+            async with btd6ml_test_client.put(endpoint_put, headers=HEADERS, json=req_data) as resp:
                 assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                    f"Editing a {comp_name_str} completion as a {mod_name_str} Mod returns {resp.status}"
+                    f"Editing a completion without edit:completion in that format returns {resp.status}"
 
             req_data["format"] = completion["format"]
             async with btd6ml_test_client.put(endpoint_put, headers=HEADERS, json=req_data) as resp:
                 assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                    f"Editing a {comp_name_str} completion as a {mod_name_str} Mod while leaving the format " \
-                    f"unchanged returns {resp.status}"
+                    f"Editing a completion without edit:completion in that format and leaving the format unchanged " \
+                    f"returns {resp.status}"

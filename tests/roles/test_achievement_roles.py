@@ -2,7 +2,7 @@ import http
 import pytest
 import src.utils.validators
 from ..testutils import fuzz_data, invalidate_field, remove_fields
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -51,7 +51,7 @@ async def test_get_ach_roles(btd6ml_test_client):
 
 async def test_submit_roles(btd6ml_test_client, mock_auth):
     """Test changing a format's roles, and not interfering with other roles"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: {Permissions.edit.achievement_roles}})
     data = {
         "lb_format": 1,
         "lb_type": "points",
@@ -110,7 +110,7 @@ class TestAchievementRoleValidation:
         }
         extra_expected = {"roles": {"tooltip_description": [None]}}
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.achievement_roles}})
         for req_data, path, dtype in fuzz_data(data, extra_expected=extra_expected, int_as_float=True):
             async with assert_state_unchanged("/roles/achievement"), \
                     btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=req_data) as resp:
@@ -135,22 +135,16 @@ class TestAchievementRoleValidation:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Modifying achievement roles without necessary perms returned {resp.status}"
 
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
+        await mock_auth(perms={51: {Permissions.edit.achievement_roles}})
         async with assert_state_unchanged("/roles/achievement"), \
                 btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Modifying Maplist achievement roles without being a Maplist Mod returned {resp.status}"
-
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
-        data["lb_format"] = 51
-        async with assert_state_unchanged("/roles/achievement"), \
-                btd6ml_test_client.put("/roles/achievement", headers=HEADERS, json=data) as resp:
-            assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Modifying Expert achievement roles without being a Expert Mod returned {resp.status}"
+                f"Modifying achievement roles without having edit:achievement_roles in that format returns " \
+                f"{resp.status}"
 
     async def test_submit_invalid(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
         """Test setting fields to invalid values"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.achievement_roles}})
         data = {
             "lb_format": 1,
             "lb_type": "points",
@@ -248,7 +242,7 @@ class TestAchievementRoleValidation:
             ]
         }
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: {Permissions.edit.achievement_roles}})
 
         for req_data, path in remove_fields(data):
             async with assert_state_unchanged(f"/roles/achievement"), \

@@ -17,8 +17,7 @@ async def put(
         request: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """
@@ -73,8 +72,7 @@ async def put(
     data = await get_completion_request(
         request,
         discord_profile["id"],
-        is_maplist_mod=is_maplist_mod,
-        is_explist_mod=is_explist_mod,
+        permissions=permissions,
         resource=resource,
     )
     if isinstance(data, web.Response):

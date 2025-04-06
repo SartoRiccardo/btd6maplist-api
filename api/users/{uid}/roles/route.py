@@ -82,10 +82,9 @@ async def patch(
     """
     granter_roles = await get_user_roles(discord_profile["id"])
 
-    can_grant = []
+    can_grant = set()
     for role in granter_roles:
-        can_grant += role.can_grant
-    can_grant = set(can_grant)
+        can_grant.update(role.can_grant)
 
     to_delete = []
     to_grant = []

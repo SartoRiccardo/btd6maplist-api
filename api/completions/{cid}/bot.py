@@ -16,8 +16,7 @@ async def delete(
         _r: web.Request,
         resource: "src.db.models.ListCompletionWithMeta" = None,
         json_data: dict = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """Only deletes if not `accepted_by`"""
@@ -28,9 +27,9 @@ async def delete(
         )
 
     err_resp = validate_completion_perms(
-        is_maplist_mod,
-        is_explist_mod,
+        permissions,
         resource.format,
+        action="delete",
     )
     if isinstance(err_resp, web.Response):
         return err_resp

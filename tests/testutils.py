@@ -7,6 +7,8 @@ import aiohttp
 from typing import Any
 from collections.abc import Generator
 
+HEADERS = {"Authorization": "Bearer test_token"}
+
 
 def override_config():
     spec = importlib.util.spec_from_file_location(

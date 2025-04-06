@@ -2,21 +2,41 @@ import asyncio
 import http
 import math
 import json
-import pathlib
 import pytest
-import requests
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
 
 
-def to_subm_formdata(subm_data: dict, img_url: str, tmp_path: pathlib.Path):
-    form_data = to_formdata(subm_data)
-    path = tmp_path / "proof_completion.png"
-    path.write_bytes(requests.get(img_url).content)
-    form_data.add_field("proof_completion", path.open("rb"))
-    return form_data
+@pytest.fixture
+def assert_implicit_accept(btd6ml_test_client, submit_test_map, mock_auth, map_payload, assert_submission):
+    async def function(
+            test_code: str = None,
+            exists: tuple[bool, bool] = None,
+            changes: tuple[list[tuple[str, int]], list[tuple[str, int]]] = None,
+    ) -> None:
+        should_exist_post, should_exist_put = exists
+        changes_post, changes_put = changes
+
+        await submit_test_map(test_code)
+
+        await mock_auth(user_id=5, perms={None: Permissions.curator()})
+        map_data = map_payload(test_code)
+        for key, value in changes_post:
+            map_data[key] = value
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Adding map with correct payload returns {resp.status}"
+            await assert_submission(test_code, exists=should_exist_post)
+
+        for key, value in changes_put:
+            map_data[key] = value
+        async with btd6ml_test_client.put(f"/maps/{test_code}", headers=HEADERS, data=to_formdata(map_data)) as resp:
+            assert resp.status == http.HTTPStatus.NO_CONTENT, \
+                f"Editing a map with correct payload returns {resp.status}"
+            await assert_submission(test_code, exists=should_exist_put)
+    return function
 
 
 @pytest.mark.get
@@ -84,6 +104,22 @@ class TestGetSubmissions:
 @pytest.mark.post
 @pytest.mark.submissions
 class TestSubmitMap:
+    async def test_closed_submissions(self, btd6ml_test_client, mock_auth, map_submission_payload, save_image,
+                                      valid_codes, assert_state_unchanged):
+        """Test submitting a map to a format with map submissions closed"""
+        await mock_auth()
+
+        proof_completion = save_image(1)
+        valid_data = map_submission_payload(valid_codes[4])
+        valid_data["format"] = 2
+
+        form_data = to_formdata(valid_data)
+        form_data.add_field("proof_completion", proof_completion.open("rb"))
+        async with assert_state_unchanged("/maps/submit"), \
+                btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
+            assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+                f"Submitting a map to a list with map submissions closed returned {resp.status}"
+
     async def test_missing_fields(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
                                   save_image):
         """Test a submission without the required fields"""
@@ -180,12 +216,11 @@ class TestSubmitMap:
             (-1, "a map with a negative [keypath]"),
             (30, "a map with a [keypath] too large"),
         ]
-        invalid_schema = {None: ["type"]}
+        invalid_schema = {None: ["format", "proposed"]}
         for req_data, edited_path, error_msg in invalidate_field(valid_data, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_unauthorized(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
-                                save_image):
+    async def test_unauthorized(self, btd6ml_test_client):
         """Test a submission from an unauthorized user or one not in the Maplist Discord"""
         async with btd6ml_test_client.post("/maps/submit") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
@@ -197,7 +232,7 @@ class TestSubmitMap:
 
     async def test_banned(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes, save_image):
         """Test a submission from a user with a banned role"""
-        await mock_auth(perms=DiscordPermRoles.BANNED)
+        await mock_auth(perms={})
 
         proof_completion = save_image(1)
         valid_data = map_submission_payload(valid_codes[1])
@@ -238,8 +273,8 @@ class TestHandleSubmissions:
     @pytest.mark.delete
     async def test_reject_submission(self, btd6ml_test_client, mock_auth):
         """Test rejecting a map submission"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBJ", headers=HEADERS) as resp:
+        await mock_auth(perms={51: {Permissions.delete.map_submission}})
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBJ/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Rejecting a submission returned {resp.status}"
             async with btd6ml_test_client.get("/maps/submit") as resp_get:
@@ -273,13 +308,13 @@ class TestHandleSubmissions:
                     "Most recently submitted code differs from expected"
                 prev_created_on = resp_data["submissions"][0]["created_on"]
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
-        async with btd6ml_test_client.delete(f"/maps/submit/{TEST_CODE}", headers=HEADERS) as resp:
+        await mock_auth(perms={None: {Permissions.delete.map_submission}})
+        async with btd6ml_test_client.delete(f"/maps/submit/{TEST_CODE}/formats/1", headers=HEADERS) as resp, \
+                btd6ml_test_client.get("/maps/submit") as resp_get:
             assert resp.status == http.HTTPStatus.NO_CONTENT, f"Deleting a submission returned {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != TEST_CODE, \
-                    "Most recently submitted map is still there after deletion"
+            resp_data = await resp_get.json()
+            assert resp_data["submissions"][0]["code"] != TEST_CODE, \
+                "Most recently submitted map is still there after deletion"
 
         await asyncio.sleep(1)  # Otherwise created_on timestamps might be equal
 
@@ -302,57 +337,88 @@ class TestHandleSubmissions:
         Test rejecting a map submission without having the perms to do so.
         List mods shouldn't reject a map submitted to the expert list, and vice versa.
         """
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH") as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51") as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map submission with no headers returns {resp.status}"
 
         await mock_auth(unauthorized=True)
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map submission with an invalid token returns {resp.status}"
 
         await mock_auth()
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map submission without perms returns {resp.status}"
 
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH", headers=HEADERS) as resp:
+        await mock_auth(perms={1: {Permissions.delete.map_submission}})
+        async with btd6ml_test_client.delete("/maps/submit/SUBXBBH/formats/51", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Deleting an Expert List map submission without being an Experts Mod returns {resp.status}"
+                f"Deleting a map submission without having delete:map_submission on that format returns {resp.status}"
 
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
-        async with btd6ml_test_client.delete("/maps/submit/SUBXBBF", headers=HEADERS) as resp:
-            assert resp.status == http.HTTPStatus.FORBIDDEN, \
-                f"Deleting a Maplist List map submission without being a Maplist Mod returns {resp.status}"
+    async def test_implicit_accept_add(self, assert_implicit_accept, valid_codes):
+        """Test seeing a submission disappears after the map is added."""
+        await assert_implicit_accept(
+            test_code=valid_codes[0],
+            exists=(False, False),
+            changes=(
+                [("placement_curver", 1)],
+                [("placement_curver", None), ("difficulty", 1)]
+            ),
+        )
 
-    async def test_implicit_accept(self, btd6ml_test_client, mock_auth, map_submission_payload, valid_codes,
-                                   map_payload, tmp_path):
-        """Test seeing a submission disappears after the map is added to the database."""
-        await mock_auth()
+    async def test_implicit_accept_edit(self, assert_implicit_accept, valid_codes):
+        """Test seeing a submission disappears after the map is edited."""
+        await assert_implicit_accept(
+            test_code=valid_codes[1],
+            exists=(True, False),
+            changes=(
+                [("difficulty", 1)],
+                [("difficulty", None), ("placement_curver", 1)]
+            ),
+        )
 
-        test_code = valid_codes[0]
-        req_data = map_submission_payload(test_code)
-        form_data = to_subm_formdata(req_data, "https://dummyimage.com/400x300/00ff00/000", tmp_path)
-        async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Valid submission returned {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] == test_code, \
-                    "Latest submission differs from expected"
+    async def test_implicit_not_accept(self, assert_implicit_accept, valid_codes):
+        """Test a submission staying there if it wasn't added to its requested formats."""
+        await assert_implicit_accept(
+            test_code=valid_codes[2],
+            exists=(True, True),
+            changes=(
+                [("difficulty", 1)],
+                [("botb_difficulty", 4)]
+            ),
+        )
 
-        await mock_auth(user_id=5, perms=DiscordPermRoles.MAPLIST_MOD)
+    async def test_resubmit(self, btd6ml_test_client, mock_auth, valid_codes, map_payload, submit_test_map,
+                            assert_submission):
+        """Test resubmitting a map that was taken off a format."""
+        test_code = valid_codes[3]
+        await submit_test_map(test_code)
+
+        await mock_auth(user_id=5, perms={None: Permissions.curator()})
         map_data = map_payload(test_code)
         map_data["placement_curver"] = 1
-        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Adding map with correct payload returns {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != test_code, \
-                    "Latest submission is still the recently added map"
-            async with btd6ml_test_client.get("/maps/submit?pending=all") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != test_code, \
-                    "Latest submission is still the recently added map, when showing all submissions"
+        async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(map_data)) as resp_post, \
+                btd6ml_test_client.delete(f"/maps/{test_code}", headers=HEADERS) as resp_del:
+            assert resp_post.status == http.HTTPStatus.CREATED, \
+                f"Adding map with correct payload returns {resp_post.status}"
+            assert resp_del.status == http.HTTPStatus.NO_CONTENT, \
+                f"Adding map with correct payload returns {resp_del.status}"
+            await assert_submission(test_code, exists=False)
+
+        await submit_test_map(test_code)
+
+    async def test_submit_two_formats(self, btd6ml_test_client, valid_codes, submit_test_map):
+        """Test submitting the same map on 2 formats"""
+        test_code = valid_codes[5]
+        test_formats = [1, 51]
+        for format_id in test_formats:
+            await submit_test_map(test_code, format_id=format_id)
+
+        async with btd6ml_test_client.get("/maps/submit") as resp:
+            resp_data = await resp.json()
+            for i, format_id in enumerate(reversed(test_formats)):
+                assert resp_data["submissions"][i]["code"] == test_code, \
+                    f"Submitted map code at position {i} differs from expected"
+                assert resp_data["submissions"][i]["format"] == format_id, \
+                    f"Submitted map format ID at position {i} differs from expected"

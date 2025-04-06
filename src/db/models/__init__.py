@@ -1,15 +1,49 @@
 import re
 import yaml
-from .maps import Map, PartialMap, PartialExpertMap, PartialListMap
+from .Config import Config
+from .maps import Map, PartialMap, MinimalMap, RetroMap
 from .challenges import LCC, ListCompletion, ListCompletionWithMeta
-from .users import User, PartialUser, MaplistProfile, MaplistMedals
+from .users import User, PartialUser, MaplistProfile, MaplistMedals, MinimalUser
 from .Role import Role
 from .LeaderboardEntry import LeaderboardEntry
 from .MapSubmission import MapSubmission
 from .AchievementRole import DiscordRole, AchievementRole, RoleUpdateAction
+from .Format import Format
+from .Permissions import Permissions
 
+entities = [
+    RetroMap,
+    Config,
+    Map,
+    PartialMap,
+    MinimalUser,
+    MinimalMap,
+    LCC,
+    ListCompletion,
+    ListCompletionWithMeta,
+    User,
+    PartialUser,
+    MaplistProfile,
+    LeaderboardEntry,
+    MaplistMedals,
+    MapSubmission,
+    Role,
+    DiscordRole,
+    AchievementRole,
+    RoleUpdateAction,
+    Format,
+]
 
 swagger_definitions_str = """
+NamedObject:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+      nullable: true
+      
 DiscordID:
   type: string
   description: an user's Discord ID. Is numeric.
@@ -20,18 +54,21 @@ RequestUserID:
 
 MaplistFormat:
   type: int
-  enum: [1, 2, 51]
+  enum: [1, 2, 51, 52, 11]
   description: >
-    The format a run was played in. Formats 1-50 are for the Maplist, 51-100 are for Expert List.\\n
+    The format a run was played in.\\n
     * `1` - Maplist ~ current version.\\n
     * `2` - Maplist ~ all versions.\\n
-    * `51` - Expert List.
+    * `11` - Nostalgia Pack.\\n
+    * `51` - Expert List.\\n
+    * `52` - Best of the Best.
 
 ExpertDifficulty:
   type: int
-  enum: [-1, 0, 1, 2, 3, 4]
+  nullable: true
+  enum: [0, 1, 2, 3, 4]
   description: >
-    The Expert difficulty. If none, it's set to `-1`.\\n
+    The Expert difficulty.\\n
     * `0` - Casual Expert.\\n
     * `1` - Medium Expert.\\n
     * `2` - High Expert.\\n
@@ -81,25 +118,6 @@ def remove_init_indent(docstring: str, init_padding: int) -> str:
     )
 
 
-entities = [
-    Map,
-    PartialMap,
-    PartialExpertMap,
-    PartialListMap,
-    LCC,
-    ListCompletion,
-    ListCompletionWithMeta,
-    User,
-    PartialUser,
-    MaplistProfile,
-    LeaderboardEntry,
-    MaplistMedals,
-    MapSubmission,
-    Role,
-    DiscordRole,
-    AchievementRole,
-    RoleUpdateAction,
-]
 for entity in entities:
     if not entity.__doc__:
         continue
