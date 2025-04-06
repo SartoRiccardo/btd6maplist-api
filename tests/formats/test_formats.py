@@ -13,18 +13,66 @@ format_schema = {
     "run_submission_status": str,
 }
 
+full_format_schema = {
+    **format_schema,
+    "run_submission_wh": str | None,
+    "map_submission_wh": str | None,
+    "emoji": str | None,
+}
+
 
 @pytest.mark.formats
 @pytest.mark.get
-async def test_formats(btd6ml_test_client):
-    """Test getting all formats"""
-    async with btd6ml_test_client.get("/formats") as resp:
-        assert resp.ok, f"GET /formats returned {resp.status}"
-        resp_data = await resp.json()
-        assert len(resp_data) == 5, "Returned more formats than expected"
-        for i, fmt in enumerate(resp_data):
-            assert len(src.utils.validators.check_fields(fmt, format_schema)) == 0, \
-                f"Error while validating Format[{i}]"
+class TestGetFormats:
+    async def test_formats(self, btd6ml_test_client):
+        """Test getting all formats"""
+        async with btd6ml_test_client.get("/formats") as resp:
+            assert resp.status == http.HTTPStatus.OK, f"GET /formats returned {resp.status}"
+            resp_data = await resp.json()
+            assert len(resp_data) == 5, "Returned more formats than expected"
+            for i, fmt in enumerate(resp_data):
+                assert len(src.utils.validators.check_fields(fmt, format_schema)) == 0, \
+                    f"Error while validating Format[{i}]"
+
+    async def test_get_format(self, btd6ml_test_client, mock_auth):
+        """Test getting a format successfully"""
+        await mock_auth(perms={1: {Permissions.edit.config}})
+        async with btd6ml_test_client.get("/formats/1", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.OK, f"GET /formats/:id returned {resp.status}"
+            resp_data = await resp.json()
+            assert len(src.utils.validators.check_fields(resp_data, full_format_schema)) == 0, \
+                f"Error while validating the full Format data"
+
+    async def test_get_nonexistent_format(self, btd6ml_test_client, mock_auth):
+        """Test getting a format that doesn't exist"""
+        await mock_auth(perms={1: {Permissions.edit.config}})
+        async with btd6ml_test_client.get("/formats/9999", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.NOT_FOUND, f"GET /formats/:id returned {resp.status}"
+
+    async def test_get_format_unauthorized(self, btd6ml_test_client, mock_auth):
+        """Test getting a format without providing authorization"""
+        await mock_auth(unauthorized=True)
+
+        async with btd6ml_test_client.get("/formats/1") as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Getting a format with no Authorization header returns {resp.status}"
+
+        async with btd6ml_test_client.get("/formats/1", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
+                f"Getting a format with an invalid token returns {resp.status}"
+
+    async def test_get_format_forbidden(self, btd6ml_test_client, mock_auth):
+        """Test getting a format without the necessary perms"""
+        await mock_auth(perms={None: Permissions.basic()})
+
+        async with btd6ml_test_client.get("/formats/1", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Getting a format without the necessary perms returns {resp.status}"
+
+        await mock_auth(perms={51: Permissions.mod()})
+        async with btd6ml_test_client.get("/formats/1", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Getting a format without the necessary perms in that format returns {resp.status}"
 
 
 @pytest.mark.formats
