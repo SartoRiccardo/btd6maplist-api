@@ -407,3 +407,18 @@ class TestHandleSubmissions:
             await assert_submission(test_code, exists=False)
 
         await submit_test_map(test_code)
+
+    async def test_submit_two_formats(self, btd6ml_test_client, valid_codes, submit_test_map):
+        """Test submitting the same map on 2 formats"""
+        test_code = valid_codes[4]
+        test_formats = [1, 51]
+        for format_id in test_formats:
+            await submit_test_map(test_code, format_id=format_id)
+
+        async with btd6ml_test_client.get("/maps/submit") as resp:
+            resp_data = await resp.json()
+            for i, format_id in enumerate(reversed(test_formats)):
+                assert resp_data["submissions"][i]["code"] == test_code, \
+                    f"Submitted map code at position {i} differs from expected"
+                assert resp_data["submissions"][i]["format"] == format_id, \
+                    f"Submitted map format ID at position {i} differs from expected"

@@ -34,20 +34,19 @@ def valid_codes():
 
 @pytest.fixture
 def submit_test_map(mock_auth, btd6ml_test_client, tmp_path, map_submission_payload):
-    async def function(map_code: str) -> None:
+    async def function(map_code: str, format_id: int = 1) -> None:
         await mock_auth()
 
-        req_data = map_submission_payload(map_code)
+        req_data = map_submission_payload(map_code, format=format_id)
         form_data = to_subm_formdata(req_data, "https://dummyimage.com/400x300/00ff00/000", tmp_path)
-        async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp:
-            if not resp.ok:
-                print(await resp.json())
+        async with btd6ml_test_client.post("/maps/submit", headers=HEADERS, data=form_data) as resp, \
+                btd6ml_test_client.get("/maps/submit") as resp_get:
             assert resp.status == http.HTTPStatus.CREATED, \
                 f"Valid submission returned {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] == map_code, \
-                    "Latest submission differs from expected"
+
+            resp_data = await resp_get.json()
+            assert resp_data["submissions"][0]["code"] == map_code, \
+                "Latest submission differs from expected"
     return function
 
 
