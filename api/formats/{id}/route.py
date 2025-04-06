@@ -82,7 +82,27 @@ async def put(
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Format"
+            type: object
+            properties:
+              hidden:
+                type: boolean
+                description: Whether maps with this format should be hidden.
+              run_submission_status:
+                type: int
+                description: Whether submissions are open, closed, ...
+                enum: ["open", "closed", "lcc_only"]
+              map_submission_status:
+                type: int
+                description: Whether map submissions are open, closed, ...
+                enum: ["open", "closed"]
+              run_submission_wh:
+                type: string
+                nullable: true
+                description: The webhook URL to send Discord embed-like information about completion submissions.
+              map_submission_wh:
+                type: string
+                nullable: true
+                description: The webhook URL to send Discord embed-like information about map submissions.
     responses:
       "204":
         description: The resource was modified correctly
