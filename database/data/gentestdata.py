@@ -801,6 +801,23 @@ def gen_retro_maps() -> list[RetroMap]:
     return maps
 
 
+def inject_botb_diff(maps: list[Map]) -> None:
+    diff_amount = 5
+
+    i = 0
+    diff = 0
+    injected = 0
+    while diff < diff_amount and i < len(maps):
+        if injected >= diff * 2:
+            injected = 0
+            diff += 1
+            continue
+
+        maps[i].botb_difficulty = diff
+        i += 1
+        injected += 1
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -828,7 +845,7 @@ if __name__ == '__main__':
 
     achievement_roles = random_achivement_roles()
 
-    achievement_roles = random_achivement_roles()
+    inject_botb_diff(maps)
 
     with open(bpath / "01_maps.csv", "w") as fout:
         fout.write("\n".join(

@@ -33,7 +33,7 @@ class DiscordRequestsMock(DiscordRequests):
 
     @staticmethod
     async def get_user_profile(access_token: str) -> dict:
-        if user_id := get_user_id(access_token):
+        if (user_id := get_user_id(access_token)) is None:
             raise aiohttp.ClientResponseError(None, (), status=http.HTTPStatus.UNAUTHORIZED)
 
         return {
