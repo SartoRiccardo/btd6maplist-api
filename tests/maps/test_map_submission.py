@@ -410,7 +410,7 @@ class TestHandleSubmissions:
 
     async def test_submit_two_formats(self, btd6ml_test_client, valid_codes, submit_test_map):
         """Test submitting the same map on 2 formats"""
-        test_code = valid_codes[4]
+        test_code = valid_codes[5]
         test_formats = [1, 51]
         for format_id in test_formats:
             await submit_test_map(test_code, format_id=format_id)

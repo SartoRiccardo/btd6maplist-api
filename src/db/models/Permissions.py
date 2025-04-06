@@ -29,6 +29,7 @@ class Permissions:
             "delete:map_submission",
             "edit:achievement_roles",
             "create:user",
+            "ban:user",
         ]
         return any(
             any(
