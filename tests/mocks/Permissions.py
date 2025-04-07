@@ -50,11 +50,16 @@ class Permissions:
             Permissions.edit.map,
             Permissions.delete.map,
             Permissions.misc.ban_user,
+            Permissions.delete.map_submission,
         })
 
     @staticmethod
     def mod() -> set[str]:
-        return Permissions.verifier().union(Permissions.curator())
+        return {
+            Permissions.edit.achievement_roles
+        }\
+            .union(Permissions.verifier())\
+            .union(Permissions.curator())
 
     @staticmethod
     def requires_recording() -> set[str]:

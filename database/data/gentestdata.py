@@ -817,6 +817,11 @@ def inject_botb_diff(maps: list[Map]) -> None:
         i += 1
         injected += 1
 
+    # Autofill form check
+    mlxxxed = next(m for m in maps if m.code == "MLXXXED")
+    mlxxxed.botb_difficulty = 3
+    mlxxxed.remake_of = 100
+
 
 if __name__ == '__main__':
     import os

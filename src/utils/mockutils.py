@@ -14,8 +14,9 @@ async def set_user_roles(token: str, conn=None) -> None:
       Category: !{category}/{format_ids, comma separated. If empty, present in all formats}
         For example: !mod/51+!curator/1,2
         Categories are methods in the Permissions class.
+      Role id: @{role_id} you can assign a role by ID, other than the test one.
 
-      You can combine the two types: edit:config/+!mod/51
+      You can combine the two types: edit:config/+!mod/51+@4
     """
     match = re.match(r"mock_discord_(\d+)_(.*)", token)
     if match is None:
@@ -25,6 +26,7 @@ async def set_user_roles(token: str, conn=None) -> None:
     perms_str = match.group(2)
 
     permissions: dict[int | None, set[str]] = {}
+    roles = []
 
     for segment in perms_str.split("+"):
         if segment.startswith("!"):
@@ -35,6 +37,10 @@ async def set_user_roles(token: str, conn=None) -> None:
 
             for format_id in ids:
                 permissions.setdefault(format_id, set()).update(perm_set)
+        elif segment.startswith("@"):
+            # Role ID
+            role_id = int(segment[1:])
+            roles.append(role_id)
         elif len(segment):
             # Specific permission
             perm_type, _, rest = segment.partition(":")
@@ -59,6 +65,7 @@ async def set_user_roles(token: str, conn=None) -> None:
             RETURNING id
             """,
         )
+        roles.append(role_id)
 
         role_permissions = []
         for format_id, role_perms in permissions.items():
@@ -75,7 +82,12 @@ async def set_user_roles(token: str, conn=None) -> None:
             role_permissions
         )
 
-        await conn.execute(
-            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)",
-            uid, role_id
+        await conn.executemany(
+            """
+            INSERT INTO user_roles
+                (user_id, role_id)
+            VALUES
+                ($1, $2)
+            """,
+            [(uid, role_id) for role_id in roles],
         )
