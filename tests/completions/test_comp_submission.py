@@ -527,11 +527,12 @@ class TestHandleSubmissions(CompletionTest):
         )
 
     @pytest.mark.post
-    async def test_forbidden(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
+    async def test_forbidden(self, btd6ml_test_client, mock_auth, assert_state_unchanged, completion_payload):
         """Test a user accepting a completion if they don't have perms"""
         await self._test_forbidden(
             btd6ml_test_client,
             mock_auth,
+            completion_payload,
             assert_state_unchanged,
             endpoint_put="/completions/29/accept",
             endpoint_get_put="/completions/29",

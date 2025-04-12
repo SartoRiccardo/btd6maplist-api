@@ -161,11 +161,12 @@ class TestValidateCompletions(CompletionTest):
     @pytest.mark.post
     @pytest.mark.put
     @pytest.mark.delete
-    async def test_forbidden(self, btd6ml_test_client, mock_auth, assert_state_unchanged):
+    async def test_forbidden(self, btd6ml_test_client, mock_auth, assert_state_unchanged, completion_payload):
         """Test a user adding, editing or deleting a completion if they don't have perms"""
         await self._test_forbidden(
             btd6ml_test_client,
             mock_auth,
+            completion_payload,
             assert_state_unchanged,
             endpoint_post="/maps/MLXXXAA/completions",
             endpoint_put="/completions/1",

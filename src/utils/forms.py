@@ -22,14 +22,12 @@ async def get_completion_request(
     async def validate_json_part(data: dict) -> None:
         await validate_completion(data)
 
-        err_resp = validate_completion_perms(
+        validate_completion_perms(
             permissions,
             data["format"],
             resource.format if resource else None,
             action="edit" if resource else "create",
         )
-        if isinstance(err_resp, web.Response):
-            return err_resp
 
         if user_id in data["user_ids"]:
             raise GenericErrorException(
@@ -54,6 +52,9 @@ async def get_completion_request(
     elif request.content_type == "application/json":
         data = await request.json()
         await validate_json_part(data)
+
+    if data is None:
+        raise GenericErrorException("No data was submitted")
 
     data["subm_proof"] = subm_proof
 

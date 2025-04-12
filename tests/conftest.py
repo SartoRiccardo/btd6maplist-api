@@ -234,9 +234,6 @@ async def mock_auth(mock_discord_api, set_roles, set_custom_role):
 
     async def set_mock(**kwargs) -> None:
         mocker = mock_discord_api(**kwargs)
-        if "perms" in kwargs and isinstance(kwargs["perms"], int):
-            pytest.skip("Uses old mock API")
-
         if kwargs.get("perms", None) is None:
             await set_roles(mocker.user_id, [CAN_SUBMIT_ROLE_ID])
         else:
@@ -502,3 +499,16 @@ def submission_formdata(save_image, partial_sign, finish_sign):
         return form_data
 
     return generate
+
+
+@pytest.fixture
+def payload_format():
+    def function() -> dict:
+        return {
+            "hidden": False,
+            "run_submission_status": "closed",
+            "map_submission_status": "closed",
+            "run_submission_wh": "https://discord.com/wh/999",
+            "map_submission_wh": "https://discord.com/wh/999",
+        }
+    return function

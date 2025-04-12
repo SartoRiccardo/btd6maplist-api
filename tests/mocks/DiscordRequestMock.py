@@ -36,6 +36,8 @@ class DiscordRequestMock:
         self.bot_guilds = bot_guilds if bot_guilds is not None else []
         self.user_guilds = user_guilds if user_guilds is not None else []
 
+        self.wh_events = []
+
     async def get_user_profile(self, *args) -> dict:
         if self.unauthorized:
             raise aiohttp.ClientResponseError(None, (), status=http.HTTPStatus.UNAUTHORIZED)
@@ -58,17 +60,18 @@ class DiscordRequestMock:
             # "premium_type": 0
         }
 
-    async def execute_webhook(self, *args, wait: bool = False) -> str:
+    async def execute_webhook(self, *args, wait: bool = False) -> str | None:
+        wh_id = int(self.wh_rand.random() * 1_000_000_000_000)
+        self.wh_events.append({"action": "post", "msg_id": wh_id})
         if wait:
-            return str(int(self.wh_rand.random() * 1_000_000_000_000))
+            return str(wh_id)
 
-    @staticmethod
-    async def patch_webhook(*args) -> bool:
+    async def patch_webhook(self, _hook_url: str, message_id: int, *args) -> bool:
+        self.wh_events.append({"action": "patch", "msg_id": message_id})
         return True
 
-    @staticmethod
-    async def delete_webhook(*args) -> None:
-        pass
+    async def delete_webhook(self, _hook_url: str, message_id: int) -> None:
+        self.wh_events.append({"action": "delete", "msg_id": message_id})
 
     async def get_user_guilds(self, *args, **kwargs) -> list[dict]:
         return [g.to_dict() for g in self.user_guilds]

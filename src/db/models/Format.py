@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 import src.utils.formats.formatinfo
+from src.utils.misc import str_to_comp_status, str_to_map_status
 
 
-submission_status_to_str = {
-    0: "closed",
-    1: "open",
-    2: "lcc_only"
+run_submission_status_to_str = {
+    value: key for key, value in str_to_comp_status.items()
+}
+map_submission_status_to_str = {
+    value: key for key, value in str_to_map_status.items()
 }
 
 
@@ -77,8 +79,8 @@ class Format:
             "id": self.id,
             "name": self.name,
             "hidden": self.hidden,
-            "run_submission_status": submission_status_to_str.get(self.run_submission_status, "closed"),
-            "map_submission_status": submission_status_to_str.get(self.map_submission_status, "closed"),
+            "run_submission_status": run_submission_status_to_str.get(self.run_submission_status, "closed"),
+            "map_submission_status": map_submission_status_to_str.get(self.map_submission_status, "closed"),
             "proposed_difficulties": proposed_values,
         }
 

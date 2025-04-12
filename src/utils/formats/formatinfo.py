@@ -15,6 +15,7 @@ class FormatStatus:
     CLOSED = 0
     OPEN = 1
     LCC_ONLY = 2
+    OPEN_CHIMPS = 2
 
 
 @dataclass

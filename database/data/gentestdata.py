@@ -176,6 +176,7 @@ class Map:
 
 @dataclass
 class MapSubmission:
+    id: int
     code: str
     submitter: int
     subm_notes: str | None
@@ -185,6 +186,7 @@ class MapSubmission:
     created_on: int
     completion_proof: str
     wh_data: str | None
+    wh_msg_id: int | None
 
     def dump_submission(self) -> str:
         return SEPARATOR.join(stringify(
@@ -197,6 +199,8 @@ class MapSubmission:
             dateify(self.created_on),
             self.completion_proof,
             self.wh_data,
+            self.wh_msg_id,
+            self.id,
         ))
 
 
@@ -375,6 +379,7 @@ def random_map_submissions() -> list[MapSubmission]:
     for i in range(MAP_SUBMISSION_COUNT):
         submissions.append(
             MapSubmission(
+                i,
                 f"SUBX{num_to_letters(i)}",
                 ((i // 3) % USER_COUNT)+1,
                 None if i < 40 else f"Submission notes for map {i}",
@@ -384,11 +389,13 @@ def random_map_submissions() -> list[MapSubmission]:
                 start_timestamp + i*3600 * (-1 if i % 23 == 0 else 1),
                 rand_images.choice(images),
                 None,
+                None,
             )
         )
     for i in range(10):
         submissions.append(
             MapSubmission(
+                i + 10_000,
                 f"MLXX{num_to_letters(i)}",
                 1,
                 None,
@@ -397,6 +404,7 @@ def random_map_submissions() -> list[MapSubmission]:
                 2 if i % 2 == 0 else None,
                 start_timestamp - (i + 1)*3600,
                 rand_images.choice(images),
+                None,
                 None,
             )
         )
@@ -792,6 +800,17 @@ def gen_retro_maps() -> list[RetroMap]:
     return maps
 
 
+def inject_discord_data(submissions: list[MapSubmission]) -> None:
+    inject_to = [1, 51]
+    for subm in submissions:
+        if subm.for_list not in inject_to:
+            continue
+
+        subm.wh_msg_id = subm.for_list * 1000
+        subm.wh_data = [{"body": "test"}]
+        inject_to.remove(subm.for_list)
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -812,6 +831,8 @@ if __name__ == '__main__':
                    completions_lb + \
                    completions_misc + \
                    completions_round
+
+    inject_discord_data(map_submissions)
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps

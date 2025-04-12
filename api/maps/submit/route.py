@@ -25,7 +25,7 @@ PAGE_ENTRIES = 50
 @src.utils.routedecos.bearer_auth
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.register_user
-@src.utils.routedecos.require_perms(throw_on_permless=False)
+@src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
         discord_profile: dict = None,
@@ -81,62 +81,59 @@ async def post(
         description: Your token is missing or invalid.
     """
     if not permissions.has_in_any("create:map_submission"):
-        return web.json_response(
-            {"errors": {"": "You are banned from submitting maps"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
+        raise MissingPermsException("create:map_submission")
 
-    if not request.content_type.startswith("multipart"):
-        return web.json_response(
-            {"errors": {"": "multipart/* Content-Type expected"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
-
-    embeds = []
     data = None
     proof_fname = None
 
-    reader = await request.multipart()
-    while part := await reader.next():
-        if part.name == "proof_completion":
-            proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
-            file_contents = await part.read(decode=False)
-            proof_fname, _fpath = await save_image(file_contents, proof_ext)
-        elif part.name == "data":
-            data = await part.json()
-            await validate_map_submission(data)
-            
-            if not permissions.has("create:map_submission", data["format"]):
-                raise MissingPermsException("create:map_submission", data["format"])
-            proposed_values = format_info[data["format"]].proposed_values
-            if isinstance(proposed_values, tuple) and data["proposed"] not in range(len(proposed_values[1])) or \
-                    not isinstance(proposed_values, tuple) and not await proposed_values(data["proposed"]):
-                raise ValidationException({"proposed": "Out of range"})
+    if request.content_type.startswith("multipart/"):
+        reader = await request.multipart()
+        while part := await reader.next():
+            if part.name == "proof_completion":
+                proof_ext = part.headers[aiohttp.hdrs.CONTENT_TYPE].split("/")[-1]
+                file_contents = await part.read(decode=False)
+                proof_fname, _fpath = await save_image(file_contents, proof_ext)
+            elif part.name == "data":
+                data = await part.json()
+    elif request.content_type == "application/json":
+        data = await request.json()
+    else:
+        raise GenericErrorException("Unsupported Content-Type")
 
-            if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
-                raise ValidationException({"code": "That map doesn't exist"})
+    if data is None:
+        raise GenericErrorException("Missing data")
 
-            embeds = await get_mapsubm_embed(data, discord_profile, btd6_map)
+    await validate_map_submission(data, has_proof=proof_fname is not None)
 
-    if len(embeds) == 0 or data is None or proof_fname is None:
-        raise GenericErrorException("Missing either data or proof_completion")
+    if not permissions.has("create:map_submission", data["format"]):
+        raise MissingPermsException("create:map_submission", data["format"])
+    proposed_values = format_info[data["format"]].proposed_values
+    if isinstance(proposed_values, tuple) and data["proposed"] not in range(len(proposed_values[1])) or \
+            not isinstance(proposed_values, tuple) and not await proposed_values(data["proposed"]):
+        raise ValidationException({"proposed": "Out of range"})
 
-    embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
+    if not (btd6_map := await ninja_kiwi_api().get_btd6_map(data["code"])):
+        raise ValidationException({"code": "That map doesn't exist"})
+
+    embeds = await get_mapsubm_embed(data, discord_profile, btd6_map)
+
+    if proof_fname:
+        embeds[0]["image"] = {"url": f"{MEDIA_BASE_URL}/{proof_fname}"}
     wh_data = {"embeds": embeds}
 
     prev_submission = await check_prev_map_submission(data["code"], data["format"], discord_profile["id"])
-    await add_map_submission(
+    submission_id = await add_map_submission(
         data["code"],
         discord_profile["id"],
         data["notes"],
         data["format"],
         data["proposed"],
-        f"{MEDIA_BASE_URL}/{proof_fname}",
+        f"{MEDIA_BASE_URL}/{proof_fname}" if proof_fname else None,
         edit=(prev_submission is not None),
     )
 
     asyncio.create_task(
-        send_map_submission_wh(prev_submission, data["format"], data["code"], wh_data)
+        send_map_submission_wh(prev_submission, data["format"], submission_id, wh_data)
     )
     return web.Response(status=http.HTTPStatus.NO_CONTENT if prev_submission is not None else http.HTTPStatus.CREATED)
 

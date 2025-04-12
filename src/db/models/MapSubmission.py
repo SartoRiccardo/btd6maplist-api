@@ -38,6 +38,7 @@ class MapSubmission:
         type: integer
         description: Date of the submission.
     """
+    id: int
     code: str
     submitter: int
     subm_notes: str | None
@@ -47,6 +48,7 @@ class MapSubmission:
     created_on: datetime
     completion_proof: str
     wh_data: str | None
+    wh_msg_id: int | None
 
     def to_dict(self) -> dict:
         diff_names = src.utils.formats.formatinfo.format_info[self.format_id].proposed_values

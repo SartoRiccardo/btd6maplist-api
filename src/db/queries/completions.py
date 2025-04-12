@@ -572,13 +572,13 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
 async def transfer_all_completions(
         from_code: str,
         to_code: str,
-        permissions: "src.db.models.Permissions" = None,
+        transfer_formats: list[int] = None,
         conn=None
 ) -> None:
+    if transfer_formats is None:
+        transfer_formats = []
     now = datetime.now()
     args = [from_code, to_code, now]
-
-    transfer_formats = permissions.formats_where("edit:completion")
     transfer_formats_filter = ""
     if None not in transfer_formats:
         args.append(transfer_formats)

@@ -214,7 +214,10 @@ def typecheck_map_submission(body: dict) -> None:
         raise ValidationException(check)
 
 
-async def validate_map_submission(body: dict) -> None:
+async def validate_map_submission(
+        body: dict,
+        has_proof: bool = False,
+) -> None:
     if check_fail := typecheck_map_submission(body):
         return check_fail
 
@@ -226,6 +229,8 @@ async def validate_map_submission(body: dict) -> None:
     else:
         if list_format.map_submission_status == FormatStatus.CLOSED:
             errors["format"] = "Format is currently not accepting submissions"
+        elif list_format.map_submission_status == FormatStatus.OPEN_CHIMPS and not has_proof:
+            errors["proof_completion"] = "This format requires image proof of the map being beaten in CHIMPS mode"
         if await map_exists_in_format(body["code"], body["format"]):
             raise ValidationException({"code": "Map already exists"})
 

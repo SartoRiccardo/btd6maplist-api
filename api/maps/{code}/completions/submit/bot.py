@@ -18,7 +18,7 @@ compl_files = [f"proof_completion[{n}]" for n in range(MAX_FILES)]
 
 
 @src.utils.routedecos.check_bot_signature(files=compl_files, path_params=["code"])
-@src.utils.routedecos.require_perms(throw_on_permless=False)
+@src.utils.routedecos.require_perms()
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 async def post(
         _r: web.Request,

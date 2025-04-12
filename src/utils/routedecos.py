@@ -26,7 +26,7 @@ def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **
             except json.decoder.JSONDecodeError:
                 raise GenericErrorException("Invalid JSON data", status_code=http.HTTPStatus.BAD_REQUEST)
 
-            if (errors := await validator_function(body, **kwargs_deco)):
+            if errors := await validator_function(body, **kwargs_deco):
                 raise ValidationException(errors)
             return await handler(request, *args, **kwargs_caller, json_body=body)
         return wrapper
@@ -83,9 +83,7 @@ def validate_resource_exists(
     return deco
 
 
-def require_perms(
-        throw_on_permless: bool = True,
-):
+def require_perms():
     """
     Must be used with `with_discord_profile` or `check_bot_signature` beforehand.
     Returns 403 if they don't have any perms, adds `permissions` to kwargs othewise.
@@ -101,12 +99,6 @@ def require_perms(
             if discord_profile is None:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
             permissions = await get_user_perms(discord_profile["id"])
-
-            if not permissions.has_any_perms() and throw_on_permless:
-                raise GenericErrorException(
-                    "You don't have the necessary permissions to do this",
-                    status_code=http.HTTPStatus.FORBIDDEN,
-                )
 
             return await handler(
                 request,

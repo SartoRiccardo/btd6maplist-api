@@ -131,7 +131,7 @@ async def test_get_config(btd6ml_test_client):
 
 
 @pytest.mark.put
-async def test_edit_config(btd6ml_test_client, mock_auth, assert_state_unchanged):
+async def test_edit_config(btd6ml_test_client, mock_auth):
     """Test successfully editing config variable"""
     async def assert_edit_success(perms: dict[int, set[str]], config: dict):
         await mock_auth(perms=perms)
@@ -215,7 +215,7 @@ class TestValidate:
 
         await mock_auth()
         async with assert_state_unchanged("/config"):
-            async with btd6ml_test_client.put("/config", headers=HEADERS) as resp:
+            async with btd6ml_test_client.put("/config", headers=HEADERS, json={"config": {"exp_lcc_extra": 3}}) as resp:
                 assert resp.status == http.HTTPStatus.FORBIDDEN, \
                     f"Editing config without having perms returned {resp.status}"
 
