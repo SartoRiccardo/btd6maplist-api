@@ -23,7 +23,7 @@ MAX_FILES = 4
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.register_user
-@src.utils.routedecos.require_perms(throw_on_permless=False)
+@src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
         discord_profile: dict = None,

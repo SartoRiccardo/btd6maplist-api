@@ -4,9 +4,7 @@ import math
 import json
 import pytest
 from ..mocks import Permissions
-from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field
-
-HEADERS = {"Authorization": "Bearer test_access_token"}
+from ..testutils import to_formdata, formdata_field_tester, fuzz_data, invalidate_field, HEADERS
 
 
 @pytest.fixture
@@ -422,3 +420,15 @@ class TestHandleSubmissions:
                     f"Submitted map code at position {i} differs from expected"
                 assert resp_data["submissions"][i]["format"] == format_id, \
                     f"Submitted map format ID at position {i} differs from expected"
+
+    async def test_submit_no_proof(self, btd6ml_test_client, valid_codes, map_submission_payload, mock_auth):
+        """Test submitting without completion proof to a map that doesn't require it"""
+        await mock_auth(perms={None: Permissions.basic()})
+
+        valid_data = map_submission_payload(valid_codes[6])
+        valid_data["proposed"] = 50
+        valid_data["format"] = 11
+
+        async with btd6ml_test_client.post("/maps/submit", json=valid_data, headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.CREATED, \
+                f"Submitting map without completion proof on a format that doesn't require it returns {resp.status}"

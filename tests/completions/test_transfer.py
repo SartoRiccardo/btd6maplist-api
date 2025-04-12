@@ -135,7 +135,11 @@ class TestTransfer:
                     f"Transferring completions with an invalid token returns {resp.status}"
 
             await mock_auth()
-            async with btd6ml_test_client.put(f"/maps/{TEST_FROM}/completions/transfer", headers=HEADERS) as resp:
+            async with btd6ml_test_client.put(
+                    f"/maps/{TEST_FROM}/completions/transfer",
+                    headers=HEADERS,
+                    json={"code": "MLXXXAA"},
+            ) as resp:
                 assert resp.status == http.HTTPStatus.FORBIDDEN, \
                     f"Transferring completions without perms returns {resp.status}"
 

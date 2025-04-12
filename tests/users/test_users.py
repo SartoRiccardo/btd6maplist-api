@@ -162,19 +162,21 @@ class TestAddUser:
                 assert "errors" in resp_data and path in resp_data["errors"], \
                     f"\"{path}\" was not in response.errors"
 
-    async def test_add_unauthorized(self, btd6ml_test_client, mock_auth):
+    async def test_add_unauthorized(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test adding a user without having the perms to do so"""
         await mock_auth(unauthorized=True)
-        async with btd6ml_test_client.post("/users") as resp:
+        req_usr_data = new_user_payload(999888)
+
+        async with btd6ml_test_client.post("/users", json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user without an Authorization header returns {resp.status}"
 
-        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+        async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user with an invalid token returns {resp.status}"
 
         await mock_auth()
-        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+        async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Creating a user without the necessary permissions returns {resp.status}"
 

@@ -7,6 +7,7 @@ from src.utils.forms import get_map_form
 from src.utils.formats.formatinfo import format_info
 from src.utils.embeds import map_change_update_map_submission_wh
 import src.utils.routedecos
+from src.exceptions import MissingPermsException
 
 
 @src.utils.routedecos.validate_resource_exists(get_map, "code")
@@ -83,10 +84,13 @@ async def put(
                   type: object
                   example: {}
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
       "404":
         description: No map with that ID was found.
     """
+    if not permissions.has_in_any("edit:map"):
+        raise MissingPermsException("edit:map")
+
     json_body = await get_map_form(request, check_dup_code=False, editing=True)
     if isinstance(json_body, web.Response):
         return json_body
@@ -135,11 +139,11 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
+    if not permissions.has_in_any("delete:map"):
+        raise MissingPermsException("delete:map")
+
     if resource.deleted_on:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
-
-    if not permissions.has_any_perms():
-        return
 
     fields_values = []
     for format_id in format_info:

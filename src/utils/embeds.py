@@ -1,7 +1,7 @@
 import json
 import aiohttp
 from src.db.queries.completions import add_completion_wh_payload
-from src.db.queries.mapsubmissions import add_map_submission_wh, get_map_submissions
+from src.db.queries.mapsubmissions import set_map_submission_wh, get_map_submissions
 from src.db.queries.format import get_format
 from config import NK_PREVIEW_PROXY
 from src.utils.emojis import Emj
@@ -37,7 +37,7 @@ async def get_mapsubm_embed(
             prop_name, prop_label = await format_info[data["format"]].proposed_values(data["proposed"])
         field_proposed = {
             "name": f"Proposed {prop_name}",
-            "value": prop_label[data["proposed"]],
+            "value": prop_label,
         }
 
     embeds = [
@@ -138,7 +138,7 @@ async def update_run_webhook(comp: "src.db.models.ListCompletionWithMeta", fail:
 
 
 async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail: bool = False):
-    if mapsubm.wh_data is None:
+    if mapsubm.wh_msg_id is None:
         return
 
     list_format = await get_format(mapsubm.format_id)
@@ -146,23 +146,22 @@ async def update_map_submission_wh(mapsubm: "src.db.models.MapSubmission", fail:
     if hook_url is None:
         return
 
-    msg_id, wh_data = mapsubm.wh_data.split(";", 1)
-    wh_data = json.loads(wh_data)
+    wh_data = json.loads(mapsubm.wh_data)
     wh_data["embeds"][0]["color"] = FAIL_CLR if fail else ACCEPT_CLR
-    if await discord_api().patch_webhook(hook_url, msg_id, wh_data):
-        await add_map_submission_wh(mapsubm.code, None)
+    if await discord_api().patch_webhook(hook_url, mapsubm.wh_msg_id, wh_data):
+        await set_map_submission_wh(mapsubm.id, None, None)
 
 
 async def send_map_submission_wh(
         prev_submission: "src.db.models.MapSubmission",
         format_id: int,
-        map_code: str,
+        submission_id: int,
         wh_data: dict,
 ) -> None:
-    if prev_submission and prev_submission.wh_data:
+    if prev_submission and prev_submission.wh_msg_id:
         old_list_format = await get_format(prev_submission.format_id)
         old_hook_url = old_list_format.map_submission_wh if old_list_format else None
-        await discord_api().delete_webhook(old_hook_url, prev_submission.wh_data.split(";")[0])
+        await discord_api().delete_webhook(old_hook_url, prev_submission.wh_msg_id)
 
     list_format = await get_format(format_id)
     hook_url = list_format.map_submission_wh if list_format else None
@@ -174,7 +173,7 @@ async def send_map_submission_wh(
     form_data.add_field("payload_json", wh_data_str)
 
     msg_id = await discord_api().execute_webhook(hook_url, form_data, wait=True)
-    await add_map_submission_wh(map_code, f"{msg_id};{wh_data_str}")
+    await set_map_submission_wh(submission_id, msg_id, wh_data_str)
 
 
 async def map_change_update_map_submission_wh(map_code: str, map_data: dict) -> None:
@@ -184,19 +183,18 @@ async def map_change_update_map_submission_wh(map_code: str, map_data: dict) -> 
         if map_data.get(format_info[format_id].key) is not None
     ]
 
-    submissions = await get_map_submissions(on_code=map_code, on_formats=new_formats)
+    _, submissions = await get_map_submissions(on_code=map_code, on_formats=new_formats)
     for subm in submissions:
-        if subm is None or subm.wh_data is None:
+        if subm is None or subm.wh_msg_id is None:
             return
 
-        list_format = await get_format(subm.format_id)
+        list_format = await get_format(subm.wh_msg_id)
         hook_url = list_format.map_submission_wh if list_format else None
         if hook_url is None:
             return
 
-        msg_id, wh_data = subm.wh_data.split(";", 1)
-        wh_data = json.loads(wh_data)
+        wh_data = json.loads(subm.wh_data)
         wh_data["embeds"][0]["color"] = ACCEPT_CLR
-        async with src.http.http.patch(hook_url + f"/messages/{msg_id}", json=wh_data) as resp:
+        async with src.http.http.patch(hook_url + f"/messages/{subm.wh_msg_id}", json=wh_data) as resp:
             if resp.ok:
-                await add_map_submission_wh(map_code, None)
+                await set_map_submission_wh(subm.id, None, None)

@@ -3,6 +3,7 @@ import src.utils.routedecos
 from aiohttp import web
 from src.db.queries.format import get_format, edit_format
 from src.utils.validators import validate_format
+from src.exceptions import GenericErrorException, MissingPermsException
 
 
 @src.utils.routedecos.bearer_auth
@@ -50,7 +51,7 @@ async def get(
         description: No format with that ID was found.
     """
     if not permissions.has("edit:config", resource.id):
-        return web.Response(status=http.HTTPStatus.FORBIDDEN)
+        raise MissingPermsException("edit:config", resource.id)
 
     return web.json_response(resource.to_full_dict())
 
@@ -130,16 +131,9 @@ async def put(
     if request.content_type == "application/json":
         json_data = await request.json()
     else:
-        return web.json_response(
-            {"errors": {"": "Unsupported Content-Type"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+        raise GenericErrorException("Unsupported Content-Type")
 
-    if errors := await validate_format(json_data):
-        return web.json_response(
-            {"errors": errors},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+    await validate_format(json_data)
 
     await edit_format(
         resource.id,

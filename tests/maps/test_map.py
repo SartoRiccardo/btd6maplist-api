@@ -529,7 +529,7 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
 
 
 @pytest.mark.delete
-async def test_forbidden(btd6ml_test_client, mock_auth):
+async def test_forbidden(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test a user adding, editing or deleting maps if unauthorized"""
     async def make_admin_requests(
             test_label: str,
@@ -537,11 +537,19 @@ async def test_forbidden(btd6ml_test_client, mock_auth):
     ) -> None:
         TEST_CODE = "MLXXXAA"
 
-        async with btd6ml_test_client.post("/maps", headers=HEADERS) as resp:
+        async with btd6ml_test_client.post(
+                "/maps",
+                headers=HEADERS,
+                json={**map_payload(valid_codes[0]), "difficulty": 3},
+        ) as resp:
             assert resp.status == expected_status, \
                 f"POST /maps ({test_label}) returned {resp.status}"
 
-        async with btd6ml_test_client.put(f"/maps/{TEST_CODE}", headers=HEADERS) as resp:
+        async with btd6ml_test_client.put(
+                f"/maps/{TEST_CODE}",
+                headers=HEADERS,
+                json={**map_payload(TEST_CODE), "difficulty": 3},
+        ) as resp:
             assert resp.status == expected_status, \
                 f"PUT /maps/:code ({test_label}) returned {resp.status}"
 

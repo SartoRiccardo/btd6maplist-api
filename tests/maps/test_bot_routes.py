@@ -1,3 +1,4 @@
+import asyncio
 import http
 import aiohttp
 import pytest
@@ -48,6 +49,58 @@ async def assert_submit_map(btd6ml_test_client, mock_auth, valid_codes, save_ima
 
 @pytest.mark.bot
 @pytest.mark.submissions
+@pytest.mark.post
+@pytest.mark.delete
+async def test_reject_discord(btd6ml_test_client, mock_auth, valid_codes, sign_message,
+                              payload_format, mock_discord_api, submission_payload, bot_user_payload):
+    """Test submitting and Rejecting via Discord"""
+    FORMAT_ID = 2
+    USER_ID = 20
+    await mock_auth(user_id=USER_ID, perms={FORMAT_ID: Permissions.mod()})
+    mocker = mock_discord_api(user_id=USER_ID)
+
+    payload = payload_format()
+    payload["map_submission_status"] = "open"
+    async with btd6ml_test_client.put(f"/formats/{FORMAT_ID}", headers=HEADERS, json=payload) as resp:
+        assert resp.status == http.HTTPStatus.NO_CONTENT, \
+            f"Editing a format with a correct payload returned {resp.status}"
+
+    valid_data = json.dumps({
+        **submission_payload(valid_codes[8]),
+        "format": FORMAT_ID,
+    })
+    req_data = {
+        "data": valid_data,
+        "signature": sign_message(valid_data.encode()),
+    }
+    async with btd6ml_test_client.post("/maps/submit/bot", json=req_data) as resp:
+        assert resp.status == http.HTTPStatus.CREATED, \
+            f"Submitting a map through Discord on a format with a webhook returns {resp.status}"
+
+    await asyncio.sleep(0.5)
+    assert len(mocker.wh_events) == 1, "Webhook information wasn't sent on map submission"
+    assert mocker.wh_events[0]["action"] == "post", "Wrong webhook event was sent on map submission"
+    wh_msg_id = mocker.wh_events[0]["msg_id"]
+
+    valid_data = json.dumps({
+        **bot_user_payload(USER_ID),
+        "message_id": str(wh_msg_id),
+    })
+    req_data = {
+        "data": valid_data,
+        "signature": sign_message(valid_data.encode()),
+    }
+    async with btd6ml_test_client.delete("/maps/submit/bot", json=req_data) as resp:
+        assert resp.status == http.HTTPStatus.NO_CONTENT, \
+            f"Rejecting a map through Discord on a format with a webhook returns {resp.status}"
+    await asyncio.sleep(0.5)
+    assert len(mocker.wh_events) == 2, "Webhook information wasn't sent on map submission deletion"
+    assert mocker.wh_events[1] == {"action": "patch", "msg_id": wh_msg_id}, \
+        "Wrong webhook event was sent on map submission deletion"
+
+
+@pytest.mark.bot
+@pytest.mark.submissions
 class TestSubmit:
     CODE_IDX = 2
 
@@ -56,6 +109,7 @@ class TestSubmit:
         """Test submitting a map"""
         await assert_submit_map(self.CODE_IDX)
 
+    @pytest.mark.post
     async def test_closed_submissions(self, btd6ml_test_client, mock_auth, submission_payload, save_image,
                                       valid_codes, assert_state_unchanged, submission_formdata):
         """Test submitting a map to a format with map submissions closed"""
@@ -127,33 +181,13 @@ class TestSubmit:
                 f"Submitting a map with an invalid signature returns {resp.status}"
 
     @pytest.mark.delete
-    async def test_reject_submission(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message,
-                                     valid_codes):
-        """Test rejecting a map submission"""
-        USER_ID = 20
-        await mock_auth(user_id=USER_ID, perms={1: {Permissions.delete.map_submission}})
-        req_data = bot_user_payload(USER_ID)
-        signature = sign_message(valid_codes[self.CODE_IDX] + json.dumps(req_data))
-        req_data = {
-            "data": json.dumps(req_data),
-            "signature": signature,
-        }
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
-            assert resp.status == http.HTTPStatus.NO_CONTENT, \
-                f"Deleting a map with a correct payload returns {resp.status}"
-            async with btd6ml_test_client.get("/maps/submit") as resp_get:
-                resp_data = await resp_get.json()
-                assert resp_data["submissions"][0]["code"] != valid_codes[self.CODE_IDX], \
-                    "Deleted map is still the most recently submitted"
-
-    @pytest.mark.delete
     async def test_reject_signature(self, mock_auth, btd6ml_test_client, bot_user_payload, sign_message,
                                     valid_codes):
         """Test rejecting a map submission with an invalid or missing signature"""
         await mock_auth()
         req_data = bot_user_payload(20)
         req_data = {"data": json.dumps(req_data)}
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Deleting a map without a signature returns {resp.status}"
 
@@ -165,7 +199,7 @@ class TestSubmit:
             }),
             "signature": signature,
         }
-        async with btd6ml_test_client.delete(f"/maps/submit/{valid_codes[self.CODE_IDX]}/formats/1/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a map with an invalid signature returns {resp.status}"
 
@@ -192,48 +226,55 @@ class TestPermissions:
                 f"Submitting a map through a bot as a banned user returns {resp.status}"
 
     @pytest.mark.post
+    @pytest.mark.delete
     async def test_reject_submission_perms(self, valid_codes, mock_auth, save_image, submission_formdata,
                                            btd6ml_test_client, submission_payload, bot_user_payload, sign_message):
         """Test submitting a map when they're banned from submitting"""
-        await mock_auth(user_id=20)
-        proof_comp = save_image(2)
-        maplist_code = valid_codes[5]
-        experts_code = valid_codes[6]
-
-        data_str = json.dumps(submission_payload(maplist_code))
-        req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
-        async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Submitting a map returns {resp.status}"
-
-        data = submission_payload(experts_code)
-        data["format"] = 51
-        data_str = json.dumps(data)
-        req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
-        async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
-            assert resp.status == http.HTTPStatus.CREATED, \
-                f"Submitting a map returns {resp.status}"
+        # await mock_auth(user_id=20)
+        # proof_comp = save_image(2)
+        # maplist_code = valid_codes[5]
+        # experts_code = valid_codes[6]
+        #
+        # data_str = json.dumps(submission_payload(maplist_code))
+        # req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
+        # async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
+        #     assert resp.status == http.HTTPStatus.CREATED, \
+        #         f"Submitting a map returns {resp.status}"
+        #
+        # data = submission_payload(experts_code)
+        # data["format"] = 51
+        # data_str = json.dumps(data)
+        # req_data = submission_formdata(data_str, [("proof_completion", proof_comp)])
+        # async with btd6ml_test_client.post("/maps/submit/bot", data=req_data) as resp:
+        #     assert resp.status == http.HTTPStatus.CREATED, \
+        #         f"Submitting a map returns {resp.status}"
 
         user_id = 30
-        req_data = bot_user_payload(user_id)
-        signature = sign_message(maplist_code + json.dumps(req_data))
+        req_data = {
+            **bot_user_payload(user_id),
+            "message_id": "1000",
+        }
+        signature = sign_message(json.dumps(req_data))
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
         await mock_auth(user_id=user_id, perms={51: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/formats/1/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Deleting a submission without delete:map_submission on that format returns {resp.status}"
 
         await mock_auth(user_id=user_id, perms={1: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{maplist_code}/formats/1/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a submission with delete:map_submission on that format returns {resp.status}"
 
-        req_data = bot_user_payload(user_id)
-        signature = sign_message(experts_code + json.dumps(req_data))
+        req_data = {
+            **bot_user_payload(user_id),
+            "message_id": "51000",
+        }
+        signature = sign_message(json.dumps(req_data))
         req_data = {"data": json.dumps(req_data), "signature": signature}
 
         await mock_auth(user_id=user_id, perms={None: {Permissions.delete.map_submission}})
-        async with btd6ml_test_client.delete(f"/maps/submit/{experts_code}/formats/51/bot", json=req_data) as resp:
+        async with btd6ml_test_client.delete(f"/maps/submit/bot", json=req_data) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a submission with delete:map_submission on all formats returns {resp.status}"

@@ -194,15 +194,15 @@ CREATE TABLE formats (
     run_submission_wh TEXT,
     hidden BOOLEAN DEFAULT TRUE NOT NULL,
     run_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:LCCOnly
-    map_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open
+    map_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:OpenNeedsCHIMPS
     emoji VARCHAR(255)
 );
 INSERT INTO formats
     (id, name, run_submission_status, hidden, map_submission_status)
 VALUES
-    (1, 'Maplist', 1, FALSE, 1),
+    (1, 'Maplist', 1, FALSE, 2),
     (2, 'Maplist (all versions)', 0, TRUE, 0),
-    (51, 'Expert List', 1, FALSE, 1),
+    (51, 'Expert List', 1, FALSE, 2),
     (52, 'Best of the Best', 1, FALSE, 0),
     (11, 'Nostalgia Pack', 2, FALSE, 1)
 ;
@@ -517,7 +517,16 @@ WHERE c.name = cd.config_name
 
 DROP INDEX map_submissions_uq_code;
 ALTER TABLE map_submissions RENAME COLUMN for_list TO format_id;
-
+ALTER TABLE map_submissions ALTER COLUMN completion_proof DROP NOT NULL;
+ALTER TABLE map_submissions ADD COLUMN wh_msg_id BIGINT;
+-- Add ID to table
+ALTER TABLE map_submissions ADD COLUMN id INT;
+CREATE SEQUENCE map_submissions_id_seq;
+UPDATE map_submissions SET id = nextval('map_submissions_id_seq');
+SELECT setval('map_submissions_id_seq', (SELECT MAX(id) FROM map_submissions));
+ALTER TABLE map_submissions ALTER COLUMN id SET DEFAULT nextval('map_submissions_id_seq');
+ALTER TABLE map_submissions ADD PRIMARY KEY (id);
+ALTER SEQUENCE map_submissions_id_seq OWNED BY map_submissions.id;
 
 -- User bans
 

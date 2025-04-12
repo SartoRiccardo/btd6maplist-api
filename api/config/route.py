@@ -4,6 +4,7 @@ from src.utils.misc import index_where
 from src.db.queries.misc import get_config, update_config
 import src.utils.routedecos
 import src.log
+from src.exceptions import MissingPermsException
 
 
 async def get(_r: web.Request):
@@ -107,7 +108,10 @@ async def put(
       "401":
         description: Your token is missing, invalid, or you don't have the privileges for this.
     """
+    formats_change = permissions.formats_where("edit:config")
+    if len(formats_change) == 0:
+        raise MissingPermsException("edit:config")
 
-    changed_vars = await update_config(json_body["config"], permissions.formats_where("edit:config"))
+    changed_vars = await update_config(json_body["config"], formats_change)
     asyncio.create_task(src.log.log_action("config", "put", None, json_body["config"], discord_profile["id"]))
     return web.json_response({"errors": {}, "data": changed_vars})

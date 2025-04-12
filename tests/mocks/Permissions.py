@@ -40,6 +40,7 @@ class Permissions:
             Permissions.edit.completion,
             Permissions.delete.completion,
             Permissions.misc.ban_user,
+            Permissions.edit.achievement_roles,
         })
 
     @staticmethod
@@ -49,6 +50,7 @@ class Permissions:
             Permissions.create.map,
             Permissions.edit.map,
             Permissions.delete.map,
+            Permissions.delete.map_submission,
             Permissions.misc.ban_user,
             Permissions.delete.map_submission,
         })

@@ -14,15 +14,15 @@ async def add_map_submission(
         subm_notes: str | None,
         format_id: int,
         proposed: int,
-        completion_proof: str,
+        completion_proof: str | None,
         edit: bool = False,
         conn=None,
-) -> None:
+) -> int:
     if isinstance(submitter, str):
         submitter = int(submitter)
 
     if edit:
-        await conn.execute(
+        return await conn.fetchval(
             """
             UPDATE map_submissions
             SET
@@ -32,33 +32,43 @@ async def add_map_submission(
                 completion_proof=$5,
                 created_on=CURRENT_TIMESTAMP
             WHERE code=$1
+            RETURNING id
             """,
             code, subm_notes, format_id, proposed, completion_proof,
         )
     else:
-        await conn.execute(
+        return await conn.fetchval(
             """
             INSERT INTO map_submissions
                 (code, submitter, subm_notes, format_id, proposed, completion_proof)
             VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
             """,
             code, submitter, subm_notes, format_id, proposed, completion_proof,
         )
 
 
 @postgres
-async def add_map_submission_wh(
-        code: str,
+async def set_map_submission_wh(
+        submission_id: int | str,
+        wh_msg_id: int | str | None,
         wh_data: str | None,
-        conn=None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> None:
+    if isinstance(submission_id, str):
+        submission_id = int(submission_id)
+    if isinstance(wh_msg_id, str):
+        wh_msg_id = int(wh_msg_id)
+
     await conn.execute(
         """
         UPDATE map_submissions
-        SET wh_data=$2
-        WHERE code=$1
+        SET
+            wh_data = $2,
+            wh_msg_id = $3
+        WHERE id = $1
         """,
-        code, wh_data,
+        submission_id, wh_data, wh_msg_id
     )
 
 
@@ -115,7 +125,8 @@ async def get_map_submissions(
         SELECT
             COUNT(*) OVER() AS total_count,
             ms.code, ms.submitter, ms.subm_notes, ms.format_id, ms.proposed,
-            ms.rejected_by, ms.created_on, ms.completion_proof, ms.wh_data 
+            ms.rejected_by, ms.created_on, ms.completion_proof, ms.wh_data, ms.wh_msg_id, 
+            ms.id
         FROM map_submissions ms
         LEFT JOIN map_list_meta m
             ON ms.code = m.code
@@ -135,6 +146,7 @@ async def get_map_submissions(
     )
     submissions = [
         MapSubmission(
+            row["id"],
             row["code"],
             row["submitter"],
             row["subm_notes"],
@@ -144,6 +156,7 @@ async def get_map_submissions(
             row["created_on"],
             row["completion_proof"],
             row["wh_data"],
+            row["wh_msg_id"],
         ) for row in payload
     ]
 
@@ -155,7 +168,7 @@ async def reject_submission(
         code: str,
         format_id: str | int,
         rejected_by: str | int,
-        conn=None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> None:
     if isinstance(rejected_by, str):
         rejected_by = int(rejected_by)
@@ -170,4 +183,38 @@ async def reject_submission(
             AND format_id = $2
         """,
         code, format_id, rejected_by,
+    )
+
+
+@postgres
+async def get_map_submissions_by_message(
+        message_id: str | int,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> MapSubmission | None:
+    if isinstance(message_id, str):
+        message_id = int(message_id)
+    submission = await conn.fetchrow(
+        """
+        SELECT
+            ms.code, ms.submitter, ms.subm_notes, ms.format_id, ms.proposed,
+            ms.rejected_by, ms.created_on, ms.completion_proof, ms.wh_data,
+            ms.wh_msg_id, ms.id
+        FROM map_submissions ms
+        WHERE ms.wh_msg_id = $1
+        """,
+        message_id
+    )
+
+    return None if submission is None else MapSubmission(
+        submission["id"],
+        submission["code"],
+        submission["submitter"],
+        submission["subm_notes"],
+        submission["format_id"],
+        submission["proposed"],
+        submission["rejected_by"],
+        submission["created_on"],
+        submission["completion_proof"],
+        submission["wh_data"],
+        submission["wh_msg_id"],
     )
