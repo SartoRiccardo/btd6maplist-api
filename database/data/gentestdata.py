@@ -801,7 +801,7 @@ def gen_retro_maps() -> list[RetroMap]:
                 i,
                 f"Track BTD{i//50+1}",
                 i % 30,
-                i//50+1,
+                i * 6 // amount,
                 i // 20,
                 i // 30,
             )
