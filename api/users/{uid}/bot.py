@@ -1,7 +1,7 @@
 from aiohttp import web
 import http
 import src.utils.routedecos
-from src.db.queries.users import get_user, edit_user, get_user_min
+from src.db.queries.users import get_user, edit_user, get_user_min, get_user_perms
 from src.requests import ninja_kiwi_api
 
 
@@ -22,6 +22,7 @@ async def get(
     return web.json_response({
         **resource.to_dict(profile=True),
         **deco,
+        "permissions": (await get_user_perms(resource.id)).to_dict(),
     })
 
 
