@@ -1,6 +1,6 @@
 import http
 import pytest
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import to_formdata, fuzz_data, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_access_token"}
@@ -27,8 +27,8 @@ class TestGetMaps:
             value_eq_check = {
                 "name": f"Maplist Map 44",
                 "code": f"MLXXXED",
-                "placement_cur": 44,
-                "placement_all": 39,
+                "placement_curver": 44,
+                "placement_allver": 39,
                 "difficulty": 0,
                 "r6_start": "https://drive.google.com/file/d/qWpmWHvTUJMEhyxBNiZTsMJjOHJfLFdY/view",
                 "map_data": None,
@@ -87,16 +87,12 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     Test that adding a correct map payload works, and pushes off a map off
     the list correctly and only sets the perms it can.
     """
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: {Permissions.create.map}})
 
     cur_code = valid_codes[0]
     req_map_data = {
-        **map_payload(cur_code),
+        **map_payload(cur_code, []),
         "placement_curver": 10,
-        "creators": [
-            {"id": "1", "role": None},
-            {"id": "usr2", "role": "Suggested the idea"},
-        ],
     }
     form_data = to_formdata(req_map_data)
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
@@ -113,8 +109,8 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
         value_eq_check = {
             "name": req_map_data["name"],
             "code": req_map_data["code"],
-            "placement_cur": req_map_data["placement_curver"],
-            "placement_all": req_map_data["placement_allver"],
+            "placement_curver": req_map_data["placement_curver"],
+            "placement_allver": req_map_data["placement_allver"],
             "difficulty": req_map_data["difficulty"],
             "r6_start": req_map_data["r6_start"],
             "aliases": req_map_data["aliases"],
@@ -123,10 +119,7 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
             "map_preview_url": f"https://data.ninjakiwi.com/btd6/maps/map/{cur_code}/preview",
             "verified": False,
             "deleted_on": None,
-            "creators": [
-                {"id": "1", "name": "usr1", "role": None},
-                {"id": "2", "name": "usr2", "role": "Suggested the idea"},
-            ],
+            "creators": [],
         }
         for key in value_eq_check:
             exp_value = value_eq_check[key]
@@ -145,11 +138,11 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
             f"Maplist length after add: {len(maplist)}"
 
         for i in range(len(maplist)):
-            assert maplist[i]["placement"] == i+1, \
+            assert maplist[i]["format_idx"] == i+1, \
                 f"Maplist placement misordered"
 
     async with btd6ml_test_client.get("/maps/MLXXXEJ") as resp:
-        assert (await resp.json())["placement_cur"] == 51, \
+        assert (await resp.json())["placement_curver"] == 51, \
             "50th map was not pushed off the list"
 
 
@@ -157,7 +150,7 @@ async def test_add(btd6ml_test_client, mock_auth, map_payload, valid_codes):
 @pytest.mark.post
 async def test_add_aggr_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding a map with all fields provided"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: {Permissions.create.map}})
 
     cur_code = valid_codes[0]
     req_map_data = {
@@ -230,7 +223,7 @@ async def test_add_aggr_fields(btd6ml_test_client, mock_auth, map_payload, valid
 @pytest.mark.maps
 async def test_fuzz(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Sets every field to another datatype, one by one"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator()})
     req_map_data = {
         **map_payload(valid_codes[0]),
         "placement_curver": 1,
@@ -243,6 +236,10 @@ async def test_fuzz(btd6ml_test_client, mock_auth, map_payload, valid_codes):
         "optimal_heros": ["geraldo", "brickell"],
     }
     extra_expected = {
+        "placement_curver": [None],
+        "placement_allver": [None],
+        "difficulty": [None],
+        "botb_difficulty": [None],
         "map_data": [str],
         "r6_start": [str],
         "map_preview_url": [str],
@@ -258,12 +255,13 @@ async def test_fuzz(btd6ml_test_client, mock_auth, map_payload, valid_codes):
             assert "errors" in resp_data and path in resp_data["errors"], \
                 f"\"{path}\" was not in response.errors"
 
+
 @pytest.mark.maps
 @pytest.mark.put
 @pytest.mark.post
 async def test_invalid_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding and editing map with invalid fields in the payload"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator()})
 
     req_map_data = {
         **map_payload(valid_codes[3]),
@@ -365,10 +363,10 @@ async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid
             check_url = resp_data["map_preview_url"] if full else resp_data["map_preview_url"].split("/")[-1]
             assert check_url == expected[1], "Map.map_preview_url differs from expected"
 
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={None: Permissions.curator()})
 
-    r6_start_path = save_image(1, filename="r6start.png")
-    preview_path = save_image(2, filename="preview.png")
+    r6_start_path, r6_hash = save_image(1, filename="r6start.png", with_hash=True)
+    preview_path, prev_hash = save_image(2, filename="preview.png", with_hash=True)
 
     req_map_data = {
         **map_payload(valid_codes[0]),
@@ -380,24 +378,14 @@ async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid
     form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Adding a map with images in the payload return {resp.status}"
-        await assert_images(
-            valid_codes[0], (
-                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-            )
-        )
+        await assert_images(valid_codes[0], (f"{r6_hash}.webp", f"{prev_hash}.webp"))
 
     form_data = to_formdata(req_map_data)
     form_data.add_field("r6_start", r6_start_path.open("rb"))
     form_data.add_field("map_preview_url", preview_path.open("rb"))
     async with btd6ml_test_client.put(f"/maps/{valid_codes[0]}", headers=HEADERS, data=form_data) as resp:
         assert resp.ok, f"Editing a map with images in the payload return {resp.status}"
-        await assert_images(
-            valid_codes[0], (
-                "e7e2636a87ed7a754d01379a2412beeab09df53918a56701762b6344715650ea.png",
-                "4a611bb64cbe70ed3878a6101422dd0f3c33a95dd8f892f75df4a5cd5000d884.png"
-            )
-        )
+        await assert_images(valid_codes[0], (f"{r6_hash}.webp", f"{prev_hash}.webp"))
 
     form_data = to_formdata({
         **req_map_data,
@@ -432,7 +420,7 @@ async def test_req_with_images(btd6ml_test_client, mock_auth, map_payload, valid
 @pytest.mark.put
 async def test_missing_fields(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test a request with some missing fields"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={51: Permissions.curator()})
 
     correct_map_data = {
         **map_payload("MLXXXCJ"),
@@ -503,9 +491,9 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
     async def assert_map_placements(map_code: str, expected: tuple[int, int, int], mod_type: str):
         async with btd6ml_test_client.get(f"/maps/{map_code}") as resp:
             resp_map_data = await resp.json()
-            assert resp_map_data["placement_cur"] == expected[0], \
+            assert resp_map_data["placement_curver"] == expected[0], \
                 f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
-            assert resp_map_data["placement_all"] == expected[1], \
+            assert resp_map_data["placement_allver"] == expected[1], \
                 f"{mod_type} Moderator {'did not change' if mod_type == 'Maplist' else 'changed'} List Placement"
             assert resp_map_data["difficulty"] == expected[2], \
                 f"{mod_type} Moderator {'did not change' if mod_type != 'Maplist' else 'changed'} Expert Difficulty"
@@ -520,48 +508,60 @@ async def test_moderator_perms(btd6ml_test_client, mock_auth, map_payload, valid
     }
 
     # Maplist Mods
-    await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+    await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator()})
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+        assert resp.status == http.HTTPStatus.FORBIDDEN, \
             f"POST /maps/{test_code} returned {resp.status}"
 
     async with btd6ml_test_client.put("/maps/MLXXXAA", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.ok, f"PUT /maps/MLXXXAA returned {resp.status}"
-        await assert_map_placements("MLXXXAA", (10, 10, -1), "Maplist")
+        await assert_map_placements("MLXXXAA", (10, 10, None), "Maplist")
 
     # Expert Mods
-    await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD)
+    await mock_auth(perms={51: Permissions.curator()})
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
-        assert resp.status == http.HTTPStatus.BAD_REQUEST, \
+        assert resp.status == http.HTTPStatus.FORBIDDEN, \
             f"POST /maps/{test_code} returned {resp.status}"
 
     async with btd6ml_test_client.put("/maps/MLXXXAB", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.ok, f"PUT /maps/MLXXXAB returned {resp.status}"
-        await assert_map_placements("MLXXXAB", (1, -1, 2), "Experts")
+        await assert_map_placements("MLXXXAB", (1, None, 2), "Experts")
 
-    @pytest.mark.delete
-    async def test_forbidden(self, btd6ml_test_client, mock_auth):
-        """Test a user adding, editing or deleting maps if unauthorized"""
-        async def make_admin_requests(test_label: str, expected_status: int) -> None:
-            TEST_CODE = "MLXXXAA"
 
-            async with btd6ml_test_client.post("/maps", headers=HEADERS) as resp:
-                assert resp.status == expected_status, \
-                    f"POST /maps ({test_label}) returned {resp.status}"
+@pytest.mark.delete
+async def test_forbidden(btd6ml_test_client, mock_auth, map_payload, valid_codes):
+    """Test a user adding, editing or deleting maps if unauthorized"""
+    async def make_admin_requests(
+            test_label: str,
+            expected_status: int,
+    ) -> None:
+        TEST_CODE = "MLXXXAA"
 
-            async with btd6ml_test_client.put(f"/maps/{TEST_CODE}", headers=HEADERS) as resp:
-                assert resp.status == expected_status, \
-                    f"PUT /maps/:code ({test_label}) returned {resp.status}"
+        async with btd6ml_test_client.post(
+                "/maps",
+                headers=HEADERS,
+                json={**map_payload(valid_codes[0]), "difficulty": 3},
+        ) as resp:
+            assert resp.status == expected_status, \
+                f"POST /maps ({test_label}) returned {resp.status}"
 
-            async with btd6ml_test_client.delete(f"/maps/{TEST_CODE}", headers=HEADERS) as resp:
-                assert resp.status == expected_status, \
-                    f"DELETE /maps/:code ({test_label}) returned {resp.status}"
+        async with btd6ml_test_client.put(
+                f"/maps/{TEST_CODE}",
+                headers=HEADERS,
+                json={**map_payload(TEST_CODE), "difficulty": 3},
+        ) as resp:
+            assert resp.status == expected_status, \
+                f"PUT /maps/:code ({test_label}) returned {resp.status}"
 
-        await mock_auth(unauthorized=True)
-        await make_admin_requests("unauthorized", http.HTTPStatus.UNAUTHORIZED)
+        async with btd6ml_test_client.delete(f"/maps/{TEST_CODE}", headers=HEADERS) as resp:
+            assert resp.status == expected_status, \
+                f"DELETE /maps/:code ({test_label}) returned {resp.status}"
 
-        await mock_auth()
-        await make_admin_requests("missing permissions", http.HTTPStatus.FORBIDDEN)
+    await mock_auth(unauthorized=True)
+    await make_admin_requests("unauthorized", http.HTTPStatus.UNAUTHORIZED)
+
+    await mock_auth()
+    await make_admin_requests("missing permissions", http.HTTPStatus.FORBIDDEN)
 
 
 @pytest.mark.maps
@@ -572,7 +572,7 @@ class TestEditMaps:
         Test editing a map with a correct payload works, and rearranging maps on
         the list correctly.
         """
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator(), 51: Permissions.curator()})
 
         req_map_data = {
             **map_payload("MLXXXCJ"),  # 30th map
@@ -624,8 +624,8 @@ class TestEditMaps:
                 ],
                 "map_preview_url": f"https://data.ninjakiwi.com/btd6/maps/map/MLXXXCJ/preview",
                 "verified": True,
-                "placement_all": req_map_data["placement_allver"],
-                "placement_cur": req_map_data["placement_curver"],
+                "placement_allver": req_map_data["placement_allver"],
+                "placement_curver": req_map_data["placement_curver"],
             }
             del value_eq_check["code"]
             del value_eq_check["placement_allver"]
@@ -639,25 +639,25 @@ class TestEditMaps:
     @pytest.mark.delete
     async def test_delete(self, btd6ml_test_client, mock_auth):
         """Test deleting a map, and all other maps rearranging"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.curator()})
 
         last_map = "MLXXXEJ"
-        async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp:
+        async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp, \
+                btd6ml_test_client.get(f"/maps/{last_map}") as resp_get:
             assert resp.ok, f"Delete map with correct perms returned {resp.status}"
-            async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get:
-                assert resp_get.ok, f"Get deleted map returned {resp.status}"
-                resp_map_data = await resp_get.json()
-                assert resp_map_data["deleted_on"] is not None, \
-                    f"Map.deleted_on is not None after being deleted"
+            assert resp_get.ok, f"Get deleted map returned {resp_get.status}"
+            resp_map_data = await resp_get.json()
+            assert resp_map_data["deleted_on"] is not None, \
+                f"Map.deleted_on is not None after being deleted"
 
-                current_deleted_on = resp_map_data["deleted_on"]
-                async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp_delete_again:
-                    assert resp_delete_again.status == http.HTTPStatus.NO_CONTENT, \
-                        f"Deleting a map again returns {resp_delete_again.status}"
-                async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get_again:
-                    resp_del_data = await resp_get_again.json()
-                    assert current_deleted_on == resp_del_data["deleted_on"], \
-                        "Map.deleted_on changed upon double deletion"
+            current_deleted_on = resp_map_data["deleted_on"]
+            async with btd6ml_test_client.delete(f"/maps/{last_map}", headers=HEADERS) as resp_delete_again:
+                assert resp_delete_again.status == http.HTTPStatus.NO_CONTENT, \
+                    f"Deleting a map again returns {resp_delete_again.status}"
+            async with btd6ml_test_client.get(f"/maps/{last_map}") as resp_get_again:
+                resp_del_data = await resp_get_again.json()
+                assert current_deleted_on == resp_del_data["deleted_on"], \
+                    "Map.deleted_on changed upon double deletion"
 
             async with btd6ml_test_client.get(f"/maps/50") as resp_get:
                 resp_map_data = await resp_get.json()
@@ -666,46 +666,42 @@ class TestEditMaps:
     @pytest.mark.delete
     async def test_delete_missing_perms(self, btd6ml_test_client, mock_auth):
         """Test deleting a map without having the perms to delete it completely"""
-        async def delete_gradually(code: str, prev_values: tuple[int, int, int], maplist_first: bool):
-            await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD if maplist_first else DiscordPermRoles.EXPLIST_MOD)
-            async with btd6ml_test_client.delete(f"/maps/{code}", headers=HEADERS) as resp:
-                assert resp.ok, f"Deleting a map with correct perms returned {resp.status}"
-                async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
-                    resp_map_data = await resp_get.json()
-                    assert resp_map_data["deleted_on"] is None, "Map.deleted_on is not None after partial deletion"
-                    assert resp_map_data["placement_cur"] == (-1 if maplist_first else prev_values[0]), \
-                        "Map.placement_cur != -1 after deletion"
-                    assert resp_map_data["placement_all"] == (-1 if maplist_first else prev_values[1]), \
-                        "Map.placement_all != -1 after deletion"
-                    assert resp_map_data["difficulty"] == (prev_values[2] if maplist_first else -1), \
-                        "Map.difficulty changed after deletion by Maplist Mod"
+        code = "MLXXXDJ"
+        prev_values = (40, 35, 0)
 
-            await mock_auth(perms=DiscordPermRoles.EXPLIST_MOD if maplist_first else DiscordPermRoles.MAPLIST_MOD)
-            async with btd6ml_test_client.delete(f"/maps/{code}", headers=HEADERS) as resp:
+        formats = [1, 2, 51]
+        for i, format_id in enumerate(formats):
+            await mock_auth(perms={format_id: {Permissions.delete.map}})
+            async with btd6ml_test_client.delete(f"/maps/{code}", headers=HEADERS) as resp, \
+                    btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                 assert resp.ok, f"Deleting a map with correct perms returned {resp.status}"
-                async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
-                    resp_map_data = await resp_get.json()
-                    assert resp_map_data["deleted_on"] is not None, "Map.deleted_on is None after remaining deletion"
-                    assert resp_map_data["placement_cur"] == -1, "Map.placement_cur != -1 after full deletion"
-                    assert resp_map_data["placement_all"] == -1, "Map.placement_all != -1 after full deletion"
-                    assert resp_map_data["difficulty"] == -1, "Map.difficulty != -1 after full deletion"
+                resp_map_data = await resp_get.json()
+                if i == len(formats)-1:
+                    assert resp_map_data["deleted_on"] is not None, \
+                        "Map.deleted_on is still None after last partial deletion"
+                else:
+                    assert resp_map_data["deleted_on"] is None, \
+                        "Map.deleted_on is not None after partial deletion"
 
-        await delete_gradually("MLXXXDJ", (40, 35, 0), True)
-        await delete_gradually("MLXXXEA", (40, 35, 0), False)
+                assert resp_map_data["placement_curver"] is None, \
+                    "Map.placement_curver is not None after deletion"
+                assert resp_map_data["placement_allver"] == (None if i >= 1 else prev_values[1]), \
+                    f"Map.placement_allver is {'not' if i >= 1 else ''} None after deletion"
+                assert resp_map_data["difficulty"] == (None if i >= 2 else prev_values[2]), \
+                    f"Map.difficulty is {'not' if i >= 2 else ''} None after deletion"
 
     @pytest.mark.put
     async def test_edit_legacy_map(self, btd6ml_test_client, mock_auth, map_payload):
         """Test editing a legacy map fails. It only succeeds if leaving the placements untouched"""
-        """Test adding aliases to a map reclaimed them from a deleted one"""
         async def assert_legacy_role(code, uid, placement):
             async with btd6ml_test_client.get(f"/maps/{code}") as resp_get:
                 resp_map_data = await resp_get.json()
                 assert resp_map_data["creators"] == [{"id": str(uid), "role": "Legacy Role", "name": f"usr{uid}"}], \
                     "Legacy map not edited correctly"
-                assert resp_map_data["placement_cur"] == placement, \
+                assert resp_map_data["placement_curver"] == placement, \
                     "Legacy placement was changed"
 
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={1: Permissions.curator()})
 
         async with btd6ml_test_client.get("/maps/55") as resp:
             code = (await resp.json())["code"]
@@ -736,7 +732,7 @@ class TestEditMaps:
     @pytest.mark.post
     async def test_reassign_aliases(self, btd6ml_test_client, mock_auth, map_payload):
         """Test adding aliases to a map reclaimed them from a deleted one"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={51: Permissions.curator()})
 
         req_map_data = {
             **map_payload("MLXXXDF"),
@@ -763,7 +759,7 @@ class TestEditMaps:
 @pytest.mark.maps
 async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, valid_codes):
     """Test adding/editing a map with a really large placement"""
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={None: Permissions.curator()})
 
     req_map_data = {
         **map_payload(valid_codes[0]),
@@ -776,10 +772,10 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/{valid_codes[0]}") as resp_get:
             resp_map_data = await resp_get.json()
-            assert resp_map_data["placement_cur"] == -1, \
-                "Map.placement_cur != -1 when added with a large payload"
-            assert resp_map_data["placement_all"] == -1, \
-                "Map.placement_all != -1 when added with a large payload"
+            assert resp_map_data["placement_curver"] is None, \
+                "Map.placement_curver is not None when added with a large payload"
+            assert resp_map_data["placement_allver"] is None, \
+                "Map.placement_allver is not None when added with a large payload"
 
     async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
         prev_map_data = await resp_get.json()
@@ -788,12 +784,12 @@ async def test_large_placements(btd6ml_test_client, mock_auth, map_payload, vali
             f"Adding map with large placements returns {resp.status}"
         async with btd6ml_test_client.get(f"/maps/MLXXXAA") as resp_get:
             resp_map_data = await resp_get.json()
-            assert resp_map_data["placement_cur"] == prev_map_data["placement_cur"], \
-                "Map.placement_cur != -1 when added with a large payload"
-            assert resp_map_data["placement_all"] == prev_map_data["placement_all"], \
-                "Map.placement_all != -1 when added with a large payload"
+            assert resp_map_data["placement_curver"] == prev_map_data["placement_curver"], \
+                "Map.placement_curver is not None when added with a large payload"
+            assert resp_map_data["placement_allver"] == prev_map_data["placement_allver"], \
+                "Map.placement_allver is not None when added with a large payload"
 
-    await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+    await mock_auth(perms={1: Permissions.curator(), 2: Permissions.curator()})
     async with btd6ml_test_client.post("/maps", headers=HEADERS, data=to_formdata(req_map_data)) as resp:
         assert resp.status == http.HTTPStatus.BAD_REQUEST, \
             f"Adding map with large placements as a list moderator returns {resp.status}"

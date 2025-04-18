@@ -9,10 +9,6 @@ HEADERS = {"Authorization": "Bearer test_token"}
 role_schema = {
     "id": int,
     "name": str,
-    "edit_maplist": bool,
-    "edit_experts": bool,
-    "cannot_submit": bool,
-    "requires_recording": bool,
     "can_grant": [int],
 }
 
@@ -31,9 +27,10 @@ async def test_roles(btd6ml_test_client):
 @pytest.mark.roles
 @pytest.mark.put
 class TestGrants:
-    async def test_grant(self, btd6ml_test_client, mock_auth, set_roles, assert_state_unchanged):
+    async def test_grant(self, btd6ml_test_client, mock_auth, set_roles, assert_state_unchanged, add_role):
         """Test correctly granting and removing roles"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.EXPLIST_OWNER)
 
         user_id = 20
         await set_roles(user_id, [6])
@@ -44,8 +41,8 @@ class TestGrants:
 
         body = {
             "roles": [
-                {"id": 5, "action": "POST"},
-                {"id": 6, "action": "DELETE"},
+                {"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"},
+                {"id": DiscordPermRoles.REQUIRES_RECORDING, "action": "DELETE"},
             ],
         }
         async with btd6ml_test_client.patch(f"/users/{user_id}/roles", json=body, headers=HEADERS) as resp, \
@@ -61,19 +58,20 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Patching a user's roles again returned {resp.status}"
 
-    async def test_grant_no_perms(self, btd6ml_test_client, mock_auth, set_roles, assert_state_unchanged):
+    async def test_grant_no_perms(self, btd6ml_test_client, mock_auth, set_roles, assert_state_unchanged, add_role):
         """Test correctly granting and removing roles"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.EXPLIST_OWNER)
 
         user_id = 20
-        await set_roles(user_id, [6, 1])
+        await set_roles(user_id, [DiscordPermRoles.REQUIRES_RECORDING, DiscordPermRoles.TECHNICIAN])
         body = {
             "roles": [
-                {"id": 5, "action": "POST"},
-                {"id": 6, "action": "DELETE"},
+                {"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"},
+                {"id": DiscordPermRoles.REQUIRES_RECORDING, "action": "DELETE"},
                 # Wrong roles below
-                {"id": 1, "action": "DELETE"},
-                {"id": 4, "action": "POST"},
+                {"id": DiscordPermRoles.TECHNICIAN, "action": "DELETE"},
+                {"id": DiscordPermRoles.MAPLIST_MOD, "action": "POST"},
             ],
         }
         async with assert_state_unchanged(f"/users/{user_id}"), \
@@ -87,12 +85,13 @@ class TestGrants:
             assert "roles[3]" in data["errors"], \
                 "Attempting to grant a role without perms doesn't appear in response.errors"
 
-    async def test_fuzz(self, mock_auth, assert_state_unchanged, btd6ml_test_client):
+    async def test_fuzz(self, mock_auth, assert_state_unchanged, btd6ml_test_client, add_role):
         """Test sending invalid data types in the body"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.EXPLIST_OWNER)
 
         user_id = 20
-        body = {"roles": [{"id": 5, "action": "POST"}]}
+        body = {"roles": [{"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"}]}
 
         for req_data, path, sub_value in fuzz_data(body):
             async with assert_state_unchanged(f"/users/{user_id}"), \
@@ -103,11 +102,13 @@ class TestGrants:
                 assert "errors" in resp_data and path in resp_data["errors"], \
                     f"\"{path}\" was not in response.errors"
 
-    async def test_invalid_fields(self, mock_auth, assert_state_unchanged, btd6ml_test_client):
+    async def test_invalid_fields(self, mock_auth, assert_state_unchanged, btd6ml_test_client, add_role):
         """Test sending invalid data"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.EXPLIST_OWNER)
+
         user_id = 20
-        body = {"roles": [{"id": 5, "action": "POST"}]}
+        body = {"roles": [{"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"}]}
 
         async def call_endpoints(
                 req_data: dict,
@@ -136,12 +137,13 @@ class TestGrants:
         for req_data, edited_path, error_msg in invalidate_field(body, invalid_schema, validations):
             await call_endpoints(req_data, edited_path, error_msg)
 
-    async def test_missing_fields(self, mock_auth, assert_state_unchanged, btd6ml_test_client):
+    async def test_missing_fields(self, mock_auth, assert_state_unchanged, btd6ml_test_client, add_role):
         """Test sending data with missing fields"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.MAPLIST_OWNER)
 
         user_id = 20
-        body = {"roles": [{"id": 5, "action": "POST"}]}
+        body = {"roles": [{"id": DiscordPermRoles.MAPLIST_MOD, "action": "POST"}]}
 
         for req_data, path in remove_fields(body):
             async with assert_state_unchanged(f"/users/{user_id}"), \
@@ -165,15 +167,16 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Patching a user's roles while unauthorized returned {resp.status}"
 
-    async def test_repeated_fields(self, mock_auth, btd6ml_test_client, assert_state_unchanged):
+    async def test_repeated_fields(self, mock_auth, btd6ml_test_client, add_role):
         """Test providing the same role twice"""
-        await mock_auth(perms=DiscordPermRoles.EXPLIST_OWNER)
+        uid = await mock_auth()
+        await add_role(uid, DiscordPermRoles.EXPLIST_OWNER)
 
         user_id = 20
         body = {
             "roles": [
-                {"id": 5, "action": "POST"},
-                {"id": 5, "action": "POST"},
+                {"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"},
+                {"id": DiscordPermRoles.EXPLIST_MOD, "action": "POST"},
             ],
         }
         async with btd6ml_test_client.patch(f"/users/{user_id}/roles", json=body, headers=HEADERS) as resp, \
@@ -181,7 +184,7 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Adding the same role twice returned {resp.status}"
             user_data = await resp_get.json()
-            assert [rl["id"] for rl in user_data["roles"]] == [5], \
+            assert [rl["id"] for rl in user_data["roles"]] == [5, 8], \
                 "Modified roles differ from expected"
 
         body = {
@@ -195,15 +198,15 @@ class TestGrants:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Removing the same role twice returned {resp.status}"
             user_data = await resp_get.json()
-            assert len(user_data["roles"]) == 0, \
+            assert len(user_data["roles"]) == 1, \
                 "Modified roles differ from expected"
 
         body = {
             "roles": [
                 {"id": 5, "action": "POST"},
                 {"id": 5, "action": "DELETE"},
-                {"id": 7, "action": "DELETE"},
-                {"id": 7, "action": "POST"},
+                {"id": 8, "action": "DELETE"},
+                {"id": 8, "action": "POST"},
             ],
         }
         async with btd6ml_test_client.patch(f"/users/{user_id}/roles", json=body, headers=HEADERS) as resp, \

@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 import http
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 from ..testutils import fuzz_data, remove_fields, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -19,13 +19,14 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
         expected_profile = {
             "id": str(user_id),
             "name": name,
-            "maplist": await calc_usr_placements(user_id),
+            "list_stats": await calc_usr_placements(user_id),
             "medals": expected_medals,
             "created_maps": [],
             "avatarURL": None,
             "bannerURL": None,
-            "roles": [],
+            "roles": [{"id": 8, "name": "Can Submit"}],
             "achievement_roles": [],
+            "is_banned": False,
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
@@ -40,16 +41,9 @@ class TestGetUsers:
     async def test_get_user(self, validate_user, mock_auth):
         """Test getting a user by ID"""
         USER_ID = 33
-        await mock_auth(user_id=USER_ID, perms=DiscordPermRoles.NEEDS_RECORDING)
+        await mock_auth(user_id=USER_ID)
         roles = [
-            {
-                "id": 6,
-                "name": "Requires Recordings",
-                "edit_maplist": False,
-                "edit_experts": False,
-                "requires_recording": True,
-                "cannot_submit": False,
-            },
+            {"id": 8, "name": "Can Submit"},
         ]
         await validate_user(USER_ID, profile_overrides={
             "roles": roles,
@@ -98,7 +92,7 @@ class TestAddUser:
         """Test adding a user with a valid payload"""
         USER_ID = 2000000
         USERNAME = "Test User 2M"
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_data = new_user_payload(USER_ID, USERNAME)
         async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_data) as resp:
@@ -108,7 +102,7 @@ class TestAddUser:
 
     async def test_add_invalid_user(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test adding an invalid user, with duplicate or invalid properties"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_user_data = new_user_payload(8888)
 
@@ -143,7 +137,7 @@ class TestAddUser:
         """Test adding a user with missing properties"""
         USER_ID = 2000001
         USERNAME = "Test User 2M1"
-        await mock_auth(perms=DiscordPermRoles.MAPLIST_MOD)
+        await mock_auth(perms={None: {"create:user"}})
 
         req_usr_data = new_user_payload(USER_ID, USERNAME)
         for req_data, path in remove_fields(req_usr_data):
@@ -155,9 +149,9 @@ class TestAddUser:
                     assert "errors" in resp_data and path in resp_data["errors"], \
                         f"\"{path}\" is not in the returned errors"
 
-    async def test_fuzz(self, btd6ml_test_client, mock_auth, new_user_payload, assert_state_unchanged):
+    async def test_fuzz(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test setting every field to a different data type, one by one"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: {"create:user"}})
         req_usr_data = new_user_payload(2000001, "Test User 2M1")
 
         for req_data, path, sub_value in fuzz_data(req_usr_data):
@@ -168,19 +162,21 @@ class TestAddUser:
                 assert "errors" in resp_data and path in resp_data["errors"], \
                     f"\"{path}\" was not in response.errors"
 
-    async def test_add_unauthorized(self, btd6ml_test_client, mock_auth):
+    async def test_add_unauthorized(self, btd6ml_test_client, mock_auth, new_user_payload):
         """Test adding a user without having the perms to do so"""
         await mock_auth(unauthorized=True)
-        async with btd6ml_test_client.post("/users") as resp:
+        req_usr_data = new_user_payload(999888)
+
+        async with btd6ml_test_client.post("/users", json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user without an Authorization header returns {resp.status}"
 
-        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+        async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.UNAUTHORIZED, \
                 f"Creating a user with an invalid token returns {resp.status}"
 
         await mock_auth()
-        async with btd6ml_test_client.post("/users", headers=HEADERS) as resp:
+        async with btd6ml_test_client.post("/users", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.FORBIDDEN, \
                 f"Creating a user without the necessary permissions returns {resp.status}"
 
@@ -193,7 +189,7 @@ class TestEditSelf:
         """Test editing one's own profile"""
         USER_ID = 33
         USERNAME = "New Name 33"
-        await mock_auth(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms={None: Permissions.basic()})
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(USERNAME, oak="oak_test123")
 
@@ -201,6 +197,7 @@ class TestEditSelf:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Editing a profile with a correct payload returns {resp.status}"
             extra = {
+                "roles": [{"id": 16, "name": "test-role"}],
                 "avatarURL":
                     "https://static-api.nkstatic.com/appdocs/4/assets/opendata/a5d32db006cb5d8d535a14494320fc92_ProfileAvatar26.png",
                 "bannerURL":
@@ -232,21 +229,28 @@ class TestEditSelf:
             }
             await validate_user(USER_ID, name=USERNAME, profile_overrides=extra)
 
-    async def test_edit_leave_name(self, btd6ml_test_client, mock_auth, profile_payload, mock_ninja_kiwi_api,
-                                   assert_state_unchanged):
+    async def test_edit_leave_name(self, btd6ml_test_client, mock_auth, profile_payload, mock_ninja_kiwi_api):
         """Test editing one's own profile while leaving the name unchanged"""
         USER_ID = 29
-        await mock_auth(user_id=USER_ID)
+        await mock_auth(user_id=USER_ID, perms={None: Permissions.basic()})
         mock_ninja_kiwi_api()
         req_usr_data = profile_payload(f"usr{USER_ID}", oak="oak_test123")
 
         async with btd6ml_test_client.put("/users/@me", headers=HEADERS, json=req_usr_data) as resp:
             assert resp.status == http.HTTPStatus.OK
 
+    async def test_edit_forbidden(self, mock_auth, btd6ml_test_client, profile_payload, assert_state_unchanged):
+        """Test calling the endpoint without the necessary permissions"""
+        await mock_auth(user_id=33)
+        async with assert_state_unchanged("/users/33"), \
+                btd6ml_test_client.put("/users/@me", headers=HEADERS, json=profile_payload("Newer Name 33")) as resp:
+            assert resp.status == http.HTTPStatus.FORBIDDEN, \
+                f"Editing oneself without edit:self returns {resp.status}"
+
     async def test_edit_missing_fields(self, btd6ml_test_client, mock_auth, profile_payload,
                                        assert_state_unchanged):
         """Test editing one's own profile with missing fields"""
-        await mock_auth(user_id=33)
+        await mock_auth(user_id=33, perms={None: Permissions.basic()})
         req_usr_data = profile_payload("Newer Name 33")
 
         for req_data, path in remove_fields(req_usr_data):
@@ -260,7 +264,7 @@ class TestEditSelf:
 
     async def test_fuzz(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged):
         """Test setting every field to a different data type, one by one"""
-        await mock_auth(user_id=33)
+        await mock_auth(user_id=33, perms={None: Permissions.basic()})
         req_usr_data = profile_payload("Newer Name 33")
         extra_expected = {"oak": [str]}
 
@@ -276,7 +280,7 @@ class TestEditSelf:
     async def test_edit_invalid(self, btd6ml_test_client, mock_auth, profile_payload, assert_state_unchanged,
                                 mock_ninja_kiwi_api):
         """Test editing one's own profile with missing or invalid fields"""
-        await mock_auth(perms=DiscordPermRoles.ADMIN)
+        await mock_auth(perms={None: Permissions.basic()})
 
         req_usr_data = profile_payload("Cool Username")
 

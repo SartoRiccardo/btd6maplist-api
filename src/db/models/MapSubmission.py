@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from src.utils.misc import list_to_int
+import src.utils.formats.formatinfo
 
 
 @dataclass
@@ -17,13 +17,17 @@ class MapSubmission:
         type: string
         nullable: true
         description: Additional notes provided in the submission.
-      type:
-        type: string
-        enum: ["experts", "list"]
-        description: The list the submission is for.
-      proposed_difficulty:
+      format:
+        $ref: "#/components/schemas/MaplistFormat"
+      proposed_diff:
         type: string
         description: The proposed difficulty
+      proposed_diff_name:
+        type: string
+        nullable: true
+        description: |
+          The proposed difficulty as a string. Nullable if it's a dynamic value
+          such as Nostalgia Pack remake maps.
       rejected_by:
         $ref: "#/components/schemas/DiscordID"
         nullable: true
@@ -34,23 +38,31 @@ class MapSubmission:
         type: integer
         description: Date of the submission.
     """
+    id: int
     code: str
     submitter: int
     subm_notes: str | None
-    for_list: int
+    format_id: int
     proposed_diff: int
     rejected_by: int | None
     created_on: datetime
     completion_proof: str
     wh_data: str | None
+    wh_msg_id: int | None
 
     def to_dict(self) -> dict:
+        diff_names = src.utils.formats.formatinfo.format_info[self.format_id].proposed_values
+        diff_name = None
+        if isinstance(diff_names, tuple) and 0 <= self.proposed_diff < len(diff_names[1]):
+            diff_name = diff_names[1][self.proposed_diff]
+
         return {
             "code": self.code,
             "submitter": str(self.submitter),
             "subm_notes": self.subm_notes,
-            "type": list_to_int[self.for_list],
+            "format": self.format_id,
             "proposed_diff": self.proposed_diff,
+            "proposed_diff_name": diff_name,
             "rejected_by": str(self.rejected_by) if self.rejected_by else None,
             "completion_proof": self.completion_proof,
             "created_on": int(self.created_on.timestamp()),

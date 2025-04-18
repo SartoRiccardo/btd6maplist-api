@@ -9,9 +9,8 @@ import importlib
 import requests
 import src.db.connection
 import src.requests
-from .mocks.DiscordRequestMock import DiscordRequestMock
+from .mocks.DiscordRequestMock import DiscordRequestMock, DiscordPermRoles
 from .mocks.NinjaKiwiMock import NinjaKiwiMock
-from .mocks import DiscordPermRoles
 from aiohttp.test_utils import TestServer, TestClient
 from .testutils import clear_db_patch_data, override_config
 from cryptography.hazmat.primitives import hashes, serialization
@@ -79,45 +78,167 @@ async def set_roles():
         if isinstance(uid, str):
             uid = int(uid)
 
-        await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
-        await conn.executemany(
-            """
-            INSERT INTO user_roles
-                (user_id, role_id)
-            VALUES
-                ($1, $2)
-            """,
-            [(uid, role) for role in roles],
-        )
+        async with conn.transaction():
+            await conn.execute("DELETE FROM user_roles WHERE user_id = $1", uid)
+            await conn.execute(
+                """
+                INSERT INTO user_roles
+                    (user_id, role_id)
+                SELECT
+                    $1, r.id
+                FROM users u
+                CROSS JOIN (SELECT UNNEST($2::int[])) r(id)
+                WHERE u.discord_id = $1
+                """,
+                uid, roles,
+            )
 
     return fixture
 
 
+@pytest_asyncio.fixture(scope="function")
+async def set_custom_role():
+    inserted_roles = []
+
+    @src.db.connection.postgres
+    async def fixture(
+            uid: int | str,
+            permissions: dict[int | None, set[str]],
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        if isinstance(uid, str):
+            uid = int(uid)
+
+        for format_id in permissions:
+            if isinstance(permissions[format_id], str):
+                raise TypeError("permissions must not be str")
+
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM user_roles WHERE user_id = $1",
+                uid,
+            )
+
+            role_id = await conn.fetchval(
+                """
+                INSERT INTO roles (name) VALUES ($1) RETURNING id
+                """,
+                "test-role"
+            )
+            await conn.executemany(
+                """
+                INSERT INTO role_format_permissions
+                    (role_id, format_id, permission)
+                VALUES
+                    ($1, $2, $3)
+                """,
+                [
+                    (role_id, format_id, permission)
+                    for format_id in permissions
+                    for permission in permissions[format_id]
+                ]
+            )
+            await conn.execute(
+                """
+                INSERT INTO user_roles
+                    (user_id, role_id)
+                VALUES
+                    ($1, $2)
+                """,
+                uid, role_id
+            )
+            inserted_roles.append(role_id)
+
+    @src.db.connection.postgres
+    async def cleanup(
+            roles: list[int],
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        async with conn.transaction():
+            await conn.execute(
+                """
+                DELETE FROM roles
+                WHERE id = ANY($1::int[])
+                """,
+                roles,
+            )
+
+    yield fixture
+    await cleanup(inserted_roles)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def add_role():
+    inserted_roles = []
+
+    @src.db.connection.postgres
+    async def fixture(
+            uid: int | str,
+            role_id: int,
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        if isinstance(uid, str):
+            uid = int(uid)
+
+        async with conn.transaction():
+            await conn.execute(
+                """
+                INSERT INTO user_roles
+                    (user_id, role_id)
+                VALUES
+                    ($1, $2)
+                """,
+                uid, role_id,
+            )
+            inserted_roles.append((uid, role_id))
+
+    @src.db.connection.postgres
+    async def cleanup(
+            roles: list[tuple[int | int]],
+            conn: "asyncpg.pool.PoolConnectionProxy" = None,
+    ) -> None:
+        async with conn.transaction():
+            await conn.executemany(
+                """
+                DELETE FROM user_roles
+                WHERE (user_id, role_id) IN (
+                    VALUES
+                        ($1::bigint, $2::int)
+                )
+                """,
+                roles,
+            )
+
+    yield fixture
+    await cleanup(inserted_roles)
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def mock_auth(mock_discord_api, set_roles):
+async def mock_auth(mock_discord_api, set_roles, set_custom_role):
+    CAN_SUBMIT_ROLE_ID = 8
+
     @src.db.connection.postgres
     async def reset_roles(conn=None) -> None:
-        await conn.execute("DELETE FROM user_roles")
+        await conn.execute(
+            f"""
+            DELETE FROM user_roles
+            ;
+            INSERT INTO user_roles
+                (user_id, role_id)
+            SELECT
+                discord_id, {CAN_SUBMIT_ROLE_ID}
+            FROM users
+            ;
+            """
+        )
 
     async def set_mock(**kwargs) -> None:
         mocker = mock_discord_api(**kwargs)
-        if "perms" not in kwargs:
-            return
-        perms = {
-            DiscordPermRoles.ADMIN: [4, 5],
-            DiscordPermRoles.MAPLIST_MOD: [4],
-            DiscordPermRoles.EXPLIST_MOD: [5],
-            DiscordPermRoles.NEEDS_RECORDING: [6],
-            DiscordPermRoles.BANNED: [7],
-            DiscordPermRoles.MAPLIST_OWNER: [2],
-            DiscordPermRoles.EXPLIST_OWNER: [3],
-        }
-
-        roles = []
-        for perm in perms:
-            if perm & kwargs["perms"]:
-                roles += perms[perm]
-        await set_roles(mocker.user_id, list(set(roles)))
+        if kwargs.get("perms", None) is None:
+            await set_roles(mocker.user_id, [CAN_SUBMIT_ROLE_ID])
+        else:
+            await set_custom_role(mocker.user_id, kwargs["perms"])
+        return mocker.user_id
 
     await reset_roles()
     return set_mock
@@ -285,9 +406,11 @@ def map_payload():
         return {
             "code": code,
             "name": "Test Map Data",
-            "placement_allver": -1,
-            "placement_curver": -1,
-            "difficulty": -1,
+            "placement_allver": None,
+            "placement_curver": None,
+            "difficulty": None,
+            "botb_difficulty": None,
+            "remake_of": None,
             "r6_start": None,
             "map_data": None,
             "map_preview_url": None,
@@ -376,3 +499,16 @@ def submission_formdata(save_image, partial_sign, finish_sign):
         return form_data
 
     return generate
+
+
+@pytest.fixture
+def payload_format():
+    def function() -> dict:
+        return {
+            "hidden": False,
+            "run_submission_status": "closed",
+            "map_submission_status": "closed",
+            "run_submission_wh": "https://discord.com/wh/999",
+            "map_submission_wh": "https://discord.com/wh/999",
+        }
+    return function

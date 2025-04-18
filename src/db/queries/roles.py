@@ -10,11 +10,12 @@ async def get_roles(conn=None):
         """
         SELECT
             DISTINCT ON (r.id)
-            r.id, r.name, r.edit_maplist, r.edit_experts, r.requires_recording, r.cannot_submit,
+            r.id, r.name,
             ARRAY_AGG(rg.role_can_grant) OVER(PARTITION BY r.id) AS can_grant
         FROM roles r
         LEFT JOIN role_grants rg
             ON r.id = rg.role_required
+        WHERE NOT r.internal
         """
     )
 
@@ -22,10 +23,6 @@ async def get_roles(conn=None):
         Role(
             row["id"],
             row["name"],
-            row["edit_maplist"],
-            row["edit_experts"],
-            row["requires_recording"],
-            row["cannot_submit"],
             can_grant=[rl for rl in row["can_grant"] if rl is not None],
         )
         for row in payload

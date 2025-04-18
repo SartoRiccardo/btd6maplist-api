@@ -9,10 +9,11 @@ from aiohttp import web
 from typing import Awaitable, Callable, Any
 from functools import wraps
 import src.http
-from src.db.queries.users import create_user, get_user_min, get_user_roles
+from src.db.queries.users import create_user, get_user_min, get_user_perms
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from ..requests import discord_api
+from src.exceptions import GenericErrorException, ValidationException
 
 
 def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **kwargs_deco):
@@ -23,11 +24,10 @@ def validate_json_body(validator_function: Callable[[dict], Awaitable[dict]], **
             try:
                 body = json.loads(await request.text())
             except json.decoder.JSONDecodeError:
-                return web.json_response({"errors": {"": "Invalid JSON data"}, "data": {}}, status=400)
+                raise GenericErrorException("Invalid JSON data", status_code=http.HTTPStatus.BAD_REQUEST)
 
-            errors = await validator_function(body, **kwargs_deco)
-            if len(errors):
-                return web.json_response({"errors": errors, "data": {}}, status=400)
+            if errors := await validator_function(body, **kwargs_deco):
+                raise ValidationException(errors)
             return await handler(request, *args, **kwargs_caller, json_body=body)
         return wrapper
     return deco
@@ -39,93 +39,54 @@ def bearer_auth(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     async def wrapper(request: web.Request, *args, **kwargs):
         if "Authorization" not in request.headers or \
                 not request.headers["Authorization"].startswith("Bearer "):
-            return web.json_response(
-                {"errors": {"": "No token found"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("No token found", status_code=http.HTTPStatus.UNAUTHORIZED)
         token = request.headers["Authorization"][len("Bearer "):]
         return await handler(request, *args, **kwargs, token=token)
-    return wrapper
-
-
-def with_maplist_profile(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
-    """
-    Must be used with `bearer_auth` beforehand.
-    Checks if the user is in the maplist Discord.
-    Adds `maplist_profile` to kwargs if they're there or returns 401.
-    """
-    @wraps(handler)
-    async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
-        if token == "":
-            return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-
-        try:
-            profile = await discord_api().get_maplist_profile(token)
-            return await handler(request, *args, **kwargs, token=token, maplist_profile=profile)
-        except aiohttp.ClientResponseError as exc:
-            if exc.status == http.HTTPStatus.NOT_FOUND:
-                return web.json_response(
-                    {"errors": {"": "You don't seem to be in the maplist discord..."}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
-            else:
-                return web.json_response(
-                    {"errors": {"": "Couldn't verify your Maplist account"}, "data": {}},
-                    status=http.HTTPStatus.UNAUTHORIZED,
-                )
-
     return wrapper
 
 
 def with_discord_profile(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
     """
     Must be used with `bearer_auth` beforehand.
+    TODO Migrate to JWT and dont call an external service every auth call
     Adds `discord_profile` to kwargs or returns 401.
     """
     @wraps(handler)
     async def wrapper(request: web.Request, *args, token: str = "", **kwargs):
         if token == "":
-            return web.json_response(
-                {"errors": {"": "No Discord token found"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("No Discord token found", status_code=http.HTTPStatus.UNAUTHORIZED)
 
         try:
             profile = await discord_api().get_user_profile(token)
             return await handler(request, *args, **kwargs, token=token, discord_profile=profile)
         except aiohttp.ClientResponseError:
-            return web.json_response(
-                {"errors": {"": "Couldn't verify your Discord account"}, "data": {}},
-                status=http.HTTPStatus.UNAUTHORIZED,
-            )
+            raise GenericErrorException("Couldn't verify your Discord account", status_code=http.HTTPStatus.UNAUTHORIZED)
 
     return wrapper
 
 
 def validate_resource_exists(
         exist_check: Callable[[Any], Awaitable[Any]],
-        match_info_key: str,
+        *match_info_key: str,
         **kwargs_deco
 ):
     """Adds `resource` to kwargs or returns 404."""
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
         async def wrapper(request: web.Request, *args, **kwargs_caller):
-            resource = await exist_check(request.match_info[match_info_key], **kwargs_deco)
+            args_get = [request.match_info[key] for key in match_info_key]
+            resource = await exist_check(*args_get, **kwargs_deco)
             if not resource:
-                return web.Response(status=404)
+                return web.Response(status=http.HTTPStatus.NOT_FOUND)
             return await handler(request, *args, **kwargs_caller, resource=resource)
         return wrapper
     return deco
 
 
-def require_perms(
-        throw_on_permless: bool = True,
-):
+def require_perms():
     """
     Must be used with `with_discord_profile` or `check_bot_signature` beforehand.
-    Returns 403 if they don't have any perms.
-    Adds `is_admin`, `is_maplist_mod`, `is_explist_mod`, `cannot_submit`, and `requires_recording` to kwargs.
+    Returns 403 if they don't have any perms, adds `permissions` to kwargs othewise.
     """
     def deco(handler: Callable[[web.Request, Any], Awaitable[web.Response]]):
         @wraps(handler)
@@ -137,36 +98,13 @@ def require_perms(
                 discord_profile = kwargs_caller["json_data"]["user"]
             if discord_profile is None:
                 return web.Response(status=http.HTTPStatus.UNAUTHORIZED)
-            roles = await get_user_roles(discord_profile["id"])
-
-            is_admin = False
-            is_list_mod = False
-            is_explist_mod = False
-            cannot_submit = False
-            requires_recording = False
-            for role in roles:
-                # is_admin no longer used
-                is_list_mod = is_list_mod or role.edit_maplist
-                is_explist_mod = is_explist_mod or role.edit_experts
-                cannot_submit = cannot_submit or role.cannot_submit
-                requires_recording = requires_recording or role.requires_recording
-
-            if not (is_admin or is_explist_mod or is_list_mod) and throw_on_permless:
-                return web.json_response(
-                    {"errors": {"": "You don't have the necessary permissions to do this"}, "data": {}},
-                    status=http.HTTPStatus.FORBIDDEN,
-                )
+            permissions = await get_user_perms(discord_profile["id"])
 
             return await handler(
                 request,
                 *args,
                 **kwargs_caller,
-                is_admin=is_admin,
-                is_explist_mod=is_explist_mod,
-                is_list_mod=is_list_mod,
-                is_maplist_mod=is_list_mod,  # Alias cause I keep mixing them up
-                cannot_submit=cannot_submit,
-                requires_recording=requires_recording,
+                permissions=permissions,
             )
         return wrapper
     return deco

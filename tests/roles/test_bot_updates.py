@@ -1,7 +1,7 @@
 import http
 import urllib.parse
 import pytest
-from ..mocks import DiscordPermRoles
+from ..mocks import Permissions
 import src.utils.validators
 
 HEADERS = {"Authorization": "Bearer test_token"}
@@ -23,7 +23,7 @@ async def test_get_role_updates(btd6ml_test_client, mock_auth, sign_message):
         assert resp.status == http.HTTPStatus.OK, f"Getting achievement updates returned {resp.status}"
         assert len(await resp.json()) == 0, "Role updates present in a fresh database"
 
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: {Permissions.edit.config}})
     req_data = {"config": {"points_top_map": 10000, "points_bottom_map": 300}}
     async with btd6ml_test_client.get("/roles/achievement") as resp_roles, \
             btd6ml_test_client.get("/maps/leaderboard") as resp_lb, \
@@ -63,7 +63,7 @@ async def test_get_role_updates(btd6ml_test_client, mock_auth, sign_message):
 async def test_update_delete_roles(btd6ml_test_client, mock_auth, sign_message):
     """Test deleting all roles and checking the update endpoint"""
     qparams = {"signature": sign_message(b"")}
-    await mock_auth(perms=DiscordPermRoles.ADMIN)
+    await mock_auth(perms={1: {Permissions.edit.achievement_roles}})
 
     data = {
         "lb_format": 1,

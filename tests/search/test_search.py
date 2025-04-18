@@ -10,14 +10,14 @@ user_schema = {
 map_schema = {
     "code": str,
     "name": str,
-    "placement_all": int,
-    "placement_cur": int,
-    "difficulty": int,
+    "placement_allver": int | None,
+    "placement_curver": int | None,
+    "difficulty": int | None,
+    "botb_difficulty": int | None,
     "r6_start": str | None,
     "map_data": str | None,
     "optimal_heros": [str],
     "deleted_on": int | None,
-    "created_on": int,
     "map_preview_url": str
 }
 

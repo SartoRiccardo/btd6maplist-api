@@ -1,17 +1,18 @@
 import asyncio
 import validators
-from aiohttp import web
-import http
-from typing import Type, Any, get_args
+from typing import Type, Any, get_args, Literal
 import re
 import src.utils.routedecos
 import src.http
 from src.db.models import MapSubmission
-from src.db.queries.maps import map_exists, alias_exists, get_map
+from src.db.queries.maps import map_exists, alias_exists, get_map, map_exists_in_format
 from src.db.queries.users import get_user_min
+from src.db.queries.format import get_format
 from src.db.queries.mapsubmissions import get_map_submission
 from src.db.queries.achievement_roles import get_duplicate_ds_roles
-from .formats import is_format_expert, is_format_maplist, is_format_valid
+from src.exceptions import ValidationException, MissingPermsException, GenericErrorException
+from src.utils.formats.formatinfo import format_info, FormatStatus
+from .misc import str_to_comp_status, str_to_map_status
 
 
 MAX_TEXT_LEN = 100
@@ -67,13 +68,10 @@ def check_fields(body: dict | list | Any, schema: dict | list | Type, path: str 
     return {}
 
 
-def typecheck_full_map(body: dict) -> dict:
+def typecheck_full_map(body: dict) -> None:
     check_fields_exists = {
         "code": str,
         "name": str,
-        "placement_allver": int,
-        "placement_curver": int,
-        "difficulty": int,
         "r6_start": str | None,
         "map_data": str | None,
         "additional_codes": [{"code": str, "description": str}],
@@ -84,22 +82,24 @@ def typecheck_full_map(body: dict) -> dict:
         "optimal_heros": [str],
         "map_preview_url": str | None,
     }
+    for format_id in format_info:
+        check_fields_exists[format_info[format_id].key] = int | None
     check = check_fields(body, check_fields_exists)
-    if len(check):
-        return check
+
+    if check:
+        raise ValidationException(check)
 
 
 async def validate_full_map(
         body: dict,
         check_dup_code: bool = True,
         validate_code_exists: bool = True,
-) -> dict:
-    errors = {}
-    if check_fail := typecheck_full_map(body):
-        return check_fail
+) -> None:
+    typecheck_full_map(body)
 
+    errors = {}
     if check_dup_code and await map_exists(body["code"]):
-        return {"code": "Map already exists"}
+        raise ValidationException({"code": "Map already exists"})
     if code_err := await validate_map_code(body["code"], validate_code_exists=validate_code_exists):
         errors["code"] = code_err
     for i, addcode in enumerate(body["additional_codes"][:MAX_ADD_CODES]):
@@ -123,6 +123,7 @@ async def validate_full_map(
     else:
         map_res = await get_map(body["code"])
 
+        # REFACTOR just take 1 query
         async def cannot_be_taken(a: str) -> bool:
             """Returns True if the alias cannot be taken"""
             exists = await alias_exists(a)
@@ -144,9 +145,7 @@ async def validate_full_map(
             (len(body["map_preview_url"]) == 0 or not validators.url(body["map_preview_url"])):
         errors["map_preview_url"] = "Must be a URL"
 
-    if len(body["creators"]) == 0:
-        errors["creators"] = "Must have at least one creator"
-    elif rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
+    if rep_idx := get_repeated_indexes([el["id"] for el in body["creators"]]):
         for idx in rep_idx:
             errors[f"creators[{idx}].id"] = "Duplicate creator"
     else:
@@ -174,21 +173,18 @@ async def validate_full_map(
         else:
             body["verifiers"][i]["id"] = str(usr.id)
 
-    if not (-1 <= body["difficulty"] <= 4):
-        errors["difficulty"] = "Must be between -1 and 4, included"
-    elif body["difficulty"] <= body["placement_curver"] <= body["placement_allver"] < 0:
-        errors["placement_allver"] = "At least one of these should be set"
-        errors["placement_curver"] = "At least one of these should be set"
-        errors["difficulty"] = "At least one of these should be set"
-    # FIMXE: Should take 50 from config
-    if body["placement_curver"] > 50:
-        del body["placement_curver"]
-    elif body["placement_curver"] < -1:
-        errors["placement_curver"] = "Must either be -1 or a between 1 and 50"
-    if body["placement_allver"] > 50:
-        del body["placement_allver"]
-    elif body["placement_allver"] < -1:
-        errors["placement_allver"] = "Must either be -1 or a between 1 and 50"
+    one_format_set = False
+    for format_id in format_info:
+        if body[format_info[format_id].key] is not None:
+            one_format_set = True
+            is_valid, error_msg, should_delete = await format_info[format_id].validate(body[format_info[format_id].key])
+            if not is_valid:
+                errors[format_info[format_id].key] = error_msg
+            if should_delete:
+                del body[format_info[format_id].key]
+    if not one_format_set:
+        for format_id in format_info:
+            errors[format_info[format_id].key] = "At least one of these must be not null"
 
     for i, vcompat in enumerate(body["version_compatibilities"]):
         if not (0 <= vcompat["status"] <= 3):
@@ -202,42 +198,56 @@ async def validate_full_map(
         if hero not in allowed_heros:
             errors["optimal_heros[i].hero"] = "That hero doesn't exist"
 
-    return errors
+    if errors:
+        raise ValidationException(errors)
 
 
-def typecheck_submission(body: dict) -> dict:
+def typecheck_map_submission(body: dict) -> None:
     check_fields_exists = {
         "code": str,
         "notes": str | None,
         "proposed": int,
-        "type": str,
+        "format": int,
     }
     check = check_fields(body, check_fields_exists)
-    if len(check):
-        return check
+    if check:
+        raise ValidationException(check)
 
 
-async def validate_submission(body: dict) -> dict:
-    if check_fail := typecheck_submission(body):
+async def validate_map_submission(
+        body: dict,
+        has_proof: bool = False,
+) -> None:
+    if check_fail := typecheck_map_submission(body):
         return check_fail
 
     errors = {}
-    if await map_exists(body["code"]):
-        return {"code": "Map already exists"}
+
+    list_format = await get_format(body["format"])
+    if list_format is None:
+        errors["format"] = "Format does not exist"
+    else:
+        if list_format.map_submission_status == FormatStatus.CLOSED:
+            errors["format"] = "Format is currently not accepting submissions"
+        elif list_format.map_submission_status == FormatStatus.OPEN_CHIMPS and not has_proof:
+            errors["proof_completion"] = "This format requires image proof of the map being beaten in CHIMPS mode"
+        if await map_exists_in_format(body["code"], body["format"]):
+            raise ValidationException({"code": "Map already exists"})
+
     if body["notes"]:
         if len(body["notes"]) > MAX_LONG_TEXT_LEN:
             errors["notes"] = f"Must be under {MAX_LONG_TEXT_LEN} characters"
         if len(body["notes"]) == 0:
             body["notes"] = None
-    if body["type"] not in ["list", "experts"]:
-        errors["type"] = f"Must be either `list` or `experts`"
-    return errors
+
+    if errors:
+        raise ValidationException(errors)
 
 
 async def validate_completion_submission(
     body: dict,
     on_map: "src.db.models.PartialMap",
-) -> dict:
+) -> None:
     check_fields_exists = {
         "format": int,
         "notes": str | None,
@@ -246,11 +256,10 @@ async def validate_completion_submission(
         "current_lcc": bool,
         "video_proof_url": [str],
     }
-    check = check_fields(body, check_fields_exists)
-    if len(check):
-        return check
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
-    errors = {}
     if len(body["video_proof_url"]) > MAX_PROOF_URL:
         errors[f"video_proof_url"] = f"Can submit up to {MAX_PROOF_URL} URLs"
     else:
@@ -259,29 +268,43 @@ async def validate_completion_submission(
                 errors[f"video_proof_url[{i}]"] = f"URLs must be long max. {MAX_TEXT_LEN} each"
             if not validators.url(url):
                 errors[f"video_proof_url[{i}]"] = "Invalid video URL"
-    requires_recording = body["black_border"] or body["current_lcc"] or \
-            body["no_geraldo"] and (
-                not is_format_expert(body["format"]) or
-                is_format_expert(body["format"]) and not (0 <= on_map.difficulty <= 2)
-            )
-    if requires_recording and len(body["video_proof_url"]) == 0:
-        errors["video_proof_url"] = "Missing proof URL"
-    if body["current_lcc"]:
-        if "leftover" not in body or not isinstance(body["leftover"], int):
-            errors["leftover"] = "Missing or non-integer saveup"
-        elif 0 > body["leftover"]:
-            errors["leftover"] = "Must be greater than 0"
-    if body["format"] not in [1, 2, 51]:
-        errors["format"] = "Must be a valid format"
+
+    list_format = await get_format(body["format"])
+    if list_format is None:
+        errors["format"] = "This format does not exist"
+    elif list_format.run_submission_status == FormatStatus.CLOSED:
+        errors["format"] = "This format does not accept completion submissions"
+    elif list_format.run_submission_status == FormatStatus.LCC_ONLY and not body["current_lcc"]:
+        errors["format"] = "This format only accepts LCC completion submissions"
+        errors["current_lcc"] = "Must be true for this format"
+    elif not await format_info[body["format"]].can_accept_run(on_map):
+        errors["format"] = "This map doesn't accept completions on that format"
+    else:
+        requires_recording = format_info[body["format"]].run_requires_recording(
+            on_map,
+            body["black_border"],
+            body["no_geraldo"],
+            body["current_lcc"],
+        )
+        if requires_recording and len(body["video_proof_url"]) == 0:
+            errors["video_proof_url"] = "Missing proof URL"
+        if body["current_lcc"]:
+            if "leftover" not in body or not isinstance(body["leftover"], int):
+                errors["leftover"] = "Missing or non-integer saveup"
+            elif 0 > body["leftover"]:
+                errors["leftover"] = "Must be greater than 0"
+
     if body["notes"] is not None:
         if len(body["notes"]) == 0:
             errors["notes"] = "Notes cannot be an empty string"
         elif len(body["notes"]) > MAX_LONG_TEXT_LEN:
             errors["notes"] = f"Notes cannot be longer than {MAX_LONG_TEXT_LEN} characters"
-    return errors
+
+    if errors:
+        raise ValidationException(errors)
 
 
-async def validate_completion(body: dict) -> dict[str, str]:
+async def validate_completion(body: dict) -> None:
     check_fields_exists = {
         "black_border": bool,
         "no_geraldo": bool,
@@ -289,23 +312,24 @@ async def validate_completion(body: dict) -> dict[str, str]:
         "user_ids": [str],
         "lcc": dict | None,
     }
-    if len(check := check_fields(body, check_fields_exists)):
-        return check
-
-    errors = {}
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
     if body["lcc"] is not None:
         check_lcc_exists = {
             "leftover": int,
         }
-        if len(check := check_fields(body["lcc"], check_lcc_exists, path=".lcc")):
-            return check
+        errors = check_fields(body["lcc"], check_lcc_exists, path=".lcc")
+        if errors:
+            raise ValidationException(errors)
 
         if 0 > body["lcc"]["leftover"]:
             errors["lcc.leftover"] = "Must be greater than 0"
 
-    if body["format"] not in [1, 2, 51]:
-        errors["format"] = "Must be a valid format"
+    list_format = await get_format(body["format"])
+    if list_format is None:
+        errors["format"] = "Format does not exist"
 
     if len(body["user_ids"]) == 0:
         errors["user_ids"] = "Must be beaten by someone"
@@ -322,16 +346,18 @@ async def validate_completion(body: dict) -> dict[str, str]:
             else:
                 body["user_ids"][i] = str(usr.id)
 
-    return errors
+    if errors:
+        raise ValidationException(errors)
 
 
-async def validate_discord_user(body: dict) -> dict[str, str]:
+async def validate_discord_user(body: dict) -> None:
     check_fields_exists = {
         "discord_id": str,
         "name": str,
     }
-    if len(check := check_fields(body, check_fields_exists)):
-        return check
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
     errors = {}
 
@@ -346,53 +372,43 @@ async def validate_discord_user(body: dict) -> dict[str, str]:
     elif (match := re.search(r"[^\w _\.]", body["name"])) is not None:
         errors["name"] = f"Name cannot contain the character: {match.group(0)}"
 
-    return errors
+    if errors:
+        raise ValidationException(errors)
 
 
 async def check_prev_map_submission(
         code: str,
-        submitter: str
-) -> MapSubmission | web.Response | None:
-    prev_submission = await get_map_submission(code)
+        format_id: int,
+        submitter: str | int,
+) -> MapSubmission | None:
+    if isinstance(submitter, str):
+        submitter = int(submitter)
+
+    prev_submission = await get_map_submission(code, format_id)
     if prev_submission is not None:
-        if prev_submission.rejected_by:
-            return web.json_response(
-                {"errors": {"": "That map was already rejected!"}},
-                status=http.HTTPStatus.BAD_REQUEST,
-            )
-        elif prev_submission.submitter != int(submitter):
-            return web.json_response(
-                {"errors": {"": "Someone else already submitted this map!"}},
-                status=http.HTTPStatus.FORBIDDEN,
-            )
+        # if prev_submission.rejected_by:
+        #     raise GenericErrorException("That map was already rejected!")
+        if prev_submission.submitter != submitter:
+            raise GenericErrorException("Someone else already submitted this map!")
     return prev_submission
 
 
 def validate_completion_perms(
-        is_maplist_mod: bool,
-        is_explist_mod: bool,
+        permissions: "src.db.models.Permissions",
         new_format: int,
         old_format: int | None = None,
-) -> web.Response | None:
-    if not is_maplist_mod and (
-            is_format_maplist(new_format) or
-            old_format and is_format_maplist(old_format)):
-        return web.json_response(
-            {"errors": {"format": "You must be a Maplist Moderator"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
+        action: Literal["edit", "create", "delete"] = "create",
+) -> None:
+    req_perm = f"{action}:completion"
 
-    if not is_explist_mod and (
-            is_format_expert(new_format) or
-            old_format and is_format_expert(old_format)
-    ):
-        return web.json_response(
-            {"errors": {"format": "You must be an Expert List Moderator"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
+    if not permissions.has(req_perm, new_format):
+        raise MissingPermsException(req_perm, format=new_format)
+
+    if old_format is not None and not permissions.has(req_perm, old_format):
+        raise MissingPermsException(req_perm, format=old_format)
 
 
-async def validate_achievement_roles(body: dict) -> dict:
+async def validate_achievement_roles(body: dict) -> None:
     check_fields_exists = {
         "lb_format": int,
         "lb_type": str,
@@ -406,12 +422,12 @@ async def validate_achievement_roles(body: dict) -> dict:
             "linked_roles": [{"guild_id": str, "role_id": str}],
         }],
     }
-    check = check_fields(body, check_fields_exists)
-    if len(check):
-        return check
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
 
-    errors = {}
-    if not is_format_valid(body["lb_format"]):
+    list_format = await get_format(body["lb_format"])
+    if list_format is None:
         errors["lb_format"] = "Format does not exist"
     if body["lb_type"] not in ["points", "no_geraldo", "black_border", "lccs"]:
         errors["lb_type"] = "Leaderboard type does not exist"
@@ -461,4 +477,34 @@ async def validate_achievement_roles(body: dict) -> dict:
             i, j = discord_role_idxs[dupe]
             errors[f"roles[{i}].linked_roles[{j}].role_id"] = "This role is already used elsewhere!"
 
-    return errors
+    if errors:
+        raise ValidationException(errors)
+
+
+async def validate_format(body: dict) -> None:
+    check_fields_exists = {
+        "hidden": bool,
+        "run_submission_status": str,
+        "map_submission_status": str,
+        "map_submission_wh": str | None,
+        "run_submission_wh": str | None,
+    }
+    errors = check_fields(body, check_fields_exists)
+    if errors:
+        raise ValidationException(errors)
+
+    if body["run_submission_status"] not in str_to_comp_status:
+        errors["run_submission_status"] = f"Must be one of the following: [{','.join(str_to_comp_status.keys())}]"
+    else:
+        body["run_submission_status"] = str_to_comp_status[body["run_submission_status"]]
+    if body["map_submission_status"] not in str_to_map_status:
+        errors["map_submission_status"] = f"Must be one of the following: [{','.join(str_to_map_status.keys())}]"
+    else:
+        body["map_submission_status"] = str_to_map_status[body["map_submission_status"]]
+    if body["map_submission_wh"] is not None and not validators.url(body["map_submission_wh"]):
+        errors["map_submission_wh"] = "Must be a valid url"
+    if body["run_submission_wh"] is not None and not validators.url(body["run_submission_wh"]):
+        errors["run_submission_wh"] = "Must be a valid url"
+
+    if errors:
+        raise ValidationException(errors)

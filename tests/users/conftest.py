@@ -72,7 +72,7 @@ async def calc_user_profile_medals(btd6ml_test_client):
 
 @pytest_asyncio.fixture
 async def calc_usr_placements(btd6ml_test_client):
-    async def calculate(user_id: int | None) -> dict:
+    async def calculate(user_id: int | None) -> list[dict]:
         async def get_usr_data(lb_format, lb_value) -> tuple[float, int | None]:
             async with btd6ml_test_client.get(f"/maps/leaderboard?format={lb_format}&value={lb_value}") as resp:
                 data = await resp.json()
@@ -85,26 +85,32 @@ async def calc_usr_placements(btd6ml_test_client):
                 except StopIteration:
                     return 0.0, None
 
-        placements = {}
-        for key, format in [("current", 1), ("all", 2), ("experts", 51)]:
+        placements = []
+        for format_id in [1, 2, 51]:
             if user_id is None:
-                placements[key] = {
-                    "points": 0.0, "pts_placement": None,
-                    "lccs": 0.0, "lccs_placement": None,
-                    "no_geraldo": 0.0, "no_geraldo_placement": None,
-                    "black_border": 0.0, "black_border_placement": None,
-                }
+                placements.append({
+                    "format_id": format_id,
+                    "stats": {
+                        "points": 0.0, "pts_placement": None,
+                        "lccs": 0.0, "lccs_placement": None,
+                        "no_geraldo": 0.0, "no_geraldo_placement": None,
+                        "black_border": 0.0, "black_border_placement": None,
+                    }
+                })
             else:
-                pts_score, pts_plc = await get_usr_data(format, "points")
-                lcc_score, lcc_plc = await get_usr_data(format, "lccs")
-                nogerry_score, nogerry_plc = await get_usr_data(format, "no_geraldo")
-                bb_score, bb_plc = await get_usr_data(format, "black_border")
-                placements[key] = {
-                    "points": pts_score, "pts_placement": pts_plc,
-                    "lccs": lcc_score, "lccs_placement": lcc_plc,
-                    "no_geraldo": nogerry_score, "no_geraldo_placement": nogerry_plc,
-                    "black_border": bb_score, "black_border_placement": bb_plc,
-                }
+                pts_score, pts_plc = await get_usr_data(format_id, "points")
+                lcc_score, lcc_plc = await get_usr_data(format_id, "lccs")
+                nogerry_score, nogerry_plc = await get_usr_data(format_id, "no_geraldo")
+                bb_score, bb_plc = await get_usr_data(format_id, "black_border")
+                placements.append({
+                    "format_id": format_id,
+                    "stats": {
+                        "points": pts_score, "pts_placement": pts_plc,
+                        "lccs": lcc_score, "lccs_placement": lcc_plc,
+                        "no_geraldo": nogerry_score, "no_geraldo_placement": nogerry_plc,
+                        "black_border": bb_score, "black_border_placement": bb_plc,
+                    },
+                })
 
         return placements
     return calculate

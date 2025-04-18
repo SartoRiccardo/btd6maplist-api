@@ -1,9 +1,14 @@
 from aiohttp import web
 from src.db.queries.users import get_user
+import src.utils.routedecos
 from src.requests import ninja_kiwi_api
 
 
-async def get(request: web.Request):
+@src.utils.routedecos.validate_resource_exists(get_user, "uid")
+async def get(
+        _r: web.Request,
+        resource: "src.db.models.User" = None,
+) -> web.Response:
     """
     ---
     description: Returns a user's data.
@@ -23,13 +28,10 @@ async def get(request: web.Request):
             schema:
               $ref: "#/components/schemas/User"
     """
-    user_data = await get_user(request.match_info["uid"])
-    if user_data is None:
-        return web.json_response({"error": "No user with that ID found."}, status=404)
     deco = {"avatarURL": None, "bannerURL": None}
-    if user_data.oak:
-        deco = await ninja_kiwi_api().get_btd6_user_deco(user_data.oak)
+    if resource.oak:
+        deco = await ninja_kiwi_api().get_btd6_user_deco(resource.oak)
     return web.json_response({
-        **user_data.to_dict(),
+        **resource.to_dict(),
         **deco,
     })

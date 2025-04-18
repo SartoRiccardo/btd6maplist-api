@@ -1,3 +1,4 @@
+from datetime import datetime
 import asyncpg.pool
 import src.db.connection
 from src.db.models import ListCompletionWithMeta, LCC, PartialUser, PartialMap
@@ -32,13 +33,13 @@ async def submit_run(
 
         run_id = await conn.fetchval(
             """
-            INSERT INTO list_completions
-                (map, black_border, no_geraldo, lcc, format, subm_notes)
+            INSERT INTO completions
+                (map, subm_notes)
             VALUES
-                ($1, $2, $3, $4, $5, $6)
+                ($1, $2)
             RETURNING id
             """,
-            map_code, black_border, no_geraldo, lcc_id, format_id, notes,
+            map_code, notes,
         )
 
         proofs = [(run_id, url, 0) for url in proof_img_url] + \
@@ -52,12 +53,23 @@ async def submit_run(
             proofs,
         )
 
+        run_meta_id = await conn.fetchval(
+            """
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, format)
+            VALUES
+                ($1, $2, $3, $4, $5)
+            RETURNING id
+            """,
+            run_id, black_border, no_geraldo, lcc_id, format_id,
+        )
+
         await conn.execute(
             """
-            INSERT INTO listcomp_players(run, user_id)
+            INSERT INTO comp_players(run, user_id)
             VALUES($1, $2)
             """,
-            run_id, player_id
+            run_meta_id, player_id
         )
 
         return run_id
@@ -70,7 +82,18 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
 
     run = await conn.fetchrow(
         """
-        WITH the_run AS (SELECT * FROM list_completions WHERE id=$1),
+        WITH the_run AS (
+            SELECT
+                c.id AS run_id,
+                cm.id AS run_meta_id,
+                c.*,
+                cm.*
+            FROM completions c
+            JOIN completions_meta cm
+                ON c.id = cm.completion
+            WHERE c.id = $1
+                AND cm.new_version IS NULL
+        ),
         runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
             FROM the_run r
@@ -79,7 +102,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         )
         SELECT
             run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-            run.created_on, run.deleted_on,
+            run.submitted_on, run.deleted_on,
             ARRAY_AGG(cp.proof_url) FILTER (WHERE cp.proof_type = 0) OVER() AS subm_proof_img,
             ARRAY_AGG(cp.proof_url) FILTER (WHERE cp.proof_type = 1) OVER() AS subm_proof_vid,
             run.subm_notes, run.subm_wh_payload,
@@ -89,11 +112,11 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
             ARRAY_AGG(u.name) OVER() AS user_names
         FROM runs_with_flags run
         LEFT JOIN completion_proofs cp
-            ON cp.run = run.id
+            ON cp.run = run.run_id
         LEFT JOIN leastcostchimps lcc
             ON lcc.id = run.lcc
-        LEFT JOIN listcomp_players ply
-            ON ply.run = run.id
+        LEFT JOIN comp_players ply
+            ON ply.run = run.run_meta_id
         LEFT JOIN users u
             ON ply.user_id = u.discord_id
         """,
@@ -106,7 +129,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         run_id,
         run["map"],
         list_rm_dupe([
-            PartialUser(run["user_ids"][i], run["user_names"][i], None, False)
+            PartialUser(run["user_ids"][i], run["user_names"][i], None, False, False)
             for i in range(len(run["user_ids"]))
         ], preserve_order=False),
         run["black_border"],
@@ -118,7 +141,7 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
         list_rm_dupe(run["subm_proof_vid"]),
         run["subm_notes"],
         run["accepted_by"],
-        run["created_on"],
+        run["submitted_on"],
         run["deleted_on"],
         run["subm_wh_payload"],
     )
@@ -133,69 +156,18 @@ async def edit_completion(
         lcc: dict | None,
         user_ids: list[int],
         accept: int | None = None,
-        conn: asyncpg.pool.Pool | None = None
+        conn: asyncpg.pool.PoolConnectionProxy | None = None
 ) -> None:
     async with conn.transaction():
-        lcc_id = None
-        await conn.execute(
-            """
-            DELETE FROM leastcostchimps lcc
-            USING list_completions runs
-            WHERE lcc.id = runs.lcc
-                AND runs.id = $1
-            """,
-            comp_id
-        )
-        if lcc:
-            lcc_id = await conn.fetchval(
-                """
-                INSERT INTO leastcostchimps(leftover)
-                VALUES($1)
-                RETURNING id
-                """,
-                lcc["leftover"],
-            )
-
-        await conn.execute(
-            """
-            DELETE FROM listcomp_players ply
-            WHERE ply.run=$1
-            """,
-            comp_id
-        )
-        await conn.executemany(
-            """
-            INSERT INTO listcomp_players(run, user_id)
-            VALUES($1, $2)
-            """,
-            [(comp_id, uid) for uid in user_ids]
-        )
-
-        other_params = []
-        accept_params = ""
-        if accept:
-            accept_params = """
-            accepted_by=$6,
-            created_on=NOW(),
-            """
-            other_params = [accept]
-        await conn.execute(
-            f"""
-            UPDATE list_completions
-            SET
-                {accept_params}
-                black_border=$2,
-                no_geraldo=$3,
-                format=$4,
-                lcc=$5
-            WHERE id=$1
-            """,
+        await set_completion_meta(
             comp_id,
             black_border,
             no_geraldo,
             comp_format,
-            lcc_id,
-            *other_params,
+            lcc,
+            user_ids,
+            accept,
+            conn=conn,
         )
 
 
@@ -209,33 +181,17 @@ async def add_completion(
         user_ids: list[int],
         mod_id: int,
         subm_proof: str | None = None,
-        conn: asyncpg.pool.Pool | None = None
+        conn: asyncpg.pool.PoolConnectionProxy | None = None
 ) -> None:
     async with conn.transaction():
-        lcc_id = None
-        if lcc:
-            lcc_id = await conn.fetchval(
-                """
-                INSERT INTO leastcostchimps(leftover)
-                VALUES($1)
-                RETURNING id
-                """,
-                lcc["leftover"],
-            )
-
         comp_id = await conn.fetchval(
             f"""
-            INSERT INTO list_completions
-                (accepted_by, black_border, no_geraldo, format, lcc, map)
-            VALUES ($6, $1, $2, $3, $4, $5)
+            INSERT INTO completions
+                (map)
+            VALUES ($1)
             RETURNING id
             """,
-            black_border,
-            no_geraldo,
-            comp_format,
-            lcc_id,
             map_code,
-            mod_id,
         )
 
         if subm_proof:
@@ -248,20 +204,95 @@ async def add_completion(
                 comp_id, subm_proof,
             )
 
-        await conn.executemany(
-            """
-            INSERT INTO listcomp_players(run, user_id)
-            VALUES($1, $2)
-            ON CONFLICT DO NOTHING
-            """,
-            [(comp_id, uid) for uid in user_ids]
+        await set_completion_meta(
+            comp_id,
+            black_border,
+            no_geraldo,
+            comp_format,
+            lcc,
+            user_ids,
+            mod_id,
+            conn=conn,
         )
 
         if comp_format == 1:
-            await conn.execute("CALL dupe_comp_to_allver($1)", comp_id)
             await conn.execute("CALL set_comp_as_verification($1)", comp_id)
 
         return comp_id
+
+
+@postgres
+async def set_completion_meta(
+        comp_id: int,
+        black_border: bool,
+        no_geraldo: bool,
+        comp_format: int,
+        lcc: dict | None,
+        user_ids: list[int],
+        mod_id: int | None,
+        conn: asyncpg.pool.PoolConnectionProxy | None = None
+) -> None:
+    lcc_id = None
+    if lcc:
+        lcc_id = await conn.fetchval(
+            """
+            INSERT INTO leastcostchimps(leftover)
+            VALUES($1)
+            RETURNING id
+            """,
+            lcc["leftover"],
+        )
+
+    run_meta_id = await conn.fetchval(
+        """
+        INSERT INTO completions_meta
+            (completion, black_border, no_geraldo, lcc, format, accepted_by)
+        SELECT
+            $1, $2, $3, $4, $5,
+            COALESCE(cm.accepted_by, $6)
+        FROM completions_meta cm
+        WHERE cm.completion = $1
+            AND cm.new_version IS NULL
+            AND cm.deleted_on IS NULL
+        
+        UNION ALL
+        
+        SELECT
+            $1::int, $2::bool, $3::bool, $4::int, $5::int, $6::bigint
+            
+        LIMIT 1
+        RETURNING id
+        """,
+        comp_id, black_border, no_geraldo, lcc_id, comp_format, mod_id
+    )
+
+    await conn.executemany(
+        """
+        INSERT INTO comp_players
+            (run, user_id)
+        VALUES
+            ($1, $2)
+        """,
+        [(run_meta_id, uid) for uid in user_ids]
+    )
+
+    await link_completions(conn=conn)
+
+
+@postgres
+async def link_completions(conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
+    await conn.execute(
+        """
+        UPDATE completions_meta cm_old
+        SET
+            new_version = cm_new.id
+        FROM completions_meta cm_new
+        WHERE cm_old.completion = cm_new.completion
+            AND cm_old.created_on < cm_new.created_on
+            AND cm_old.new_version IS NULL AND cm_new.new_version IS NULL
+            AND cm_old.deleted_on IS NULL
+        """
+    )
 
 
 @postgres
@@ -270,20 +301,30 @@ async def delete_completion(
         hard_delete: bool = False,
         conn=None,
 ) -> None:
-    q = (
+    if hard_delete:
+        return await conn.execute(
+            """
+            DELETE FROM completions
+            WHERE id = $1
+            """,
+            cid
+        )
+
+    await conn.execute(
         """
-        DELETE FROM list_completions
-        WHERE id=$1
-        """
-    ) if hard_delete else (
-        """
-        UPDATE list_completions
-        SET deleted_on=NOW()
-        WHERE id=$1
-        """
+        INSERT INTO completions_meta
+            (completion, black_border, no_geraldo, lcc, accepted_by, format, deleted_on)
+        SELECT
+            completion, black_border, no_geraldo, lcc, accepted_by, format, NOW()
+        FROM completions_meta
+        WHERE completion = $1
+            AND deleted_on IS NULL
+            AND new_version IS NULL
+        """,
+        cid
     )
 
-    await conn.execute(q, cid)
+    await link_completions(conn=conn)
 
 
 @postgres
@@ -295,37 +336,47 @@ async def get_unapproved_completions(
     payload = await conn.fetch(
         """
         WITH unapproved_runs AS (
-            SELECT r.*, (r.lcc IS NOT NULL) AS current_lcc
-            FROM list_completions r
-            WHERE r.deleted_on IS NULL
-                AND r.accepted_by IS NULL
+            SELECT
+                c.id AS run_id,
+                cm.id AS run_meta_id,
+                cm.*,
+                c.*,
+                (cm.lcc IS NOT NULL) AS current_lcc
+            FROM completions_meta cm
+            JOIN completions c
+                ON cm.completion = c.id
+            WHERE cm.deleted_on IS NULL
+                AND cm.accepted_by IS NULL
+                AND cm.new_version IS NULL
         ),
         unique_runs AS (
-            SELECT DISTINCT ON (run.id)
+            SELECT DISTINCT ON (run.run_id)
 
                 run.map, run.black_border, run.no_geraldo, run.current_lcc, run.format, run.accepted_by,
-                run.created_on, run.deleted_on,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                run.created_on AS comp_created_on, run.deleted_on AS comp_deleted_on,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.run_id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.run_id) AS subm_proof_vid,
                 run.subm_notes,
-                run.id AS run_id, run.subm_wh_payload,
+                run.run_id, run.subm_wh_payload,
                 
                 lcc.id AS lcc_id, lcc.leftover,
-                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.run_meta_id) AS user_ids,
                 
-                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start, m.map_data,
-                m.optimal_heros, m.map_preview_url, m.created_on, m.deleted_on, m.new_version
+                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start, 
+                m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, mlm.remake_of
             FROM unapproved_runs run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
-            LEFT JOIN listcomp_players ply
-                ON ply.run = run.id
+            LEFT JOIN comp_players ply
+                ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
-                ON cp.run = run.id
+                ON cp.run = run.run_id
             JOIN maps m
                 ON m.code = run.map
-            WHERE m.deleted_on IS NULL
-                AND m.new_version IS NULL
+            JOIN map_list_meta mlm
+                ON m.code = mlm.code
+            WHERE mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
         )
         SELECT 
             COUNT(*) OVER() AS total_count, uq.*
@@ -342,19 +393,18 @@ async def get_unapproved_completions(
         ListCompletionWithMeta(
             run["run_id"],
             PartialMap(
-                run["map_id"],
                 run["map"],
                 run["name"],
                 run["placement_curver"],
                 run["placement_allver"],
                 run["difficulty"],
+                run["botb_difficulty"],
+                run["remake_of"],
                 run["r6_start"],
-                "",
-                run["deleted_on"],
-                run["optimal_heros"].split(","),
+                run["map_data"],
+                None,
+                run["optimal_heros"].split(";"),
                 run["map_preview_url"],
-                run["new_version"],
-                run["created_on"],
             ),
             list_rm_dupe(run["user_ids"], preserve_order=False),
             run["black_border"],
@@ -369,8 +419,8 @@ async def get_unapproved_completions(
             list_rm_dupe(run["subm_proof_vid"]),
             run["subm_notes"],
             run["accepted_by"],
-            run["created_on"],
-            run["deleted_on"],
+            run["comp_created_on"],
+            run["comp_deleted_on"],
             run["subm_wh_payload"],
         )
         for run in payload
@@ -380,22 +430,38 @@ async def get_unapproved_completions(
 
 
 @postgres
-async def accept_completion(cid: int, who: int, conn=None) -> None:
+async def accept_completion(cid: int, who: int, conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
     await conn.execute(
         """
-        UPDATE list_completions
-        SET accepted_by=$2
-        WHERE id=$1
+        WITH new_entry AS (
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, accepted_by, format, copied_from_id)
+            SELECT
+                completion, black_border, no_geraldo, lcc, $2, format, id
+            FROM completions_meta
+            WHERE completion = $1
+                AND deleted_on IS NULL
+                AND new_version IS NULL
+            RETURNING id AS new_id, copied_from_id AS old_id
+        )
+        INSERT INTO comp_players
+            (run, user_id)
+        SELECT
+            cm.new_id, cp.user_id
+        FROM new_entry cm
+        JOIN comp_players cp
+            ON cm.old_id = cp.run
         """,
         cid, who,
     )
+    await link_completions(conn=conn)
 
 
 @postgres
 async def add_completion_wh_payload(run_id: int, payload: str | None, conn=None) -> None:
     await conn.execute(
         """
-        UPDATE list_completions
+        UPDATE completions
         SET subm_wh_payload=$2
         WHERE id=$1
         """,
@@ -415,37 +481,47 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
     payload = await conn.fetch(
         f"""
         WITH runs_with_flags AS (
-            SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM list_completions r
+            SELECT
+                c.id AS run_id,
+                r.id AS run_meta_id,
+                c.*,
+                r.*,
+                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+            FROM completions_meta r
+            JOIN completions c
+                ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
+            WHERE r.deleted_on IS NULL
+                AND r.new_version IS NULL
         ),
         accepted_runs AS (
-            SELECT DISTINCT ON (run.id)
-                run.id AS run_id, run.map,
-                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.id) AS user_ids,
+            SELECT DISTINCT ON (run.run_id)
+                run.run_id, run.map,
+                ARRAY_AGG(ply.user_id) OVER(PARTITION BY run.run_meta_id) AS user_ids,
                 run.black_border, run.no_geraldo, run.current_lcc, run.format,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.id) AS subm_proof_vid,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.run_id) AS subm_proof_img,
+                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.run_id) AS subm_proof_vid,
                 run.subm_notes, run.accepted_by, run.created_on AS run_created_on, run.deleted_on AS run_deleted_on,
                 
                 lcc.id AS lcc_id, lcc.leftover,
                 
-                m.id AS map_id, m.name, m.placement_curver, m.placement_allver, m.difficulty, m.r6_start,
-                m.optimal_heros, m.map_preview_url, m.created_on AS map_created_on
+                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
+                mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty, m.map_data, mlm.remake_of
             FROM runs_with_flags run
             LEFT JOIN leastcostchimps lcc
                 ON lcc.id = run.lcc
-            LEFT JOIN listcomp_players ply
-                ON ply.run = run.id
+            LEFT JOIN comp_players ply
+                ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
-                ON cp.run = run.id
+                ON cp.run = run.run_id
+            JOIN map_list_meta mlm
+                ON mlm.code = run.map
             JOIN maps m
                 ON m.code = run.map
-                AND m.deleted_on IS NULL
-                AND m.new_version IS NULL
-            WHERE run.deleted_on IS NULL
-                AND run.accepted_by IS NOT NULL
+            WHERE run.accepted_by IS NOT NULL
+                AND mlm.deleted_on IS NULL
+                AND mlm.new_version IS NULL
                 {format_filter}
         )
         SELECT *
@@ -461,19 +537,18 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
         ListCompletionWithMeta(
             row["run_id"],
             PartialMap(
-                row["map_id"],
                 row["map"],
                 row["name"],
                 row["placement_curver"],
                 row["placement_allver"],
                 row["difficulty"],
+                row["botb_difficulty"],
+                row["remake_of"],
                 row["r6_start"],
-                "",
+                row["map_data"],
                 None,
-                row["optimal_heros"].split(","),
+                row["optimal_heros"].split(";"),
                 row["map_preview_url"],
-                None,
-                row["map_created_on"],
             ),
             list_rm_dupe(row["user_ids"], preserve_order=False),
             row["black_border"],
@@ -497,27 +572,66 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
 async def transfer_all_completions(
         from_code: str,
         to_code: str,
-        transfer_list_comps: bool = False,
-        transfer_explist_comps: bool = False,
+        transfer_formats: list[int] = None,
         conn=None
 ) -> None:
-    if not transfer_list_comps and not transfer_explist_comps:
-        return
-
-    transfer_range = ""
-    if transfer_explist_comps and not transfer_list_comps:
-        transfer_range = "AND format BETWEEN 51 AND 100"
-    elif not transfer_explist_comps and transfer_list_comps:
-        transfer_range = "AND format BETWEEN 1 AND 50"
+    if transfer_formats is None:
+        transfer_formats = []
+    now = datetime.now()
+    args = [from_code, to_code, now]
+    transfer_formats_filter = ""
+    if None not in transfer_formats:
+        args.append(transfer_formats)
+        transfer_formats_filter = "AND cm.format = ANY($4::int[])"
 
     await conn.execute(
         f"""
-        UPDATE list_completions
-        SET map=$2
-        WHERE map=$1
-            AND deleted_on IS NULL
-            AND new_version IS NULL
-            {transfer_range}
+        WITH copied_completions AS (
+            INSERT INTO completions
+                (map, submitted_on, subm_notes, subm_wh_payload, copied_from_id)
+            SELECT
+                $2, c.submitted_on, c.subm_notes, c.subm_wh_payload, c.id
+            FROM completions c
+            JOIN completions_meta cm
+                ON c.id = cm.completion
+            WHERE c.map = $1
+                AND cm.deleted_on IS NULL
+                AND cm.new_version IS NULL
+                {transfer_formats_filter}
+            RETURNING id AS new_id, copied_from_id AS old_id
+        ),
+        copied_completion_metas AS (
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, accepted_by, format, created_on, copied_from_id)
+            SELECT 
+                c.new_id, cm.black_border, cm.no_geraldo, cm.lcc, cm.accepted_by, cm.format, $3, cm.id
+            FROM completions_meta cm
+            JOIN copied_completions c
+                ON cm.completion = c.old_id
+            WHERE cm.deleted_on IS NULL
+                AND cm.new_version IS NULL
+                {transfer_formats_filter}
+            RETURNING id AS new_id, copied_from_id AS old_id
+        ),
+        updated_completions AS (
+            INSERT INTO completions_meta
+                (completion, black_border, no_geraldo, lcc, accepted_by, format, created_on, deleted_on)
+            SELECT 
+                cm.completion, cm.black_border, cm.no_geraldo, cm.lcc, cm.accepted_by, cm.format, $3, $3
+            FROM completions_meta cm
+            JOIN copied_completion_metas ccm
+                ON ccm.old_id = cm.id
+                AND cm.new_version IS NULL
+        )
+        INSERT INTO comp_players
+            (user_id, run)
+        SELECT
+            cp.user_id, ccm.new_id
+        FROM comp_players cp
+        JOIN copied_completion_metas ccm
+            ON ccm.old_id = cp.run
         """,
-        from_code, to_code
+        *args
     )
+
+    await link_completions(conn=conn)

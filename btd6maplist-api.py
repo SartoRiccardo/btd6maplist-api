@@ -15,6 +15,7 @@ import src.http
 import src.log
 import src.db.connection
 import src.db.models
+from src.exceptions import ServerException
 from src.utils.colors import green, yellow, blue, red, cyan
 
 
@@ -88,11 +89,21 @@ def cors_handler(cors_options, methods):
             headers={
                 "Access-Control-Allow-Origin": request.headers["Origin"],
                 "Access-Control-Allow-Methods": ",".join(methods),
-                "Access-Control-Allow-Headers": "X-Requested-With, Authorization",
+                "Access-Control-Allow-Headers": "X-Requested-With, Authorization, Content-Type",
                 # "Access-Control-Max-Age": "86400",
             }
         )
     return handler
+
+
+def response_on_exception(handler):
+    @functools.wraps(handler)
+    async def inner(*args, **kwargs) -> web.Response:
+        try:
+            return await handler(*args, **kwargs)
+        except ServerException as exc:
+            return exc.to_response()
+    return inner
 
 
 def cors_route(handler, cors_options):
@@ -158,7 +169,13 @@ def get_routes(cur_path: None | list = None) -> list:
                 if api_route_str.endswith("/bot"):
                     api_route_str = api_route_str[:-4] + " 🤖"
                 print(f"{routecolor(method.upper())}\t{api_route_str}")
-                routes.append(routefunc(api_route, cors_route(getattr(route, method), cors_origins)))
+                handler = cors_route(
+                    response_on_exception(
+                        getattr(route, method),
+                    ),
+                    cors_origins,
+                )
+                routes.append(routefunc(api_route, handler))
                 methods.append(method.upper())
             if len(methods):
                 routes.append(web.options(api_route, cors_handler(cors_origins, methods)))

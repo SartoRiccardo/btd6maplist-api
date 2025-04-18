@@ -1,5 +1,5 @@
 from aiohttp import web
-from src.db.queries.users import get_user
+from src.db.queries.users import get_minimal_profile
 import src.utils.routedecos
 
 
@@ -24,12 +24,9 @@ async def post(
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                maplist_profile:
-                  $ref: "#/components/schemas/FullProfile"
+              $ref: "#/components/schemas/FullProfile"
       "401":
         description: "`discord_token` is missing or invalid."
     """
-    user_profile = await get_user(discord_profile["id"], with_completions=True)
-    return web.json_response(user_profile.to_dict(profile=True, with_completions=True))
+    user_profile = await get_minimal_profile(discord_profile["id"])
+    return web.json_response(user_profile.to_dict(profile=True))

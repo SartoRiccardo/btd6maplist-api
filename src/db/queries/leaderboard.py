@@ -10,7 +10,7 @@ def get_lb_list(payload) -> tuple[list[LeaderboardEntry], int]:
 
     return [
         LeaderboardEntry(
-            PartialUser(row[3], row[4], None, False),
+            PartialUser(row[3], row[4], None, False, False),
             float(row[1]),
             row[2]
         )

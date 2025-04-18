@@ -5,6 +5,7 @@ import src.utils.routedecos
 import src.log
 from src.db.queries.maps import get_map
 from src.db.queries.completions import transfer_all_completions
+from src.exceptions import GenericErrorException, MissingPermsException
 
 
 async def validate_map_is_valid(json_body: dict) -> dict:
@@ -33,8 +34,7 @@ async def put(
         _r: web.Request,
         resource: "src.db.models.PartialMap" = None,
         discord_profile: dict = None,
-        is_explist_mod: bool = False,
-        is_list_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         json_body: dict = None,
         **_kwargs,
 ) -> web.Response:
@@ -75,16 +75,16 @@ async def put(
         description: No map with that ID was found.
     """
     if resource.deleted_on is None:
-        return web.json_response(
-            {"errors": {"": "You can only transfer completions from a deleted map"}},
-            status=http.HTTPStatus.BAD_REQUEST,
-        )
+        raise GenericErrorException("You can only transfer completions from a deleted map")
+
+    transfer_formats = permissions.formats_where("edit:completion")
+    if len(transfer_formats) == 0:
+        raise MissingPermsException("edit:completion")
 
     await transfer_all_completions(
         resource.code,
         json_body["code"],
-        transfer_list_comps=is_list_mod,
-        transfer_explist_comps=is_explist_mod,
+        transfer_formats,
     )
     asyncio.create_task(
         src.log.log_action("completion", "put", resource.code, json_body["code"], discord_profile["id"])

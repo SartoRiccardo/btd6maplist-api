@@ -3,6 +3,7 @@ from aiohttp import web
 from src.requests import discord_api
 import src.utils.routedecos
 from src.utils.misc import extract
+from src.exceptions import MissingPermsException
 
 load_guild_roles_sem = asyncio.Semaphore(4)
 
@@ -64,9 +65,13 @@ async def load_guild_roles(guild: dict) -> None:
 async def get(
         _r: web.Request,
         token: str = None,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """Utility endpoint that gets valid guilds/roles for role picking sections on the website."""
+    if not permissions.has_in_any("edit:achievement_roles"):
+        raise MissingPermsException("edit:achievement_roles")
+
     bot_guilds = []
     valid_guilds = filter_valid_guilds(await discord_api().get_user_guilds(token))
     while len(valid_guilds):

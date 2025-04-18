@@ -3,45 +3,54 @@ from datetime import datetime
 
 
 @dataclass
-class PartialExpertMap:
+class RetroMap:
     """
     type: object
     properties:
+      id:
+        type: integer
+        description: The numerical ID of the map.
       name:
         type: string
-        description: The name of the map.
-      code:
+        description: The map's name.
+      sort_order:
+        type: integer
+        description: The index of the resource within its (game, category, subcategory) tuple.
+      preview_url:
         type: string
-        description: The code of the map.
-      difficulty:
-        $ref: "#/components/schemas/ExpertDifficulty"
-      verified:
-        type: boolean
-        description: "`true` if the map was verified in the current update."
-      map_preview_url:
-        type: string
-        nullable: true
-        description: URL to the map preview.
+        description: An image URL to a small preview of the original map.
+      game:
+        $ref: "#/components/schemas/NamedObject"
+      category:
+        $ref: "#/components/schemas/NamedObject"
+      subcategory:
+        $ref: "#/components/schemas/NamedObject"
     """
+    id: int
     name: str
-    code: str
-    difficulty: int
-    map_preview_url: str | None
-    verified: bool
+    sort_order: int
+    preview_url: str
+    game_id: int
+    category_id: int
+    subcategory_id: int
+    game_name: str
+    category_name: str
+    subcategory_name: str
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "name": self.name,
-            "code": self.code,
-            "difficulty": self.difficulty,
-            "map_preview_url": self.map_preview_url if self.map_preview_url else
-                f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
-            "verified": self.verified,
+            "sort_order": self.sort_order,
+            "preview_url": self.preview_url,
+            "game": {"id": self.game_id, "name": self.game_name},
+            "category": {"id": self.category_id, "name": self.category_name},
+            "subcategory": {"id": self.subcategory_id, "name": self.subcategory_name},
         }
 
 
 @dataclass
-class PartialListMap:
+class MinimalMap:
     """
     type: object
     properties:
@@ -51,9 +60,11 @@ class PartialListMap:
       code:
         type: string
         description: The map's code.
-      placement:
-        type: integer
-        description: The map's placement in the list (starts from 1).
+      format_idx:
+        oneOf:
+        - type: integer
+          description: The map's placement in the requested format.
+        - $ref: "#/components/schemas/RetroMap"
       verified:
         type: boolean
         description: "`true` if the map was verified in the current update."
@@ -64,15 +75,19 @@ class PartialListMap:
     """
     name: str
     code: str
-    placement: int
+    format_idx: int | RetroMap
     verified: bool
     map_preview_url: str | None
 
     def to_dict(self) -> dict:
+        format_value = self.format_idx
+        if isinstance(self.format_idx, RetroMap):
+            format_value = self.format_idx.to_dict()
+
         return {
             "name": self.name,
             "code": self.code,
-            "placement": self.placement,
+            "format_idx": format_value,
             "verified": self.verified,
             "map_preview_url": self.map_preview_url if self.map_preview_url else
                 f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
@@ -90,14 +105,26 @@ class PartialMap:
       code:
         type: string
         description: The map's code.
-      placement_cur:
+      placement_curver:
         type: integer
+        nullable: true
         description: The map's placement in the list ~ current version (starts from 1). If none, it's set to `-1`.
-      placement_all:
+      placement_allver:
         type: integer
+        nullable: true
         description: The map's placement in the list ~ all versions (starts from 1). If none, it's set to `-1`.
       difficulty:
         $ref: "#/components/schemas/ExpertDifficulty"
+      remake_of:
+        oneOf:
+        - type: integer
+          nullable: true
+          description: Which map this is a remake of.
+        - $ref: "#/components/schemas/RetroMap"
+      botb_difficulty:
+        type: integer
+        nullable: true
+        description: The map's Best of the Best pack difficulty.
       r6_start:
         type: string
         nullable: true
@@ -114,40 +141,41 @@ class PartialMap:
         type: array
         items:
           $ref: "#/components/schemas/Btd6Hero"
-      created_on:
-        type: integer
-        description: Timestamp of the map's creation date (in seconds).
       deleted_on:
         type: integer
         nullable: true
         description: Timestamp of the map's deletion (in seconds).
     """
-    id: int  # Only for internal use
     code: str
     name: str
-    placement_cur: int | None
-    placement_all: int | None
+    placement_curver: int | None
+    placement_allver: int | None
     difficulty: int | None
+    botb_difficulty: int | None
+    remake_of: int | RetroMap | None
     r6_start: str | None
     map_data: str
     deleted_on: datetime | None
     optimal_heros: list[str]
     map_preview_url: str | None
-    new_version: int | None  # Only for internal use
-    created_on: datetime
+
+    @property
+    def id(self):
+        return self.code
 
     def to_dict(self) -> dict:
         return {
             "code": self.code,
             "name": self.name,
-            "placement_all": self.placement_all,
-            "placement_cur": self.placement_cur,
+            "placement_allver": self.placement_allver,
+            "placement_curver": self.placement_curver,
             "difficulty": self.difficulty,
+            "botb_difficulty": self.botb_difficulty,
+            "remake_of": self.remake_of.to_dict() if isinstance(self.remake_of, RetroMap) else self.remake_of,
             "r6_start": self.r6_start,
             "map_data": self.map_data,
             "optimal_heros": [oh for oh in self.optimal_heros if len(oh)],
             "deleted_on": int(self.deleted_on.timestamp()) if self.deleted_on else None,
-            "created_on": int(self.created_on.timestamp()),
             "map_preview_url": self.map_preview_url if self.map_preview_url else
                 f"https://data.ninjakiwi.com/btd6/maps/map/{self.code}/preview",
         }
@@ -240,10 +268,10 @@ class Map(PartialMap):
         code:
           type: string
           description: The map's code.
-        placement_cur:
+        placement_curver:
           type: integer
           description: The map's placement in the list ~ current version (starts from 1). If none, set to `-1`.
-        placement_all:
+        placement_allver:
           type: integer
           description: The map's placement in the list ~ all versions (starts from 1). If none, set to `-1`.
         difficulty:

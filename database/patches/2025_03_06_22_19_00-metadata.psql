@@ -1,0 +1,533 @@
+-- Maps
+CREATE TABLE map_list_meta (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(10) NOT NULL,
+    placement_curver INT DEFAULT NULL,
+    placement_allver INT DEFAULT NULL,
+    difficulty INT DEFAULT NULL,
+    optimal_heros TEXT NOT NULL DEFAULT '',
+    botb_difficulty INT DEFAULT NULL,
+    remake_of INT DEFAULT NULL,
+    created_on TIMESTAMP DEFAULT NOW(),
+    deleted_on TIMESTAMP,
+    new_version INT
+);
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_map_list_meta_1
+    FOREIGN KEY (new_version) REFERENCES map_list_meta(id);
+
+-- Update relations
+ALTER TABLE map_aliases ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE additional_codes ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE creators ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE verifications ADD COLUMN map_tmp VARCHAR(10);
+ALTER TABLE mapver_compatibilities ADD COLUMN map_tmp VARCHAR(10);
+
+UPDATE map_aliases u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE additional_codes u SET map_tmp = m.code
+FROM maps m WHERE u.belongs_to = m.id;
+
+UPDATE creators u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE verifications u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+UPDATE mapver_compatibilities u SET map_tmp = m.code
+FROM maps m WHERE u.map = m.id;
+
+ALTER TABLE map_aliases DROP CONSTRAINT fk_maps_1;
+ALTER TABLE additional_codes DROP CONSTRAINT fk_maps_1;
+ALTER TABLE creators DROP CONSTRAINT fk_maps_1;
+ALTER TABLE verifications DROP CONSTRAINT fk_maps_1;
+ALTER TABLE mapver_compatibilities DROP CONSTRAINT fk_maps_1;
+
+ALTER TABLE map_aliases DROP COLUMN map;
+ALTER TABLE additional_codes DROP COLUMN belongs_to;
+ALTER TABLE creators DROP COLUMN map;
+ALTER TABLE verifications DROP COLUMN map;
+ALTER TABLE mapver_compatibilities DROP COLUMN map;
+
+ALTER TABLE map_aliases ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE additional_codes ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE creators ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE verifications ALTER COLUMN map_tmp SET NOT NULL;
+ALTER TABLE mapver_compatibilities ALTER COLUMN map_tmp SET NOT NULL;
+
+ALTER TABLE map_aliases RENAME COLUMN map_tmp TO map;
+ALTER TABLE additional_codes RENAME COLUMN map_tmp TO belongs_to;
+ALTER TABLE creators RENAME COLUMN map_tmp TO map;
+ALTER TABLE verifications RENAME COLUMN map_tmp TO map;
+ALTER TABLE mapver_compatibilities RENAME COLUMN map_tmp TO map;
+
+-- Nobody forked this yet and I've never used new_version so idc about a perfect transfer
+INSERT INTO map_list_meta
+    (code, placement_curver, placement_allver, difficulty, created_on, deleted_on, optimal_heros)
+SELECT
+    code, placement_curver, placement_allver, difficulty, created_on, deleted_on, optimal_heros
+FROM maps;
+
+UPDATE map_list_meta SET placement_curver = NULL WHERE placement_curver = -1;
+UPDATE map_list_meta SET placement_allver = NULL WHERE placement_allver = -1;
+UPDATE map_list_meta SET difficulty = NULL WHERE difficulty = -1;
+
+DROP INDEX maps_uq_code;
+ALTER TABLE maps DROP CONSTRAINT fk_maps_1;
+ALTER TABLE maps DROP CONSTRAINT maps_pkey;
+ALTER TABLE maps
+    DROP COLUMN id CASCADE,
+    DROP COLUMN placement_curver CASCADE,
+    DROP COLUMN placement_allver CASCADE,
+    DROP COLUMN difficulty CASCADE,
+    DROP COLUMN created_on CASCADE,
+    DROP COLUMN deleted_on CASCADE,
+    DROP COLUMN optimal_heros CASCADE,
+    DROP COLUMN new_version CASCADE;
+ALTER TABLE maps ADD PRIMARY KEY (code);
+
+ALTER TABLE map_aliases ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE additional_codes ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (belongs_to) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE creators ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE verifications ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE mapver_compatibilities ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_maps_1
+    FOREIGN KEY (code) REFERENCES maps(code);
+
+-- Completions
+ALTER TABLE listcomp_players ADD COLUMN tmp_run INT;
+
+CREATE TABLE completions_meta (
+    id SERIAL PRIMARY KEY,
+    completion INT NOT NULL,
+    black_border BOOLEAN,
+    no_geraldo BOOLEAN,  -- no optimal hero
+    lcc INT,
+    created_on TIMESTAMP DEFAULT NOW(),
+    deleted_on TIMESTAMP,
+    new_version INT,
+    accepted_by BIGINT,
+    format INT NOT NULL,
+    copied_from_id INT  -- Utility field used when linking copies
+);
+ALTER TABLE completions_meta ADD CONSTRAINT fk_lccs_1
+  FOREIGN KEY (lcc) REFERENCES leastcostchimps(id) ON DELETE SET NULL;
+ALTER TABLE completions_meta ADD CONSTRAINT fk_completions_1
+  FOREIGN KEY (completion) REFERENCES list_completions(id) ON DELETE CASCADE;
+
+INSERT INTO completions_meta
+    (completion, black_border, no_geraldo, lcc, created_on, deleted_on, new_version, accepted_by, format)
+SELECT
+    id, black_border, no_geraldo, lcc, created_on, deleted_on, new_version, accepted_by, format
+FROM list_completions;
+
+UPDATE listcomp_players u SET tmp_run = cm.id
+FROM completions_meta cm WHERE cm.completion = u.run;
+
+ALTER TABLE listcomp_players DROP COLUMN run CASCADE;
+ALTER TABLE listcomp_players ALTER COLUMN tmp_run SET NOT NULL;
+ALTER TABLE listcomp_players RENAME COLUMN tmp_run TO run;
+ALTER TABLE listcomp_players ADD CONSTRAINT fk_completions_meta_1
+  FOREIGN KEY (run) REFERENCES completions_meta(id) ON DELETE CASCADE;
+
+ALTER TABLE list_completions
+    DROP COLUMN black_border CASCADE,
+    DROP COLUMN no_geraldo CASCADE,
+    DROP COLUMN lcc CASCADE,
+    DROP COLUMN deleted_on CASCADE,
+    DROP COLUMN new_version CASCADE,
+    DROP COLUMN accepted_by CASCADE,
+    DROP COLUMN format CASCADE,
+    ADD COLUMN copied_from_id INT;
+ALTER TABLE list_completions RENAME COLUMN created_on TO submitted_on;
+ALTER TABLE list_completions ADD CONSTRAINT fk_maps_1
+  FOREIGN KEY (map) REFERENCES maps(code) ON DELETE CASCADE;
+
+
+ALTER TABLE list_completions RENAME TO completions;
+ALTER SEQUENCE list_completions_id_seq RENAME TO completions_id_seq;
+ALTER TABLE listcomp_players RENAME TO comp_players;
+
+
+-- Expert List points
+INSERT INTO config
+    (name, value, type)
+VALUES
+    ('exp_bb_multi', '1', 'int'),
+    ('exp_lcc_extra', '0', 'int');
+
+-- Nostalgia Pack
+CREATE TABLE retro_games (
+    game_id INT NOT NULL,
+    category_id INT NOT NULL,
+    subcategory_id INT NOT NULL,
+    game_name VARCHAR(32) NOT NULL,
+    category_name VARCHAR(32) NOT NULL,
+    subcategory_name VARCHAR(32),
+    PRIMARY KEY (game_id, category_id, subcategory_id)
+);
+
+CREATE TABLE retro_maps (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT NOT NULL,
+    preview_url TEXT NOT NULL,
+    game_id INT NOT NULL,
+    category_id INT NOT NULL,
+    subcategory_id INT NOT NULL
+);
+ALTER TABLE map_list_meta ADD CONSTRAINT fk_retro_maps_1
+    FOREIGN KEY (remake_of) REFERENCES retro_maps(id);
+ALTER TABLE retro_maps ADD CONSTRAINT fk_retro_games_1
+    FOREIGN KEY (game_id, category_id, subcategory_id) REFERENCES retro_games(game_id, category_id, subcategory_id);
+
+-- Format config
+CREATE TABLE formats (
+    id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    map_submission_wh TEXT,
+    run_submission_wh TEXT,
+    hidden BOOLEAN DEFAULT TRUE NOT NULL,
+    run_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:LCCOnly
+    map_submission_status INT DEFAULT 0 NOT NULL,  -- 0:Closed 1:Open 2:OpenNeedsCHIMPS
+    emoji VARCHAR(255)
+);
+INSERT INTO formats
+    (id, name, run_submission_status, hidden, map_submission_status)
+VALUES
+    (1, 'Maplist', 1, FALSE, 2),
+    (2, 'Maplist (all versions)', 0, TRUE, 0),
+    (51, 'Expert List', 1, FALSE, 2),
+    (52, 'Best of the Best', 1, FALSE, 0),
+    (11, 'Nostalgia Pack', 2, FALSE, 1)
+;
+
+-- Permissions
+ALTER TABLE roles
+    ADD COLUMN assign_on_create BOOLEAN DEFAULT FALSE
+;
+
+CREATE TABLE role_format_permissions (
+    role_id BIGINT NOT NULL,
+    format_id BIGINT,  -- If NULL, applies to all formats
+    permission VARCHAR(255)
+)
+;
+
+-- We're inside a TX
+CREATE TEMP TABLE mod_permissions (permission VARCHAR(255)) ON COMMIT DROP;
+INSERT INTO mod_permissions VALUES
+    ('create:map'),
+    ('edit:map'),
+    ('delete:map'),
+    ('edit:config'),
+    ('create:completion'),
+    ('edit:completion'),
+    ('delete:completion'),
+    ('delete:map_submission'),
+    ('edit:achievement_roles')
+;
+
+INSERT INTO role_format_permissions
+    (role_id, format_id, permission)
+SELECT
+    r.id, 1, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_maplist
+
+UNION ALL
+SELECT
+    r.id, 2, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_maplist
+
+UNION ALL
+SELECT
+    r.id, 51, mp.permission
+FROM roles r
+CROSS JOIN mod_permissions mp
+WHERE r.edit_experts
+
+UNION ALL
+SELECT
+    r.id, NULL, 'require:completion_submission:recording'
+FROM roles r
+WHERE r.requires_recording
+
+UNION ALL
+SELECT
+    r.id, NULL, p.perm
+FROM roles r
+CROSS JOIN (
+    VALUES
+        ('create:user'),
+        ('ban:user')
+) AS p(perm)
+WHERE r.edit_experts OR r.edit_maplist
+;
+
+WITH inserted_roles AS (
+    INSERT INTO roles
+        (name, assign_on_create)
+    VALUES
+        ('Can Submit', TRUE),
+        ('BotB Owner', FALSE),
+        ('BotB Curator', FALSE),
+        ('BotB Verifier', FALSE),
+        ('Nostalgia Owner', FALSE),
+        ('Nostalgia Curator', FALSE),
+        ('Nostalgia Verifier', FALSE)
+    RETURNING id, name
+),
+_perms AS (
+    INSERT INTO role_format_permissions
+        (role_id, format_id, permission)
+    SELECT
+        r.id, NULL, p.perm
+    FROM inserted_roles r
+    CROSS JOIN (
+        VALUES
+            ('create:map_submission'),
+            ('create:completion_submission')
+    ) AS p(perm)
+    WHERE r.name = 'Can Submit'
+
+    UNION ALL
+    SELECT
+        r.id, f.id, p.perm
+    FROM inserted_roles r
+    JOIN (
+        VALUES
+            ('Nostalgia', 11),
+            ('BotB', 51)
+    ) as f(name, id)
+        ON r.name LIKE (f.name || '%')
+    JOIN (
+        VALUES
+            ('Curator', 'create:map'),
+            ('Curator', 'edit:map'),
+            ('Curator', 'delete:map'),
+            ('Curator', 'create:user'),
+            ('Curator', 'ban:user'),
+            ('Verifier', 'edit:config'),
+            ('Verifier', 'create:completion'),
+            ('Verifier', 'edit:completion'),
+            ('Verifier', 'delete:completion'),
+            ('Verifier', 'create:user'),
+            ('Verifier', 'ban:user')
+    ) as p(name, perm)
+        ON r.name LIKE ('%' || p.name)
+        OR r.name LIKE '%Owner'
+    RETURNING role_id  -- Dummy RETURNING to use it in the CTE
+),
+_grants AS (
+    INSERT INTO role_grants
+        (role_required, role_can_grant)
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM inserted_roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON (ir_has.name = 'BotB Owner' AND ir_can_grant.name IN ('BotB Curator', 'BotB Verifier'))
+        OR (ir_has.name = 'Nostalgia Owner' AND ir_can_grant.name IN ('Nostalgia Curator', 'Nostalgia Verifier'))
+
+    UNION ALL
+    SELECT
+        ir_has.id, ir_can_grant.id
+    FROM roles ir_has
+    JOIN inserted_roles ir_can_grant
+        ON ir_can_grant.name = 'Can Submit'
+        AND (
+            ir_has.id = 1
+            OR ir_has.name LIKE '%Owner'
+            OR ir_has.name LIKE '%Moderator'
+            OR ir_has.name LIKE '%Curator'
+            OR ir_has.name LIKE '%Verifier'
+        )
+    RETURNING role_required  -- Dummy RETURNING to use it in the CTE
+)
+INSERT INTO user_roles
+    (user_id, role_id)
+SELECT DISTINCT ON (u.discord_id)
+    u.discord_id, ir.id
+FROM users u
+LEFT JOIN user_roles ur
+    ON u.discord_id = ur.user_id
+LEFT JOIN roles r
+    ON r.id = ur.role_id
+    AND r.cannot_submit
+JOIN inserted_roles ir
+    ON ir.name = 'Can Submit'
+WHERE r.id IS NULL
+;
+
+DELETE FROM roles WHERE cannot_submit;
+
+-- Technician global perms
+INSERT INTO role_format_permissions
+    (role_id, format_id, permission)
+VALUES
+    (1, NULL, 'delete:map_submission'),
+    (1, NULL, 'edit:achievement_roles'),
+    (1, NULL, 'create:map'),
+    (1, NULL, 'edit:map'),
+    (1, NULL, 'delete:map'),
+    (1, NULL, 'edit:config'),
+    (1, NULL, 'create:completion'),
+    (1, NULL, 'edit:completion'),
+    (1, NULL, 'delete:completion'),
+    (1, NULL, 'create:map_submission'),
+    (1, NULL, 'create:user'),
+    (1, NULL, 'edit:self'),
+    (1, NULL, 'ban:user'),
+    (1, NULL, 'create:completion_submission')
+;
+
+ALTER TABLE roles
+    DROP COLUMN edit_maplist CASCADE,
+    DROP COLUMN edit_experts CASCADE,
+    DROP COLUMN requires_recording CASCADE,
+    DROP COLUMN cannot_submit CASCADE
+;
+ALTER TABLE roles
+    ADD COLUMN internal BOOLEAN DEFAULT FALSE
+;
+
+WITH inserted AS (
+    INSERT INTO roles
+        (name, internal, assign_on_create)
+    VALUES
+        ('Basic Perms', TRUE, TRUE)
+    RETURNING id
+),
+_perms AS (
+    INSERT INTO role_format_permissions
+        (role_id, format_id, permission)
+    SELECT
+        inserted.id, NULL, 'edit:self'
+    FROM inserted
+    RETURNING role_id
+)
+INSERT INTO user_roles
+    (user_id, role_id)
+SELECT
+    u.discord_id, i.id
+FROM users u
+CROSS JOIN inserted i
+;
+
+-- Format migration
+UPDATE map_submissions SET for_list = 51 WHERE for_list = 1;
+UPDATE map_submissions SET for_list = 1 WHERE for_list = 0;
+ALTER TABLE map_submissions ADD CONSTRAINT fk_formats_1
+    FOREIGN KEY (for_list) REFERENCES formats(id);
+
+-- Config migration
+CREATE TABLE config_formats (
+    config_name VARCHAR(255),
+    format_id INT
+);
+ALTER TABLE config_formats ADD CONSTRAINT fk_formats_1
+    FOREIGN KEY (format_id) REFERENCES formats(id);
+INSERT INTO config_formats
+    (config_name, format_id)
+VALUES
+    ('points_top_map', 1),
+    ('points_bottom_map', 1),
+    ('formula_slope', 1),
+    ('points_extra_lcc', 1),
+    ('points_multi_gerry', 1),
+    ('points_multi_bb', 1),
+    ('decimal_digits', 1),
+    ('map_count', 1),
+    ('current_btd6_ver', 1),
+    ('points_top_map', 2),
+    ('points_bottom_map', 2),
+    ('formula_slope', 2),
+    ('points_extra_lcc', 2),
+    ('points_multi_gerry', 2),
+    ('points_multi_bb', 2),
+    ('decimal_digits', 2),
+    ('map_count', 2),
+    ('current_btd6_ver', 2),
+    ('current_btd6_ver', 51),
+    ('exp_points_casual', 51),
+    ('exp_points_medium', 51),
+    ('exp_points_high', 51),
+    ('exp_points_true', 51),
+    ('exp_points_extreme', 51),
+    ('exp_nogerry_points_casual', 51),
+    ('exp_nogerry_points_medium', 51),
+    ('exp_nogerry_points_high', 51),
+    ('exp_nogerry_points_true', 51),
+    ('exp_nogerry_points_extreme', 51),
+    ('exp_bb_multi', 51),
+    ('exp_lcc_extra', 51)
+;
+
+CREATE TEMP TABLE config_descriptions (
+    config_name VARCHAR(255),
+    config_description VARCHAR(255)
+) ON COMMIT DROP
+;
+
+INSERT INTO config_descriptions
+    (config_name, config_description)
+VALUES
+     ('points_top_map', 'Points for the #1 map'),
+     ('points_bottom_map', 'Points for the last map'),
+     ('formula_slope', 'Formula slope'),
+     ('points_extra_lcc', 'Extra points for LCCs'),
+     ('points_multi_gerry', 'No Optimal Hero point multiplier'),
+     ('points_multi_bb', 'Black Border point multiplier'),
+     ('decimal_digits', 'Decimal digits to round to'),
+     ('map_count', 'Number of maps on the list'),
+     ('current_btd6_ver', 'Current BTD6 version'),
+     ('exp_points_casual', 'Casual Exp completion points'),
+     ('exp_nogerry_points_casual', 'Casual Exp extra'),
+     ('exp_points_medium', 'Medium Exp completion points'),
+     ('exp_nogerry_points_medium', 'Medium Exp extra'),
+     ('exp_points_high', 'High Exp completion points'),
+     ('exp_nogerry_points_high', 'High Exp extra'),
+     ('exp_points_true', 'True Exp completion points'),
+     ('exp_nogerry_points_true', 'True Exp extra'),
+     ('exp_points_extreme', 'Extreme Exp completion points'),
+     ('exp_nogerry_points_extreme', 'Extreme Exp extra'),
+     ('exp_bb_multi', 'Base points multiplier'),
+     ('exp_lcc_extra', 'Extra points')
+;
+
+ALTER TABLE config
+    ADD COLUMN description VARCHAR(255)
+;
+
+UPDATE config c
+SET description = cd.config_description
+FROM config_descriptions cd
+WHERE c.name = cd.config_name
+;
+
+-- Map submissions
+
+DROP INDEX map_submissions_uq_code;
+ALTER TABLE map_submissions RENAME COLUMN for_list TO format_id;
+ALTER TABLE map_submissions ALTER COLUMN completion_proof DROP NOT NULL;
+ALTER TABLE map_submissions ADD COLUMN wh_msg_id BIGINT;
+-- Add ID to table
+ALTER TABLE map_submissions ADD COLUMN id INT;
+CREATE SEQUENCE map_submissions_id_seq;
+UPDATE map_submissions SET id = nextval('map_submissions_id_seq');
+SELECT setval('map_submissions_id_seq', (SELECT MAX(id) FROM map_submissions));
+ALTER TABLE map_submissions ALTER COLUMN id SET DEFAULT nextval('map_submissions_id_seq');
+ALTER TABLE map_submissions ADD PRIMARY KEY (id);
+ALTER SEQUENCE map_submissions_id_seq OWNED BY map_submissions.id;
+
+-- User bans
+
+ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT FALSE;

@@ -25,13 +25,13 @@ schema_completion_map = {
     "map": {
         "name": str,
         "code": str,
-        "placement_cur": int,
-        "placement_all": int,
-        "difficulty": int,
+        "placement_curver": int | None,
+        "placement_allver": int | None,
+        "difficulty": int | None,
+        "botb_difficulty": int | None,
         "r6_start": str | None,
         "map_preview_url": str,
         "optimal_heros": [str],
-        "created_on": int,
         "deleted_on": int | None,
     },
 }

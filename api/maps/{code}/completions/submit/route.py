@@ -8,12 +8,9 @@ from http import HTTPStatus
 import src.utils.routedecos
 from src.utils.files import save_image
 from src.utils.validators import validate_completion_submission
-from src.db.queries.misc import get_config
 from src.db.queries.maps import get_map
 from src.db.queries.completions import submit_run
 from config import (
-    WEBHOOK_LIST_RUN,
-    WEBHOOK_EXPLIST_RUN,
     MEDIA_BASE_URL,
     WEB_BASE_URL,
 )
@@ -26,18 +23,17 @@ MAX_FILES = 4
 @src.utils.routedecos.validate_resource_exists(get_map, "code", partial=True)
 @src.utils.routedecos.with_discord_profile
 @src.utils.routedecos.register_user
-@src.utils.routedecos.require_perms(throw_on_permless=False)
+@src.utils.routedecos.require_perms()
 async def post(
         request: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        cannot_submit: bool = False,
-        requires_recording: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ) -> web.Response:
     """
     ---
-    description: Submits a run to the maplist.
+    description: Submits a run to the maplist. Must have create:completion_submission
     tags:
     - Submissions
     requestBody:
@@ -100,18 +96,10 @@ async def post(
       "401":
         description: Your token is missing or invalid.
     """
-    if cannot_submit:
+    if not permissions.has_in_any("create:completion_submission"):
         return web.json_response(
-            {"errors": {"": "You are banned from submitting..."}},
+            {"errors": {"": "You are banned from submitting completions"}},
             status=http.HTTPStatus.FORBIDDEN,
-        )
-
-    maplist_cfg = await get_config()
-    if resource.difficulty == -1 and \
-            resource.placement_cur not in range(1, maplist_cfg["map_count"] + 1):
-        return web.json_response(
-            {"errors": {"": "That map is not on any list and is not accepting submissions!"}},
-            status=http.HTTPStatus.BAD_REQUEST,
         )
 
     embeds = []
@@ -135,32 +123,21 @@ async def post(
 
         elif part.name == "data":
             data = await part.json()
-            if len(errors := await validate_completion_submission(data, resource)):
-                return web.json_response({"errors": errors}, status=HTTPStatus.BAD_REQUEST)
+            await validate_completion_submission(data, resource)
 
-            if requires_recording and len(data["video_proof_url"]) == 0:
+            if not permissions.has_in_any("create:completion_submission"):
+                return web.json_response(
+                    {"errors": {"": "You are banned from submitting completions"}},
+                    status=http.HTTPStatus.FORBIDDEN,
+                )
+                # TODO Remove images inserted in this request
+            elif permissions.has("require:completion_submission:recording", data["format"]) and len(data["video_proof_url"]) == 0:
                 return web.json_response(
                     {"errors": {"video_proof_url": "You must submit a recording"}},
                     status=http.HTTPStatus.BAD_REQUEST,
                 )
 
-            embeds = get_runsubm_embed(data, discord_profile, resource)
-            if resource.difficulty == -1 and data["format"] in range(50, 100):
-                return web.json_response(
-                    {"errors": {"format": "Submitted experts run for non-experts map"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-            if resource.placement_cur == -1 and data["format"] == 1:
-                return web.json_response(
-                    {"errors": {"format": "Submitted maplist (current version) run for non-experts map"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-            if resource.placement_all == -1 and data["format"] == 2:
-                return web.json_response(
-                    {"errors": {"format": "Submitted maplist (all versions) run for non-experts map"}},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-            hook_url = WEBHOOK_LIST_RUN if 0 < data["format"] <= 50 else WEBHOOK_EXPLIST_RUN
+            embeds = await get_runsubm_embed(data, discord_profile, resource)
 
     proof_fnames = [url for url in proof_fnames if url is not None]
     if not (len(embeds) and len(proof_fnames)):
@@ -200,7 +177,7 @@ async def post(
     payload_json = json.dumps(json_data)
     form_data.add_field("payload_json", payload_json)
 
-    asyncio.create_task(send_run_webhook(run_id, hook_url, form_data, payload_json))
+    asyncio.create_task(send_run_webhook(run_id, data["format"], form_data, payload_json))
     return web.Response(
         status=http.HTTPStatus.CREATED,
         headers={"Location": f"/completions/{run_id}"}

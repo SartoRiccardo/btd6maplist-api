@@ -4,7 +4,10 @@ import http
 import src.log
 from src.db.queries.maps import get_map, edit_map, delete_map
 from src.utils.forms import get_map_form
+from src.utils.formats.formatinfo import format_info
+from src.utils.embeds import map_change_update_map_submission_wh
 import src.utils.routedecos
+from src.exceptions import MissingPermsException
 
 
 @src.utils.routedecos.validate_resource_exists(get_map, "code")
@@ -41,13 +44,12 @@ async def put(
         request: web.Request,
         resource: "src.db.models.PartialMap" = None,
         discord_profile: dict = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
-):
+) -> web.Response:
     """
     ---
-    description: Edit a map. Must be a Maplist or Expert List Moderator.
+    description: Edit a map. Must have edit:map perms.
     tags:
     - Maps
     parameters:
@@ -82,25 +84,24 @@ async def put(
                   type: object
                   example: {}
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
       "404":
         description: No map with that ID was found.
     """
+    if not permissions.has_in_any("edit:map"):
+        raise MissingPermsException("edit:map")
+
     json_body = await get_map_form(request, check_dup_code=False, editing=True)
     if isinstance(json_body, web.Response):
         return json_body
 
     json_body["code"] = resource.code
-    if not is_explist_mod:
-        if "difficulty" in json_body:
-            del json_body["difficulty"]
-    if not is_maplist_mod:
-        if "placement_allver" in json_body:
-            del json_body["placement_allver"]
-        if "placement_curver" in json_body:
-            del json_body["placement_curver"]
+    for format_id in format_info:
+        if not permissions.has("edit:map", format_id) and format_info[format_id].key in json_body:
+            del json_body[format_info[format_id].key]
 
     await edit_map(json_body, resource)
+    asyncio.create_task(map_change_update_map_submission_wh(resource.code, json_body))
     asyncio.create_task(src.log.log_action("map", "put", resource.code, json_body, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
@@ -113,14 +114,13 @@ async def delete(
         _r: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.PartialMap" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs
 ):
     """
     ---
     description: |
-      Soft deletes a map. Must be a Maplist or Expert List Moderator.
+      Soft deletes a map. Must have delete:map.
       Deleted maps and all their data are kept in the database, but ignored.
     tags:
     - Maps
@@ -139,11 +139,17 @@ async def delete(
       "404":
         description: No map with that ID was found.
     """
+    if not permissions.has_in_any("delete:map"):
+        raise MissingPermsException("delete:map")
+
     if resource.deleted_on:
         return web.Response(status=http.HTTPStatus.NO_CONTENT)
 
-    if not resource.deleted_on:
-        await delete_map(resource.code, map_current=resource, modify_diff=is_explist_mod, modify_pos=is_maplist_mod)
-        asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
+    fields_values = []
+    for format_id in format_info:
+        if permissions.has("delete:map", format_id):
+            fields_values.append(format_info[format_id].key)
 
+    await delete_map(resource.code, map_current=resource, keys=fields_values)
+    asyncio.create_task(src.log.log_action("map", "delete", resource.code, None, discord_profile["id"]))
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

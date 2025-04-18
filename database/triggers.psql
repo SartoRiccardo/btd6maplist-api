@@ -23,76 +23,6 @@ EXECUTE PROCEDURE refresh_listmap_points();
 
 
 ----------------------------------------------
--- Automatically insert a completion where  --
--- format=2, if a completion where format=1 --
--- has just been approved.                  --
-----------------------------------------------
-
-
-DROP PROCEDURE IF EXISTS dupe_comp_to_allver CASCADE;
-CREATE PROCEDURE dupe_comp_to_allver(comp_id INT) AS
-$$
-DECLARE
-    completion list_completions;
-    dupe_lcc_id INT;
-    dupe_run_id INT;
-BEGIN
-    SELECT * INTO completion
-    FROM list_completions
-    WHERE id = comp_id;
-
-    -- Duplicate the leastcostchimps entry, if any
-    IF completion.lcc IS NOT NULL THEN
-        INSERT INTO leastcostchimps (leftover)
-        SELECT leftover FROM leastcostchimps WHERE id = completion.lcc
-        RETURNING id INTO dupe_lcc_id;
-    ELSE
-        dupe_lcc_id := NULL;  -- No lcc to duplicate
-    END IF;
-
-
-    -- # FIXME <proof>
-
-    -- Duplicate the list_completions row with format set to 2
-    INSERT INTO list_completions (map, black_border, no_geraldo, lcc, created_on, accepted_by, format)
-    VALUES (
-        completion.map,
-        completion.black_border,
-        completion.no_geraldo,
-        dupe_lcc_id,
-        completion.created_on,
-        completion.accepted_by,
-        2
-    )
-    RETURNING id INTO dupe_run_id;
-
-    -- Duplicate all associated listcomp_players rows for the new run
-    INSERT INTO listcomp_players (run, user_id)
-    SELECT dupe_run_id, user_id FROM listcomp_players WHERE run = completion.id;
-END;
-$$
-LANGUAGE plpgsql;
-
-
-DROP FUNCTION IF EXISTS dup_curver_comp_on_accept CASCADE;
-CREATE OR REPLACE FUNCTION dup_curver_comp_on_accept()
-RETURNS TRIGGER AS
-$$
-BEGIN
-    CALL dupe_comp_to_allver(NEW.id);
-    RETURN NEW;
-END;
-$$
-LANGUAGE plpgsql;
-
-CREATE TRIGGER tr_dup_curver_comp_on_accept
-AFTER UPDATE ON list_completions
-FOR EACH ROW
-WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format = 1)
-EXECUTE PROCEDURE dup_curver_comp_on_accept();
-
-
-----------------------------------------------
 -- Sets a completion as a verification if   --
 -- a run has just been completed in format  --
 -- 1 or 51 and the map doesn't have any     --
@@ -101,23 +31,21 @@ EXECUTE PROCEDURE dup_curver_comp_on_accept();
 
 
 DROP PROCEDURE IF EXISTS set_comp_as_verification CASCADE;
-CREATE PROCEDURE set_comp_as_verification(comp_id INT) AS
+CREATE PROCEDURE set_comp_as_verification(comp_meta_id INT) AS
 $$
 DECLARE
-    completion list_completions;
-    comp_map INT;
+    comp_id INT;
+    current_completion completions;
     current_btd6_ver INT;
     is_verified BOOLEAN;
 BEGIN
-    SELECT * INTO completion
-    FROM list_completions
-    WHERE id = comp_id;
+    SELECT completion INTO comp_id
+    FROM completions_meta
+    WHERE id = comp_meta_id;
 
-    SELECT m.id INTO comp_map
-    FROM maps m
-    WHERE m.code = completion.map
-        AND m.deleted_on IS NULL
-        AND m.new_version IS NULL;
+    SELECT c.* INTO current_completion
+    FROM completions c
+    WHERE c.id = comp_id;
 
     SELECT c.value::int INTO current_btd6_ver
     FROM config c
@@ -128,12 +56,12 @@ BEGIN
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version=current_btd6_ver
-        AND map=comp_map;
+        AND map=current_completion.map;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT comp_map, user_id, current_btd6_ver
-        FROM listcomp_players
+        SELECT current_completion.map, user_id, current_btd6_ver
+        FROM comp_players
         WHERE run = comp_id;
     END IF;
 
@@ -142,12 +70,12 @@ BEGIN
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version IS NULL
-        AND map=comp_map;
+        AND map=current_completion.map;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT comp_map, user_id, NULL
-        FROM listcomp_players
+        SELECT current_completion.map, user_id, NULL
+        FROM comp_players
         WHERE run = comp_id;
     END IF;
 END;
@@ -165,7 +93,7 @@ $$
 LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER tr_set_verif_on_accept
-AFTER UPDATE ON list_completions
+AFTER UPDATE ON completions_meta
 FOR EACH ROW
 WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format IN (1, 51))
 EXECUTE PROCEDURE set_verif_on_accept();

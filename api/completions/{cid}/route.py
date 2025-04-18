@@ -43,8 +43,7 @@ async def put(
         request: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """
@@ -93,8 +92,7 @@ async def put(
     data = await get_completion_request(
         request,
         discord_profile["id"],
-        is_maplist_mod=is_maplist_mod,
-        is_explist_mod=is_explist_mod,
+        permissions=permissions,
         resource=resource,
     )
     if isinstance(data, web.Response):
@@ -120,15 +118,13 @@ async def delete(
         _r: web.Request,
         discord_profile: dict = None,
         resource: "src.db.models.ListCompletionWithMeta" = None,
-        is_maplist_mod: bool = False,
-        is_explist_mod: bool = False,
+        permissions: "src.db.models.Permissions" = None,
         **_kwargs,
 ) -> web.Response:
     """
     ---
     description: |
-      Soft deletes a completion. Must be a Maplist or Expert List Moderator,
-      depending on the completion's `format`.
+      Soft deletes a completion. Must have delete:completion permissions.
       Deleted completions and all their data are kept in the database, but ignored.
     tags:
     - Completions
@@ -143,18 +139,13 @@ async def delete(
       "204":
         description: The resource was deleted correctly
       "401":
-        description: Your token is missing, invalid or you don't have the privileges for this.
+        description: Your token is missing, invalid, or you don't have the privileges for this.
       "404":
         description: No map with that ID was found.
     """
-    if not is_maplist_mod and 1 <= resource.format <= 50:
+    if not permissions.has("delete:completion", resource.format):
         return web.json_response(
-            {"errors": {"format": "You must be a Maplist Moderator"}},
-            status=http.HTTPStatus.FORBIDDEN,
-        )
-    if not is_explist_mod and 51 <= resource.format <= 100:
-        return web.json_response(
-            {"errors": {"format": "You must be an Expert List Moderator"}},
+            {"errors": {"format": f"You are missing `delete:completion` on format {resource.format}"}},
             status=http.HTTPStatus.FORBIDDEN,
         )
 
