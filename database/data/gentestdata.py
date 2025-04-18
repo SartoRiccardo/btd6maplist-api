@@ -309,7 +309,6 @@ class RetroMap:
 
 
 @dataclass
-
 class AchievementRole:
     lb_format: int
     lb_type: str
