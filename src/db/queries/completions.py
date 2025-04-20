@@ -502,7 +502,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 run.black_border, run.no_geraldo, run.current_lcc, run.format,
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY run.run_id) AS subm_proof_img,
                 ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY run.run_id) AS subm_proof_vid,
-                run.subm_notes, run.accepted_by, run.created_on AS run_created_on, run.deleted_on AS run_deleted_on,
+                run.subm_notes, run.accepted_by, run.submitted_on AS run_created_on, run.deleted_on AS run_deleted_on,
                 
                 lcc.id AS lcc_id, lcc.leftover,
                 
