@@ -775,9 +775,10 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
         """
     )
 
-    if map_data.get("remake_of") and \
-            (prev_remake_of := await get_remake_of_code(map_data.get("remake_of"))):
-        await set_map_list_meta(prev_remake_of, remake_of=None, conn=conn)
+    if map_data.get("remake_of"):
+        prev_remake_of = await get_remake_of_code(map_data.get("remake_of"), conn=conn)
+        if prev_remake_of and prev_remake_of != map_code:
+            await set_map_list_meta(prev_remake_of, remake_of=None, conn=conn)
     meta_id = await set_map_list_meta(map_code, **map_data, conn=conn)
     if meta_id:
         await link_new_version(conn=conn)
