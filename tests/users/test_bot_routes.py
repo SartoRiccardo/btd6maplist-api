@@ -120,6 +120,10 @@ class TestBotProfile:
                 **await resp.json(),
                 "has_seen_popup": True,
                 "oak": self.test_oak,
+                "permissions": [{
+                    "format": None,
+                    "permissions": {"create:completion_submission", "create:map_submission"},
+                }]
             }
 
         signature = sign_message(f"{self.user_id}False".encode())
@@ -127,7 +131,10 @@ class TestBotProfile:
         async with btd6ml_test_client.get(f"/users/{self.user_id}/bot?{urllib.parse.urlencode(qparams)}") as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Getting a user through a bot route returns {resp.status}"
-            assert user_info == await resp.json()
+            resp_data = await resp.json()
+            for perm in resp_data["permissions"]:
+                perm["permissions"] = set(perm["permissions"])
+            assert user_info == resp_data, "User profile gotten through a bot differs from expected"
 
         signature = sign_message(f"{self.user_id}True".encode())
         qparams = {"signature": signature, "no_load_oak": True}
@@ -139,7 +146,11 @@ class TestBotProfile:
                 "avatarURL": None,
                 "bannerURL": None,
             }
-            assert user_info == await resp.json()
+            resp_data = await resp.json()
+            for perm in resp_data["permissions"]:
+                perm["permissions"] = set(perm["permissions"])
+            assert user_info == resp_data, \
+                "User profile after loading its OAK gotten through a bot differs from expected"
 
     @pytest.mark.get
     async def test_invalid_signature_get(self, btd6ml_test_client, sign_message):
