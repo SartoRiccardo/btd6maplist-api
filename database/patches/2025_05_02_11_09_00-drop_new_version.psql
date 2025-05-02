@@ -1,2 +1,5 @@
 ALTER TABLE completions_meta
     DROP COLUMN new_version CASCADE;
+
+ALTER TABLE map_list_meta
+    DROP COLUMN new_version CASCADE;

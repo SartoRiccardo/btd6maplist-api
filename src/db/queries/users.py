@@ -115,12 +115,11 @@ async def get_completions_by(
                 ON cp.run = rwf.run_id
             LEFT JOIN leastcostchimps lccs
                 ON rwf.lcc = lccs.id
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON mlm.code = rwf.map
             JOIN maps m
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
         )
         SELECT COUNT(*) OVER() AS total_count, uq.*
         FROM unique_runs uq
@@ -196,11 +195,10 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
         FROM runs_with_flags rwf
         JOIN comp_players ply
             ON ply.run = rwf.run_meta_id
-        JOIN map_list_meta m
+        JOIN latest_maps_meta m
             ON m.code = rwf.map
         WHERE ply.user_id = $1
             AND m.deleted_on IS NULL
-            AND m.new_version IS NULL
         GROUP BY (rwf.map, rwf.format)
         """,
         uid
@@ -253,13 +251,12 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
             m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url,
             mlm.botb_difficulty, mlm.remake_of
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON m.code = mlm.code
         JOIN creators c
             ON m.code = c.map
         WHERE c.user_id = $1
             AND mlm.deleted_on IS NULL
-            AND mlm.new_version IS NULL
         """,
         int(uid)
     )
@@ -307,11 +304,10 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
                 ON c.id = rwf.completion
             JOIN comp_players ply
                 ON ply.run = rwf.id
-            JOIN map_list_meta m
+            JOIN latest_maps_meta m
                 ON c.map = m.code
             WHERE ply.user_id = $1
                 AND m.deleted_on IS NULL
-                AND m.new_version IS NULL
             GROUP BY c.map
         )
         SELECT

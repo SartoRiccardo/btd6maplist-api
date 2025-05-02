@@ -352,7 +352,6 @@ async def get_unapproved_completions(
             JOIN map_list_meta mlm
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
         )
         SELECT 
             COUNT(*) OVER() AS total_count, uq.*
@@ -478,13 +477,12 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
                 ON cp.run = run.run_id
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON mlm.code = run.map
             JOIN maps m
                 ON m.code = run.map
             WHERE run.accepted_by IS NOT NULL
                 AND mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
                 {format_filter}
         )
         SELECT *

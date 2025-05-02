@@ -9,6 +9,7 @@ from database.data.data_models import (
     Completion,
     Map,
     RetroMap,
+    MapListMeta,
 )
 from database.data.data_utils import stringify, nullify, SEPARATOR, rm_nulls, num_to_letters
 
@@ -594,6 +595,48 @@ def gen_outdated_meta(completions: list[Completion]) -> list[CompletionMeta]:
     return comp_metas
 
 
+def gen_outdated_maps(maps: list[Map]) -> list[MapListMeta]:
+    rand_map_picker = random.Random(1111)
+    rand_meta_id = random.Random(20491)
+    rand_timestamp = random.Random(9001)
+    rand_flags = random.Random(6023)
+    rand_diff = random.Random(4234)
+    rand_heros = random.Random(9754)
+    rand_remake = random.Random(8821)
+
+    base_timestamp = start_timestamp - 30 * 24 * 3600  # ~1 month before
+
+    used_ids = set()
+    map_metas = []
+
+    for _ in range(OUTDATED_COMP_META_COUNT):
+        map_data = rand_map_picker.choice(maps)
+        created_on = base_timestamp - rand_timestamp.randint(0, 100_000)
+
+        # Ensure unique meta ID (for `id` field)
+        while (meta_id := rand_meta_id.randint(10**4, 10**6 - 1)) in used_ids:
+            continue
+        used_ids.add(meta_id)
+
+        map_metas.append(
+            MapListMeta(
+                id=meta_id,
+                code=map_data.code,
+                placement_cur=rand_diff.randint(1, 60),
+                placement_all=rand_diff.randint(1, 60),
+                difficulty=rand_diff.randint(0, 4),
+                deleted_on=None,
+                new_version=map_data.id,
+                created_on=created_on,
+                optimal_heros=rand_heros.choices(allowed_heros, k=rand_heros.randint(1, 3)),
+                botb_difficulty=rand_diff.randint(0, 3),
+                remake_of=rand_diff.randint(1, 100),
+            )
+        )
+
+    return map_metas
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -621,6 +664,8 @@ if __name__ == '__main__':
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps
     retro_maps = gen_retro_maps()
+    outdated_maps_metas = gen_outdated_maps(maps)
+
 
     achievement_roles = random_achivement_roles()
 
@@ -644,7 +689,7 @@ if __name__ == '__main__':
         ))
     with open(bpath / "14_map_list_meta.csv", "w") as fout:
         fout.write("\n".join(
-            x.dump_map_meta() for x in maps
+            x.dump_map_meta() for x in (maps + outdated_maps_metas)
         ))
     with open(bpath / "02_users.csv", "w") as fout:
         fout.write("\n".join(

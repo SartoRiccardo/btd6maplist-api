@@ -47,7 +47,6 @@ class Map:
             difficultify(self.remake_of),
             dateify(self.created_on),
             dateify(self.deleted_on),
-            nullify(self.new_version),
         ))
 
     def dump_aliases(self) -> str:

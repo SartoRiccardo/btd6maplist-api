@@ -6,3 +6,4 @@ from .MapKey import MapKey
 from .Map import Map
 from .MapSubmission import MapSubmission
 from .RetroMap import RetroMap
+from .MapListMeta import MapListMeta

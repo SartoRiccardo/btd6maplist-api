@@ -22,10 +22,9 @@ async def search(
                 mlm.remake_of,
                 SIMILARITY(m.name, $1) AS simil
             FROM maps m
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
                 AND SIMILARITY(m.name, $1) > 0.1
             ORDER BY simil DESC
             LIMIT $2
