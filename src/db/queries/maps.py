@@ -417,7 +417,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
 
             ARRAY_AGG(ply.user_id) OVER (PARTITION by cm.id) AS user_ids,
             ARRAY_AGG(u.name) OVER (PARTITION by cm.id) AS user_names
-        FROM completions_meta cm
+        FROM latest_completions cm
         JOIN lccs_by_map lbm
             ON lbm.id = cm.lcc
         JOIN leastcostchimps lccs
@@ -431,7 +431,6 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
         WHERE lbm.map = $1
             AND cm.accepted_by IS NOT NULL
             AND cm.deleted_on IS NULL
-            AND cm.new_version IS NULL
         """,
         map_code,
     )
@@ -463,7 +462,7 @@ async def get_completions_for(
                 r.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc,
                 lccs.leftover
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
@@ -472,7 +471,6 @@ async def get_completions_for(
                 {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         ),
         unique_runs AS (
             SELECT DISTINCT ON (rwf.run_id)
@@ -1093,6 +1091,7 @@ async def get_legacy_maps(conn=None) -> list[MinimalMap]:
                 OR placement_curver IS NULL
                     AND difficulty IS NULL
                     AND botb_difficulty IS NULL
+                    AND remake_of IS NULL
             )
         ORDER BY
             (placement_curver IS NULL),

@@ -89,10 +89,9 @@ async def get_completion(run_id: str | int, conn=None) -> ListCompletionWithMeta
                 c.*,
                 cm.*
             FROM completions c
-            JOIN completions_meta cm
+            JOIN latest_completions cm
                 ON c.id = cm.completion
             WHERE c.id = $1
-                AND cm.new_version IS NULL
         ),
         runs_with_flags AS (
             SELECT r.*, (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
@@ -250,9 +249,8 @@ async def set_completion_meta(
         SELECT
             $1, $2, $3, $4, $5,
             COALESCE(cm.accepted_by, $6)
-        FROM completions_meta cm
+        FROM latest_completions cm
         WHERE cm.completion = $1
-            AND cm.new_version IS NULL
             AND cm.deleted_on IS NULL
         
         UNION ALL
@@ -276,24 +274,6 @@ async def set_completion_meta(
         [(run_meta_id, uid) for uid in user_ids]
     )
 
-    await link_completions(conn=conn)
-
-
-@postgres
-async def link_completions(conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
-    await conn.execute(
-        """
-        UPDATE completions_meta cm_old
-        SET
-            new_version = cm_new.id
-        FROM completions_meta cm_new
-        WHERE cm_old.completion = cm_new.completion
-            AND cm_old.created_on < cm_new.created_on
-            AND cm_old.new_version IS NULL AND cm_new.new_version IS NULL
-            AND cm_old.deleted_on IS NULL
-        """
-    )
-
 
 @postgres
 async def delete_completion(
@@ -312,19 +292,16 @@ async def delete_completion(
 
     await conn.execute(
         """
-        INSERT INTO completions_meta
-            (completion, black_border, no_geraldo, lcc, accepted_by, format, deleted_on)
-        SELECT
-            completion, black_border, no_geraldo, lcc, accepted_by, format, NOW()
-        FROM completions_meta
-        WHERE completion = $1
-            AND deleted_on IS NULL
-            AND new_version IS NULL
+        UPDATE completions_meta cm_update
+        SET
+            deleted_on = NOW()
+        FROM latest_completions cm
+        WHERE cm.completion = $1
+            AND cm.deleted_on IS NULL
+            AND cm_update.id = cm.id
         """,
         cid
     )
-
-    await link_completions(conn=conn)
 
 
 @postgres
@@ -342,12 +319,11 @@ async def get_unapproved_completions(
                 cm.*,
                 c.*,
                 (cm.lcc IS NOT NULL) AS current_lcc
-            FROM completions_meta cm
+            FROM latest_completions cm
             JOIN completions c
                 ON cm.completion = c.id
             WHERE cm.deleted_on IS NULL
                 AND cm.accepted_by IS NULL
-                AND cm.new_version IS NULL
         ),
         unique_runs AS (
             SELECT DISTINCT ON (run.run_id)
@@ -433,28 +409,16 @@ async def get_unapproved_completions(
 async def accept_completion(cid: int, who: int, conn: asyncpg.pool.PoolConnectionProxy = None) -> None:
     await conn.execute(
         """
-        WITH new_entry AS (
-            INSERT INTO completions_meta
-                (completion, black_border, no_geraldo, lcc, accepted_by, format, copied_from_id)
-            SELECT
-                completion, black_border, no_geraldo, lcc, $2, format, id
-            FROM completions_meta
-            WHERE completion = $1
-                AND deleted_on IS NULL
-                AND new_version IS NULL
-            RETURNING id AS new_id, copied_from_id AS old_id
-        )
-        INSERT INTO comp_players
-            (run, user_id)
-        SELECT
-            cm.new_id, cp.user_id
-        FROM new_entry cm
-        JOIN comp_players cp
-            ON cm.old_id = cp.run
+        UPDATE completions_meta cm_update
+        SET
+            accepted_by = $2
+        FROM latest_completions cm
+        WHERE cm.completion = $1
+            AND cm.deleted_on IS NULL
+            AND cm_update.id = cm.id
         """,
         cid, who,
     )
-    await link_completions(conn=conn)
 
 
 @postgres
@@ -487,13 +451,12 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 c.*,
                 r.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.deleted_on IS NULL
-                AND r.new_version IS NULL
         ),
         accepted_runs AS (
             SELECT DISTINCT ON (run.run_id)
@@ -592,11 +555,10 @@ async def transfer_all_completions(
             SELECT
                 $2, c.submitted_on, c.subm_notes, c.subm_wh_payload, c.id
             FROM completions c
-            JOIN completions_meta cm
+            JOIN latest_completions cm
                 ON c.id = cm.completion
             WHERE c.map = $1
                 AND cm.deleted_on IS NULL
-                AND cm.new_version IS NULL
                 {transfer_formats_filter}
             RETURNING id AS new_id, copied_from_id AS old_id
         ),
@@ -605,23 +567,19 @@ async def transfer_all_completions(
                 (completion, black_border, no_geraldo, lcc, accepted_by, format, created_on, copied_from_id)
             SELECT 
                 c.new_id, cm.black_border, cm.no_geraldo, cm.lcc, cm.accepted_by, cm.format, $3, cm.id
-            FROM completions_meta cm
+            FROM latest_completions cm
             JOIN copied_completions c
                 ON cm.completion = c.old_id
             WHERE cm.deleted_on IS NULL
-                AND cm.new_version IS NULL
                 {transfer_formats_filter}
             RETURNING id AS new_id, copied_from_id AS old_id
         ),
-        updated_completions AS (
-            INSERT INTO completions_meta
-                (completion, black_border, no_geraldo, lcc, accepted_by, format, created_on, deleted_on)
-            SELECT 
-                cm.completion, cm.black_border, cm.no_geraldo, cm.lcc, cm.accepted_by, cm.format, $3, $3
-            FROM completions_meta cm
-            JOIN copied_completion_metas ccm
-                ON ccm.old_id = cm.id
-                AND cm.new_version IS NULL
+        delete_old_completions AS (
+            UPDATE completions_meta cm
+            SET
+                deleted_on = $3
+            FROM copied_completion_metas ccm
+            WHERE ccm.old_id = cm.id
         )
         INSERT INTO comp_players
             (user_id, run)
@@ -633,5 +591,3 @@ async def transfer_all_completions(
         """,
         *args
     )
-
-    await link_completions(conn=conn)

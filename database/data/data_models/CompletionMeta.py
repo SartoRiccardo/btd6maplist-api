@@ -26,7 +26,6 @@ class CompletionMeta:
             self.lcc.id if self.lcc else None,
             dateify(self.created_on),
             dateify(self.deleted_on),
-            self.new_version,
             self.accepted_by,
             self.format,
             None,  # Copied from ID

@@ -20,6 +20,13 @@ SELECT
     ) AS points
 FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) AS indexes(n);
 
+
+CREATE VIEW latest_completions AS
+SELECT DISTINCT ON (completion) *
+FROM completions_meta
+ORDER BY completion ASC, created_on DESC;
+
+
 ----------------------------
 -- LCCs for each list map --
 ----------------------------
@@ -28,14 +35,13 @@ DROP VIEW IF EXISTS lccs_by_map CASCADE;
 CREATE VIEW lccs_by_map AS
 SELECT DISTINCT ON (c.map, cm.format)
     c.map, cm.format, lcc.leftover, lcc.id
-FROM completions_meta cm
+FROM latest_completions cm
 JOIN completions c
     ON c.id = cm.completion
 JOIN leastcostchimps lcc
     ON cm.lcc = lcc.id
 WHERE cm.accepted_by IS NOT NULL
     AND cm.deleted_on IS NULL
-    AND cm.new_version IS NULL
 ORDER BY c.map, cm.format, lcc.leftover DESC, c.submitted_on ASC;
 
 
@@ -64,7 +70,7 @@ unique_runs AS (
 	SELECT DISTINCT
 		lcp.user_id, c.map, cm.black_border, cm.no_geraldo, cm.lcc=lccs.id AS current_lcc
     FROM completions c
-    JOIN completions_meta cm
+    JOIN latest_completions cm
         ON c.id = cm.completion
     JOIN comp_players lcp
         ON cm.id = lcp.run
@@ -73,7 +79,6 @@ unique_runs AS (
     WHERE cm.format = 1
         AND cm.accepted_by IS NOT NULL
         AND cm.deleted_on IS NULL
-        AND cm.new_version IS NULL
 ),
 -- https://stackoverflow.com/a/78963508/13033269
 comp_user_map_modifiers AS (
@@ -129,7 +134,7 @@ unique_runs AS (
 	SELECT DISTINCT
 		lcp.user_id, c.map, r.black_border, r.no_geraldo, r.lcc=lccs.id AS current_lcc
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -138,7 +143,6 @@ unique_runs AS (
     WHERE (r.format = 1 OR r.format = 2)
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 comp_user_map_modifiers AS (
 	SELECT uq.user_id, uq.map,
@@ -185,7 +189,7 @@ WITH config_values AS (
 leaderboard AS (
     SELECT lcp.user_id, COUNT(lcp.user_id) AS score
     FROM lccs_by_map lccs
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON r.lcc = lccs.id
     JOIN map_list_meta m
         ON lccs.map = m.code
@@ -198,7 +202,6 @@ leaderboard AS (
         AND m.new_version IS NULL
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -214,7 +217,7 @@ WITH config_values AS (
 leaderboard AS (
     SELECT lcp.user_id, COUNT(lcp.user_id) AS score
     FROM lccs_by_map lccs
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON r.lcc = lccs.id
     JOIN map_list_meta m
         ON lccs.map = m.code
@@ -227,7 +230,6 @@ leaderboard AS (
         AND m.new_version IS NULL
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -270,7 +272,7 @@ completions_with_flags AS (
         cm.black_border,
         (lccs.id IS NOT NULL AND lbm.id = lccs.id) AS current_lcc
     FROM completions lc
-    JOIN completions_meta cm
+    JOIN latest_completions cm
         ON lc.id = cm.completion
     LEFT JOIN leastcostchimps lccs
         ON lccs.id = cm.lcc
@@ -282,7 +284,6 @@ completions_with_flags AS (
         )
         AND cm.accepted_by IS NOT NULL
         AND cm.deleted_on IS NULL
-        AND cm.new_version IS NULL
 ),
 completion_points AS (
     SELECT
@@ -324,7 +325,7 @@ WITH valid_lccs AS (
 leaderboard AS (
     SELECT lcp.user_id, COUNT(lcp.user_id) AS score
     FROM valid_lccs lccs
-    JOIN completions_meta cm
+    JOIN latest_completions cm
         ON cm.lcc = lccs.id
     JOIN map_list_meta m
         ON lccs.map = m.code
@@ -335,7 +336,6 @@ leaderboard AS (
         AND m.new_version IS NULL
         AND cm.accepted_by IS NOT NULL
         AND cm.deleted_on IS NULL
-        AND cm.new_version IS NULL
     GROUP BY lcp.user_id
 )
 SELECT user_id, score, RANK() OVER(ORDER BY score DESC) AS placement
@@ -351,7 +351,7 @@ CREATE OR REPLACE VIEW leaderboard_maplist_no_geraldo AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -359,7 +359,6 @@ WITH no_geraldo_completions AS (
         AND r.format = 1
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score
@@ -379,7 +378,7 @@ CREATE OR REPLACE VIEW leaderboard_maplist_all_no_geraldo AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -387,7 +386,6 @@ WITH no_geraldo_completions AS (
         AND (r.format = 1 OR r.format = 2)
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score
@@ -407,7 +405,7 @@ CREATE OR REPLACE VIEW leaderboard_experts_no_geraldo AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -415,7 +413,6 @@ WITH no_geraldo_completions AS (
         AND (r.format BETWEEN 51 AND 100 OR r.format = 1)
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score
@@ -439,7 +436,7 @@ CREATE OR REPLACE VIEW leaderboard_maplist_black_border AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -447,7 +444,6 @@ WITH no_geraldo_completions AS (
         AND r.format = 1
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score
@@ -467,7 +463,7 @@ CREATE OR REPLACE VIEW leaderboard_maplist_all_black_border AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -475,7 +471,6 @@ WITH no_geraldo_completions AS (
         AND (r.format = 1 OR r.format = 2)
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score
@@ -495,7 +490,7 @@ CREATE OR REPLACE VIEW leaderboard_experts_black_border AS
 WITH no_geraldo_completions AS (
     SELECT DISTINCT c.map, lcp.user_id
     FROM completions c
-    JOIN completions_meta r
+    JOIN latest_completions r
         ON c.id = r.completion
     JOIN comp_players lcp
         ON r.id = lcp.run
@@ -503,7 +498,6 @@ WITH no_geraldo_completions AS (
         AND (r.format BETWEEN 51 AND 100 OR r.format = 1)
         AND r.accepted_by IS NOT NULL
         AND r.deleted_on IS NULL
-        AND r.new_version IS NULL
 ),
 leaderboard AS (
     SELECT r.user_id, COUNT(*) AS score

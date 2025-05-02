@@ -1,1 +1,2 @@
-SELECT * FROM maps LIMIT 1;
+ALTER TABLE completions_meta
+    DROP COLUMN new_version CASCADE;
