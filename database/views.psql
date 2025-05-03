@@ -21,12 +21,14 @@ SELECT
 FROM GENERATE_SERIES(1, (SELECT value FROM config WHERE name='map_count')::int) AS indexes(n);
 
 
+DROP VIEW IF EXISTS latest_completions CASCADE;
 CREATE VIEW latest_completions AS
 SELECT DISTINCT ON (completion) *
 FROM completions_meta
 ORDER BY completion ASC, created_on DESC;
 
 
+DROP VIEW IF EXISTS latest_maps_meta CASCADE;
 CREATE VIEW latest_maps_meta AS
 SELECT DISTINCT ON (code) *
 FROM map_list_meta
