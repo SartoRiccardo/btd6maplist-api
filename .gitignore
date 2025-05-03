@@ -16,3 +16,4 @@ tmp
 tmp-test
 .coverage
 **/output.txt
+database/data/*.csv
