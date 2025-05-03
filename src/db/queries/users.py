@@ -81,7 +81,7 @@ async def get_completions_by(
                 r.*,
                 c.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             JOIN comp_players ply
@@ -92,7 +92,6 @@ async def get_completions_by(
                 {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         ),
         unique_runs AS (
             SELECT DISTINCT ON (rwf.run_id)
@@ -116,12 +115,11 @@ async def get_completions_by(
                 ON cp.run = rwf.run_id
             LEFT JOIN leastcostchimps lccs
                 ON rwf.lcc = lccs.id
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON mlm.code = rwf.map
             JOIN maps m
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
         )
         SELECT COUNT(*) OVER() AS total_count, uq.*
         FROM unique_runs uq
@@ -180,14 +178,13 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
                 c.*,
                 r.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         )
         SELECT
             rwf.map,
@@ -198,11 +195,10 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
         FROM runs_with_flags rwf
         JOIN comp_players ply
             ON ply.run = rwf.run_meta_id
-        JOIN map_list_meta m
+        JOIN latest_maps_meta m
             ON m.code = rwf.map
         WHERE ply.user_id = $1
             AND m.deleted_on IS NULL
-            AND m.new_version IS NULL
         GROUP BY (rwf.map, rwf.format)
         """,
         uid
@@ -255,13 +251,12 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
             m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url,
             mlm.botb_difficulty, mlm.remake_of
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON m.code = mlm.code
         JOIN creators c
             ON m.code = c.map
         WHERE c.user_id = $1
             AND mlm.deleted_on IS NULL
-            AND mlm.new_version IS NULL
         """,
         int(uid)
     )
@@ -292,12 +287,11 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             SELECT
                 r.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM completions_meta r
+            FROM latest_completions r
             LEFT JOIN lccs_by_map lccs
                 ON lccs.id = r.lcc
             WHERE r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         ),
         medals_per_map AS (
             SELECT
@@ -310,11 +304,10 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
                 ON c.id = rwf.completion
             JOIN comp_players ply
                 ON ply.run = rwf.id
-            JOIN map_list_meta m
+            JOIN latest_maps_meta m
                 ON c.map = m.code
             WHERE ply.user_id = $1
                 AND m.deleted_on IS NULL
-                AND m.new_version IS NULL
             GROUP BY c.map
         )
         SELECT
@@ -471,7 +464,7 @@ async def get_completions_on(
                 r.*,
                 c.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
@@ -483,7 +476,6 @@ async def get_completions_on(
                 AND ply.user_id = $1
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         )
         SELECT DISTINCT ON (run_id)
             r.run_id, r.map, r.black_border, r.no_geraldo, r.current_lcc, r.format,

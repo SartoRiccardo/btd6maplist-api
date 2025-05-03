@@ -42,14 +42,13 @@ async def get_list_maps(
             placement_curver,
             map_preview_url
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON m.code = mlm.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
         CROSS JOIN config_vars cvar
         WHERE {placement_vname} BETWEEN 1 AND cvar.map_count
             AND deleted_on IS NULL
-            AND new_version IS NULL
         ORDER BY {placement_vname} ASC
     """, )
     return [
@@ -92,13 +91,12 @@ async def get_maps_by_idx(
             m.map_preview_url,
             vc.map IS NOT NULL AS is_verified
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
         WHERE {idx} IS NOT NULL
             AND deleted_on IS NULL
-            AND new_version IS NULL
             {("AND mlm." + idx + " = $1") if filter_val is not None else ""}
         """,
         *args,
@@ -140,7 +138,7 @@ async def get_nostalgia_pack(
             rg.game_id, rg.category_id, rg.subcategory_id,
             rg.game_name, rg.category_name, rg.subcategory_name
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
@@ -152,7 +150,6 @@ async def get_nostalgia_pack(
             AND rm.subcategory_id = rg.subcategory_id
         WHERE rm.game_id = $1
             AND deleted_on IS NULL
-            AND new_version IS NULL
         """,
         filter_val,
     )
@@ -194,11 +191,10 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             
             SELECT 3 AS ord, {columns}
             FROM maps m
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON m.code = mlm.code
             WHERE mlm.placement_curver = $1::int
                 AND mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
         """
     elif code.startswith("@") and code[1:].isnumeric():  # All versions idx
         code = code[1:]
@@ -207,11 +203,10 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             
             SELECT 3 AS ord, {columns}
             FROM maps m
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta mlm
                 ON m.code = mlm.code
             WHERE mlm.placement_allver = $1::int
                 AND mlm.deleted_on IS NULL
-                AND mlm.new_version IS NULL
         """
 
     pl_map = await conn.fetchrow(
@@ -232,21 +227,19 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             FROM (
                 SELECT 1 AS ord, {columns}
                 FROM maps m
-                JOIN map_list_meta mlm
+                JOIN latest_maps_meta mlm
                     ON m.code = mlm.code
                 WHERE m.code = $1
                     AND mlm.deleted_on IS NULL
-                    AND mlm.new_version IS NULL
                 
                 UNION
                 
                 SELECT 2 AS ord, {columns}
                 FROM maps m
-                JOIN map_list_meta mlm
+                JOIN latest_maps_meta mlm
                     ON m.code = mlm.code
                 WHERE LOWER(m.name) = LOWER($1)
                     AND mlm.deleted_on IS NULL
-                    AND mlm.new_version IS NULL
                 
                 UNION
                 
@@ -417,7 +410,7 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
 
             ARRAY_AGG(ply.user_id) OVER (PARTITION by cm.id) AS user_ids,
             ARRAY_AGG(u.name) OVER (PARTITION by cm.id) AS user_names
-        FROM completions_meta cm
+        FROM latest_completions cm
         JOIN lccs_by_map lbm
             ON lbm.id = cm.lcc
         JOIN leastcostchimps lccs
@@ -431,7 +424,6 @@ async def get_lccs_for(map_code: str, conn=None) -> list[ListCompletion]:
         WHERE lbm.map = $1
             AND cm.accepted_by IS NOT NULL
             AND cm.deleted_on IS NULL
-            AND cm.new_version IS NULL
         """,
         map_code,
     )
@@ -463,7 +455,7 @@ async def get_completions_for(
                 r.*,
                 (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc,
                 lccs.leftover
-            FROM completions_meta r
+            FROM latest_completions r
             JOIN completions c
                 ON r.completion = c.id
             LEFT JOIN lccs_by_map lccs
@@ -472,7 +464,6 @@ async def get_completions_for(
                 {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
                 AND r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
-                AND r.new_version IS NULL
         ),
         unique_runs AS (
             SELECT DISTINCT ON (rwf.run_id)
@@ -526,11 +517,10 @@ async def map_exists_in_format(
         f"""
         SELECT m.code
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON mlm.code = m.code
         WHERE m.code = $1
             AND mlm.{format_keys[format_id]} IS NOT NULL
-            AND mlm.new_version IS NULL
             AND mlm.deleted_on IS NULL
         """,
         map_code
@@ -544,11 +534,10 @@ async def alias_exists(alias: str, conn=None) -> bool:
         """
         SELECT al.alias
         FROM map_aliases al
-        JOIN map_list_meta m
+        JOIN latest_maps_meta m
             ON m.code = al.map
         WHERE al.alias=$1
             AND m.deleted_on IS NULL
-            AND m.new_version IS NULL
         """,
         alias,
     )
@@ -775,12 +764,12 @@ async def set_map_relations(map_code: str, map_data: dict, conn=None) -> None:
         """
     )
 
-    if map_data.get("remake_of") and \
-            (prev_remake_of := await get_remake_of_code(map_data.get("remake_of"))):
-        await set_map_list_meta(prev_remake_of, remake_of=None, conn=conn)
-    meta_id = await set_map_list_meta(map_code, **map_data, conn=conn)
-    if meta_id:
-        await link_new_version(conn=conn)
+    if map_data.get("remake_of"):
+        # TODO make it one single call to DB instead of possibly 2
+        prev_remake_of = await get_remake_of_code(map_data.get("remake_of"), conn=conn)
+        if prev_remake_of and prev_remake_of != map_code:
+            await set_map_list_meta(prev_remake_of, remake_of=None, conn=conn)
+    await set_map_list_meta(map_code, **map_data, conn=conn)
 
 
 @postgres
@@ -792,9 +781,8 @@ async def get_remake_of_code(
         """
         SELECT 
             code
-        FROM map_list_meta
+        FROM latest_maps_meta
         WHERE remake_of = $1
-            AND new_version IS NULL
             AND deleted_on IS NULL
         """,
         retro_map_id
@@ -821,9 +809,8 @@ async def set_map_list_meta(
                 {"$5::int" if "difficulty" in kwargs else "difficulty"},
                 {"$6::int" if "botb_difficulty" in kwargs else "botb_difficulty"},
                 {"$7::int" if "remake_of" in kwargs else "remake_of"}
-            FROM map_list_meta
+            FROM latest_maps_meta
             WHERE code = $1::varchar(10)
-                AND new_version IS NULL
                 AND deleted_on IS NULL
 
             UNION ALL
@@ -964,32 +951,13 @@ async def update_list_placements(
             {curver_selector},
             {allver_selector},
             code, difficulty, botb_difficulty, optimal_heros
-        FROM map_list_meta mlm
-        WHERE mlm.new_version IS NULL
-            AND mlm.deleted_on IS NULL
+        FROM latest_maps_meta mlm
+        WHERE mlm.deleted_on IS NULL
             AND ({" OR ".join(selectors)})
             AND mlm.code != $1
         """,
         ignore_code,
         *args,
-    )
-
-    await link_new_version(conn=conn)
-
-
-@postgres
-async def link_new_version(conn=None) -> None:
-    await conn.execute(
-        """
-        UPDATE map_list_meta mlm_old
-        SET
-            new_version = mlm_new.id
-        FROM map_list_meta mlm_new
-        WHERE mlm_old.new_version IS NULL AND mlm_new.new_version IS NULL
-            AND mlm_old.deleted_on IS NULL AND mlm_new.deleted_on IS NULL
-            AND mlm_old.code = mlm_new.code
-            AND mlm_old.created_on < mlm_new.created_on
-        """
     )
 
 
@@ -1026,9 +994,8 @@ async def delete_map(
                     ELSE NULL
                 END,
                 mlm.optimal_heros
-            FROM map_list_meta mlm
-            WHERE mlm.new_version IS NULL
-                AND mlm.deleted_on IS NULL
+            FROM latest_maps_meta mlm
+            WHERE mlm.deleted_on IS NULL
                 AND mlm.code = $1::varchar(10)
             RETURNING id, placement_allver, placement_curver
             """,
@@ -1040,18 +1007,6 @@ async def delete_map(
             all_positions=(map_current.placement_allver, None) if plc_all is None else None,
             ignore_code=code,
             conn=conn,
-        )
-
-        await conn.execute(
-            """
-            UPDATE map_list_meta
-            SET new_version = $1
-            WHERE new_version IS NULL
-                AND deleted_on IS NULL
-                AND code = $2
-                AND id != $1
-            """,
-            meta_id, code
         )
 
 
@@ -1081,18 +1036,16 @@ async def get_legacy_maps(conn=None) -> list[MinimalMap]:
             placement_curver,
             map_preview_url
         FROM maps m
-        JOIN map_list_meta mlm
+        JOIN latest_maps_meta mlm
             ON m.code = mlm.code
         LEFT JOIN verified_current vc
             ON m.code=vc.map
         CROSS JOIN config_vars cvar
-        WHERE mlm.new_version IS NULL AND
-            (
-                placement_curver > cvar.map_count
-                OR placement_curver IS NULL
-                    AND difficulty IS NULL
-                    AND botb_difficulty IS NULL
-            )
+        WHERE placement_curver > cvar.map_count
+            OR placement_curver IS NULL
+                AND difficulty IS NULL
+                AND botb_difficulty IS NULL
+                AND remake_of IS NULL
         ORDER BY
             (placement_curver IS NULL),
             placement_curver ASC

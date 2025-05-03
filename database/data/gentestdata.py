@@ -1,17 +1,25 @@
 import random
 import string
-from dataclasses import dataclass
-from typing import Any
-from datetime import datetime
+from database.data.data_models import (
+    AchievementRole,
+    MapSubmission,
+    LCC,
+    CompletionMeta,
+    MapKey,
+    Completion,
+    Map,
+    RetroMap,
+    MapListMeta,
+)
+from database.data.data_utils import stringify, nullify, SEPARATOR, rm_nulls, num_to_letters
 
 # Code for this file is unkept and made kind of hastily
 
 USER_COUNT = 50
 MAP_COUNT = 60
 MAP_SUBMISSION_COUNT = 120
-NULLSTR = "\\N"
-SEPARATOR = "\t"
-BR = "\n"
+OUTDATED_COMP_META_COUNT = 1000
+OUTDATED_MAP_META_COUNT = 200
 
 start_timestamp = 1728770986
 del_timestamp = 1728770986 + 3600*24
@@ -43,46 +51,8 @@ allowed_heros = [
 ]
 
 
-def nullify(data: Any | None) -> str:
-    if data is None:
-        return NULLSTR
-    return str(data)
-
-
-def num_to_letters(num: int):
-    letters = ""
-    while num > 0:
-        letters = chr(num % 10 + ord('A')) + letters
-        num = num // 10
-    letters = "A"*max(2-len(letters), 0) + letters
-    letters = "X"*max(3-len(letters), 0) + letters
-    return letters
-
-
-def dateify(timestamp: int | None) -> str:
-    if timestamp is None:
-        return NULLSTR
-    date = datetime.fromtimestamp(timestamp)
-    return date.strftime("%Y-%m-%d %H:%M:%S.000000")
-
-
-def stringify(*args: Any) -> list[str]:
-    return [nullify(x) for x in args]
-
-
-def rm_nulls(l: list[Any | None]) -> list:
-    return [x for x in l if x is not None]
-
-
-def difficultify(diff: int) -> str:
-    return nullify(None if diff == -1 else diff)
-
-
-def User(user_id: int, username: str = None) -> str:
-    if username is None:
-        name = f"usr{user_id}"
-    else:
-        name = username
+def User(user_id: int) -> str:
+    name = f"usr{user_id}"
     if user_id == 100000:
         name = "Authenticated User"
 
@@ -93,253 +63,6 @@ def User(user_id: int, username: str = None) -> str:
         True,
         False,
     ))
-
-
-@dataclass
-class MapKey:
-    code: str
-
-
-@dataclass
-class Map:
-    id: int
-    code: str
-    name: str
-    placement_cur: int
-    placement_all: int
-    difficulty: int
-    r6_start: str | None
-    deleted_on: int | None
-    map_preview_url: str | None
-    new_version: int | None
-    created_on: int
-    optimal_heros: list[str]
-    # Many-To-One
-    creators: list[tuple[int, str | None]]
-    additional_codes: list[tuple[str, str | None]]
-    verifications: list[tuple[str, int]]
-    map_data_compatibility: list[tuple[int, int]]
-    aliases: list[str]
-    # New fields
-    botb_difficulty: int | None = None
-    remake_of: int | None = None
-
-    def dump_map(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.code,
-            self.name,
-            nullify(self.r6_start),
-            nullify(None),
-            nullify(self.map_preview_url),
-        ))
-
-    def dump_map_meta(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.id,
-            self.code,
-            difficultify(self.placement_cur),
-            difficultify(self.placement_all),
-            difficultify(self.difficulty),
-            ";".join(self.optimal_heros),
-            difficultify(self.botb_difficulty),
-            difficultify(self.remake_of),
-            dateify(self.created_on),
-            dateify(self.deleted_on),
-            nullify(self.new_version),
-        ))
-
-    def dump_aliases(self) -> str:
-        return "\n".join(
-            SEPARATOR.join(
-                stringify(alias, self.code)
-            ) for alias in self.aliases
-        )
-
-    def dump_add_codes(self) -> str:
-        return "\n".join(
-            SEPARATOR.join(
-                stringify(code, descr, self.code)
-            ) for code, descr in self.additional_codes
-        )
-
-    def dump_verifications(self) -> str:
-        return "\n".join(
-            SEPARATOR.join(
-                stringify(user_id, nullify(version), self.code)
-            ) for user_id, version in self.verifications
-        )
-
-    def dump_creators(self) -> str:
-        return "\n".join(
-            SEPARATOR.join(
-                stringify(user_id, nullify(role), self.code)
-            ) for user_id, role in self.creators
-        )
-
-
-@dataclass
-class MapSubmission:
-    id: int
-    code: str
-    submitter: int
-    subm_notes: str | None
-    for_list: int
-    proposed: int
-    rejected_by: int | None
-    created_on: int
-    completion_proof: str
-    wh_data: str | None
-    wh_msg_id: int | None
-
-    def dump_submission(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.code,
-            self.submitter,
-            self.subm_notes,
-            self.for_list,
-            self.proposed,
-            self.rejected_by,
-            dateify(self.created_on),
-            self.completion_proof,
-            self.wh_data,
-            self.wh_msg_id,
-            self.id,
-        ))
-
-
-@dataclass
-class LCC:
-    id: int
-    leftover: int
-
-    def dump_lcc(self):
-        return SEPARATOR.join(stringify(
-            self.id,
-            self.leftover,
-        ))
-
-
-@dataclass
-class Completion:
-    id: int
-    map: Map | MapKey
-    black_border: bool
-    no_geraldo: bool
-    created_on: int
-    deleted_on: int | None
-    new_version: int | None
-    accepted_by: int | None
-    format: int
-    subm_notes: str | None
-    subm_wh_payload: str | None
-    # One-to-one
-    lcc: LCC | None
-    # Many-to-one
-    players: list[int]
-    subm_proof_img: list[str]
-    subm_proof_vid: list[str]
-
-    @property
-    def comp_meta_id(self):
-        return self.id + (-1 if self.id % 2 == 0 else 1)
-
-    def dump_completion(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.id,
-            self.map.code,
-            dateify(self.created_on),
-            self.subm_notes,
-            self.subm_wh_payload,
-            None,  # Copied from ID
-        ))
-
-    def dump_completion_meta(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.comp_meta_id,
-            self.id,
-            self.black_border,
-            self.no_geraldo,
-            self.lcc.id if self.lcc else None,
-            dateify(self.created_on),
-            dateify(self.deleted_on),
-            self.new_version,
-            self.accepted_by,
-            self.format,
-            None,  # Copied from ID
-        ))
-
-    def dump_players(self) -> str:
-        return "\n".join(
-            SEPARATOR.join(stringify(user_id, self.comp_meta_id))
-            for user_id in self.players
-        )
-
-    def dump_proofs(self) -> str:
-        return "\n".join([
-            *[
-                SEPARATOR.join(stringify(self.id, url, 0))
-                for url in self.subm_proof_img
-            ],
-            *[
-                SEPARATOR.join(stringify(self.id, url, 1))
-                for url in self.subm_proof_vid
-            ],
-        ])
-
-
-@dataclass
-class RetroMap:
-    id: int
-    name: str
-    sort_order: int
-    game: int
-    difficulty: int
-    subcategory: int
-
-    def dump_retro_map(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.id,
-            self.name,
-            self.sort_order,
-            '',
-            self.game,
-            self.difficulty,
-            self.subcategory,
-        ))
-
-
-@dataclass
-class AchievementRole:
-    lb_format: int
-    lb_type: str
-    threshold: int
-    for_first: bool
-    tooltip_description: str | None
-    name: str
-    clr_border: int
-    clr_inner: int
-    # Many-to-one
-    linked_roles: list[tuple[int, int]]
-
-    def dump_ach_roles(self) -> str:
-        return SEPARATOR.join(stringify(
-            self.lb_format,
-            self.lb_type,
-            self.threshold,
-            self.for_first,
-            self.tooltip_description,
-            self.name,
-            self.clr_border,
-            self.clr_inner,
-        ))
-
-    def dump_linked_roles(self) -> str:
-        return "\n".join([
-            SEPARATOR.join(
-                stringify(self.lb_format, self.lb_type, self.threshold, guild, role)
-            )
-            for guild, role in self.linked_roles
-        ])
 
 
 def rand_str(rand: random.Random, k: int = 10) -> str:
@@ -841,6 +564,106 @@ def inject_discord_data(submissions: list[MapSubmission]) -> None:
         inject_to.remove(subm.for_list)
 
 
+def gen_outdated_meta(completions: list[Completion]) -> list[CompletionMeta]:
+    rand_comp_picker = random.Random(1111)
+    rand_meta_id = random.Random(20491)
+    rand_lcc_id = random.Random(20884)
+    rand_format = random.Random(3948)
+    rand_accepted = random.Random(1221)
+    rand_players = random.Random(7741)
+    rand_timestamp = random.Random(9001)
+    rand_flags = random.Random(6023)
+    rand_lcc_data = random.Random(9457)
+
+    base_timestamp = start_timestamp - 30 * 24 * 3600  # ~1 month before
+
+    used_timestamps = set()
+    used_ids = set()
+    comp_metas = []
+
+    for _ in range(OUTDATED_COMP_META_COUNT):
+        comp = rand_comp_picker.choice(completions)
+
+        # Ensure unique created_on
+        while True:
+            created_on = base_timestamp - rand_timestamp.randint(0, 100_000)
+            if created_on not in used_timestamps:
+                used_timestamps.add(created_on)
+                break
+
+        # Randomly decide to assign LCC or not
+        lcc = None
+        if rand_flags.random() < 0.5:  # 50% chance to include an LCC
+            lcc = LCC(
+                id=rand_lcc_id.randint(10**4, 10**6 - 1),
+                leftover=rand_lcc_data.randint(0, 100)
+            )
+
+        while (meta_id := rand_meta_id.randint(10**4, 10**6 - 1)) in used_ids:
+            continue
+        used_ids.add(meta_id)
+
+        comp_metas.append(
+            CompletionMeta(
+                comp_id=comp.id,
+                comp_meta_id=meta_id,
+                black_border=rand_flags.choice([True, False]),
+                no_geraldo=rand_flags.choice([True, False]),
+                created_on=created_on,
+                deleted_on=None,
+                new_version=comp.comp_meta_id,
+                accepted_by=rand_accepted.randint(1, 10),
+                format=rand_format.choice([1, 2, 51, 52, 11]),
+                lcc=lcc,
+                players=[rand_players.randint(1, 49) for _ in range(rand_players.randint(1, 3))],
+            )
+        )
+
+    return comp_metas
+
+
+def gen_outdated_maps(maps: list[Map]) -> list[MapListMeta]:
+    rand_map_picker = random.Random(1111)
+    rand_meta_id = random.Random(20491)
+    rand_timestamp = random.Random(9001)
+    rand_flags = random.Random(6023)
+    rand_diff = random.Random(4234)
+    rand_heros = random.Random(9754)
+    rand_remake = random.Random(8821)
+
+    base_timestamp = start_timestamp - 30 * 24 * 3600  # ~1 month before
+
+    used_ids = set()
+    map_metas = []
+
+    for _ in range(OUTDATED_COMP_META_COUNT):
+        map_data = rand_map_picker.choice(maps)
+        created_on = base_timestamp - rand_timestamp.randint(0, 100_000)
+
+        # Ensure unique meta ID (for `id` field)
+        while (meta_id := rand_meta_id.randint(10**4, 10**6 - 1)) in used_ids:
+            continue
+        used_ids.add(meta_id)
+
+        map_metas.append(
+            MapListMeta(
+                id=meta_id,
+                code=map_data.code,
+                placement_cur=rand_diff.randint(1, 60),
+                placement_all=rand_diff.randint(1, 60),
+                difficulty=rand_diff.randint(0, 4),
+                deleted_on=None,
+                new_version=map_data.id,
+                created_on=created_on,
+                optimal_heros=rand_heros.choices(allowed_heros, k=rand_heros.randint(1, 3)),
+                botb_difficulty=rand_diff.randint(0, 3),
+                remake_of=rand_diff.randint(1, 100),
+            )
+        )
+
+    return map_metas
+
+
 if __name__ == '__main__':
     import os
     from pathlib import Path
@@ -861,12 +684,15 @@ if __name__ == '__main__':
                    completions_lb + \
                    completions_misc + \
                    completions_round
+    outdated_comp_metas = gen_outdated_meta(completions)
 
     inject_discord_data(map_submissions)
 
     map_uid, extra_maps = gen_extra_maps(map_uid)
     maps += extra_maps
     retro_maps = gen_retro_maps()
+    outdated_maps_metas = gen_outdated_maps(maps)
+
 
     achievement_roles = random_achivement_roles()
 
@@ -892,7 +718,7 @@ if __name__ == '__main__':
         ))
     with open(bpath / "14_map_list_meta.csv", "w") as fout:
         fout.write("\n".join(
-            x.dump_map_meta() for x in maps
+            x.dump_map_meta() for x in (maps + outdated_maps_metas)
         ))
     with open(bpath / "02_users.csv", "w") as fout:
         fout.write("\n".join(
@@ -938,7 +764,7 @@ if __name__ == '__main__':
         ))
     with open(bpath / "23_comp_players.csv", "w") as fout:
         fout.write("\n".join(
-            x.dump_players() for x in completions
+            x.dump_players() for x in (completions + outdated_comp_metas)
         ))
     with open(bpath / "22_completion_proofs.csv", "w") as fout:
         fout.write("\n".join(
@@ -947,11 +773,11 @@ if __name__ == '__main__':
         ))
     with open(bpath / "21_completions_meta.csv", "w") as fout:
         fout.write("\n".join(
-            x.dump_completion_meta() for x in completions
+            x.dump_completion_meta() for x in (completions + outdated_comp_metas)
         ))
     with open(bpath / "08_leastcostchimps.csv", "w") as fout:
         fout.write("\n".join(
-            x.lcc.dump_lcc() for x in completions
+            x.lcc.dump_lcc() for x in (completions + outdated_comp_metas)
             if x.lcc is not None
         ))
     with open(bpath / "10_achievement_roles.csv", "w") as fout:
