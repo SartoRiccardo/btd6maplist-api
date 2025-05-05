@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import src.db.connection
 from src.db.models import (
     MinimalMap,
@@ -18,10 +19,15 @@ postgres = src.db.connection.postgres
 @postgres
 async def get_list_maps(
         conn: "asyncpg.pool.PoolConnectionProxy" = None,
-        curver: bool = True
+        curver: bool = True,
+        timestamp: datetime | None = None
 ) -> list[MinimalMap]:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     placement_vname = "placement_curver" if curver else "placement_allver"
-    payload = await conn.fetch(f"""
+    payload = await conn.fetch(
+        f"""
         WITH config_vars AS (
             SELECT
                 ({get_int_config("current_btd6_ver")}) AS current_btd6_ver,
@@ -42,7 +48,7 @@ async def get_list_maps(
             placement_curver,
             map_preview_url
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta($1) mlm
             ON m.code = mlm.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
@@ -50,7 +56,9 @@ async def get_list_maps(
         WHERE {placement_vname} BETWEEN 1 AND cvar.map_count
             AND deleted_on IS NULL
         ORDER BY {placement_vname} ASC
-    """, )
+        """,
+        timestamp
+    )
     return [
         MinimalMap(
             row["name"],
@@ -67,15 +75,20 @@ async def get_list_maps(
 async def get_maps_by_idx(
         idx: str = None,
         filter_val: int | None = None,
+        timestamp: datetime | None = None,
         conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> list[MinimalMap]:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     allowed_keys = ["difficulty", "botb_difficulty"]
     if idx not in allowed_keys:
         return []
 
-    args = []
+    args = [timestamp]
     if filter_val is not None:
         args.append(filter_val)
+
     payload = await conn.fetch(
         f"""
         WITH verified_current AS (
@@ -91,13 +104,13 @@ async def get_maps_by_idx(
             m.map_preview_url,
             vc.map IS NOT NULL AS is_verified
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta($1) mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
         WHERE {idx} IS NOT NULL
             AND deleted_on IS NULL
-            {("AND mlm." + idx + " = $1") if filter_val is not None else ""}
+            {("AND mlm." + idx + " = $2") if filter_val is not None else ""}
         """,
         *args,
     )
@@ -117,8 +130,12 @@ async def get_maps_by_idx(
 @postgres
 async def get_nostalgia_pack(
         filter_val: int | None = None,
+        timestamp: datetime | None = None,
         conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> list[MinimalMap]:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     payload = await conn.fetch(
         f"""
         WITH verified_current AS (
@@ -138,7 +155,7 @@ async def get_nostalgia_pack(
             rg.game_id, rg.category_id, rg.subcategory_id,
             rg.game_name, rg.category_name, rg.subcategory_name
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta($2) mlm
             ON mlm.code = m.code
         LEFT JOIN verified_current vc
             ON m.code = vc.map
@@ -152,6 +169,7 @@ async def get_nostalgia_pack(
             AND deleted_on IS NULL
         """,
         filter_val,
+        timestamp,
     )
 
     return [
@@ -178,7 +196,15 @@ async def get_nostalgia_pack(
 
 
 @postgres
-async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialMap | None:
+async def get_map(
+        code: str,
+        partial: bool = False,
+        timestamp: datetime | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> Map | PartialMap | None:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     columns = """
         m.code, m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty, m.r6_start,
         m.map_data, mlm.deleted_on, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
@@ -191,7 +217,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             
             SELECT 3 AS ord, {columns}
             FROM maps m
-            JOIN latest_maps_meta mlm
+            JOIN latest_maps_meta($3) mlm
                 ON m.code = mlm.code
             WHERE mlm.placement_curver = $1::int
                 AND mlm.deleted_on IS NULL
@@ -203,7 +229,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             
             SELECT 3 AS ord, {columns}
             FROM maps m
-            JOIN latest_maps_meta mlm
+            JOIN latest_maps_meta($3) mlm
                 ON m.code = mlm.code
             WHERE mlm.placement_allver = $1::int
                 AND mlm.deleted_on IS NULL
@@ -227,7 +253,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
             FROM (
                 SELECT 1 AS ord, {columns}
                 FROM maps m
-                JOIN latest_maps_meta mlm
+                JOIN latest_maps_meta($3) mlm
                     ON m.code = mlm.code
                 WHERE m.code = $1
                     AND mlm.deleted_on IS NULL
@@ -236,7 +262,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
                 
                 SELECT 2 AS ord, {columns}
                 FROM maps m
-                JOIN latest_maps_meta mlm
+                JOIN latest_maps_meta($3) mlm
                     ON m.code = mlm.code
                 WHERE LOWER(m.name) = LOWER($1)
                     AND mlm.deleted_on IS NULL
@@ -290,7 +316,7 @@ async def get_map(code: str, partial: bool = False, conn=None) -> Map | PartialM
         LEFT JOIN verified_maps v
             ON v.map = m.code
         """,
-        code, code.replace(" ", "_")
+        code, code.replace(" ", "_"), timestamp,
     )
     if pl_map is None:
         return None
@@ -517,7 +543,7 @@ async def map_exists_in_format(
         f"""
         SELECT m.code
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta(NOW()::timestamp) mlm
             ON mlm.code = m.code
         WHERE m.code = $1
             AND mlm.{format_keys[format_id]} IS NOT NULL
@@ -534,7 +560,7 @@ async def alias_exists(alias: str, conn=None) -> bool:
         """
         SELECT al.alias
         FROM map_aliases al
-        JOIN latest_maps_meta m
+        JOIN latest_maps_meta(NOW()::timestamp) m
             ON m.code = al.map
         WHERE al.alias=$1
             AND m.deleted_on IS NULL
@@ -781,7 +807,7 @@ async def get_remake_of_code(
         """
         SELECT 
             code
-        FROM latest_maps_meta
+        FROM latest_maps_meta(NOW()::timestamp)
         WHERE remake_of = $1
             AND deleted_on IS NULL
         """,
@@ -809,7 +835,7 @@ async def set_map_list_meta(
                 {"$5::int" if "difficulty" in kwargs else "difficulty"},
                 {"$6::int" if "botb_difficulty" in kwargs else "botb_difficulty"},
                 {"$7::int" if "remake_of" in kwargs else "remake_of"}
-            FROM latest_maps_meta
+            FROM latest_maps_meta(NOW()::timestamp)
             WHERE code = $1::varchar(10)
                 AND deleted_on IS NULL
 
@@ -951,7 +977,7 @@ async def update_list_placements(
             {curver_selector},
             {allver_selector},
             code, difficulty, botb_difficulty, optimal_heros
-        FROM latest_maps_meta mlm
+        FROM latest_maps_meta(NOW()::timestamp) mlm
         WHERE mlm.deleted_on IS NULL
             AND ({" OR ".join(selectors)})
             AND mlm.code != $1
@@ -994,7 +1020,7 @@ async def delete_map(
                     ELSE NULL
                 END,
                 mlm.optimal_heros
-            FROM latest_maps_meta mlm
+            FROM latest_maps_meta(NOW()::timestamp) mlm
             WHERE mlm.deleted_on IS NULL
                 AND mlm.code = $1::varchar(10)
             RETURNING id, placement_allver, placement_curver
@@ -1036,7 +1062,7 @@ async def get_legacy_maps(conn=None) -> list[MinimalMap]:
             placement_curver,
             map_preview_url
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta(NOW()::timestamp) mlm
             ON m.code = mlm.code
         LEFT JOIN verified_current vc
             ON m.code=vc.map

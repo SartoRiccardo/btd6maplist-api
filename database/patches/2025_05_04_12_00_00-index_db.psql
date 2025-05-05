@@ -1,6 +1,8 @@
---CREATE INDEX IF NOT EXISTS idx_comp_players_user_id ON comp_players(user_id);
---CREATE INDEX IF NOT EXISTS idx_compmeta_completion_creation ON completions_meta(completion, created_on);
---CREATE INDEX IF NOT EXISTS idx_mapmeta_code_creation ON map_list_meta(code, created_on);
+CREATE INDEX IF NOT EXISTS idx_comp_players_user_id ON comp_players (user_id);
+CREATE INDEX IF NOT EXISTS idx_compmeta_completion_creation ON completions_meta (completion, created_on);
+CREATE INDEX IF NOT EXISTS idx_mapmeta_code_creation ON map_list_meta (code, created_on);
+CREATE INDEX IF NOT EXISTS idx_config_difficulty ON config(difficulty);
+CREATE INDEX IF NOT EXISTS idx_mapmeta_difficulty ON map_list_meta(difficulty);
 
 CREATE TABLE formats_rules_subsets (
     format_parent INT,

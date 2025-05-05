@@ -22,7 +22,7 @@ async def search(
                 mlm.remake_of,
                 SIMILARITY(m.name, $1) AS simil
             FROM maps m
-            JOIN latest_maps_meta mlm
+            JOIN latest_maps_meta(NOW()::timestamp) mlm
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
                 AND SIMILARITY(m.name, $1) > 0.1
@@ -52,7 +52,7 @@ async def search(
             for row in payload
         ]
 
-    if "user" in entities and len(results) < limit:
+    if "user" in entities:
         payload = await conn.fetch(
             """
             SELECT
@@ -63,7 +63,7 @@ async def search(
             ORDER BY simil DESC
             LIMIT $2
             """,
-            query, limit - len(results)
+            query, limit
         )
         results += [
             (
