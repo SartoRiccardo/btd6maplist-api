@@ -38,6 +38,20 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
 @pytest.mark.get
 @pytest.mark.users
 class TestGetUsers:
+    async def test_get_minimal_user(self, btd6ml_test_client):
+        """Test getting a minimal user information by ID"""
+        user_id = 31
+        expected_profile = {
+            "name": "usr31",
+            "id": "31",
+            "avatarURL": None,
+            "bannerURL": None,
+        }
+
+        async with btd6ml_test_client.get(f"/users/{user_id}?minimal=true") as resp:
+            assert await resp.json() == expected_profile, \
+                "User profile differs from expected"
+
     async def test_get_user(self, validate_user, mock_auth):
         """Test getting a user by ID"""
         USER_ID = 33

@@ -165,8 +165,8 @@ class TestLeaderboard:
     async def test_ml_no_geraldo_leaderboard(self, btd6ml_test_client):
         """Test the maplist No Geraldo leaderboard is correctly calculated"""
         USER_ID = 13
-        lcc_count = await calc_completion_count(USER_ID, [1], btd6ml_test_client, count_key="no_geraldo")
-        assert await get_lb_score(USER_ID, 1, "no_geraldo", btd6ml_test_client) == lcc_count, \
+        nogerry_count = await calc_completion_count(USER_ID, [1], btd6ml_test_client, count_key="no_geraldo")
+        assert await get_lb_score(USER_ID, 1, "no_geraldo", btd6ml_test_client) == nogerry_count, \
             "User No Geraldo count differs from expected"
 
     async def test_exp_no_geraldo_leaderboard(self, btd6ml_test_client):

@@ -349,7 +349,7 @@ async def get_unapproved_completions(
                 ON cp.run = run.run_id
             JOIN maps m
                 ON m.code = run.map
-            JOIN map_list_meta mlm
+            JOIN latest_maps_meta(NOW()::timestamp) mlm
                 ON m.code = mlm.code
             WHERE mlm.deleted_on IS NULL
         )
@@ -477,7 +477,7 @@ async def get_recent(limit: int = 5, formats: list[int] = None, conn=None) -> li
                 ON ply.run = run.run_meta_id
             LEFT JOIN completion_proofs cp
                 ON cp.run = run.run_id
-            JOIN latest_maps_meta mlm
+            JOIN latest_maps_meta(NOW()::timestamp) mlm
                 ON mlm.code = run.map
             JOIN maps m
                 ON m.code = run.map

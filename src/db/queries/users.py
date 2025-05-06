@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import src.db.connection
 from src.utils.misc import list_rm_dupe
 from src.db.models import (
@@ -15,7 +16,7 @@ from src.db.models import (
     Permissions,
     MinimalUser,
 )
-from src.db.queries.subqueries import LeaderboardType, leaderboard_name
+from src.db.queries.subqueries import leaderboard_name
 postgres = src.db.connection.postgres
 
 FormatPlacement = tuple[float, int | None]
@@ -65,74 +66,84 @@ async def get_user_min(uid: str, conn=None) -> PartialUser | None:
 async def get_completions_by(
         uid: str,
         formats: list[int],
-        idx_start=0,
-        amount=50,
-        conn=None
+        idx_start: int = 0,
+        amount: int = 50,
+        timestamp: datetime | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
 ) -> tuple[list[ListCompletion], int]:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     extra_args = []
     if len(formats):
         extra_args.append(formats)
-    payload = await conn.fetch(
-        f"""
-        WITH runs_with_flags AS (
-            SELECT
-                r.id AS run_meta_id,
-                c.id AS run_id,
-                r.*,
-                c.*,
-                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM latest_completions r
-            JOIN completions c
-                ON r.completion = c.id
-            JOIN comp_players ply
-                ON ply.run = r.id
-            LEFT JOIN lccs_by_map lccs
-                ON lccs.id = r.lcc
-            WHERE ply.user_id = $1
-                {'AND r.format = ANY($4::int[])' if len(formats) > 0 else ''}
-                AND r.accepted_by IS NOT NULL
-                AND r.deleted_on IS NULL
-        ),
-        unique_runs AS (
-            SELECT DISTINCT ON (rwf.run_id)
-                rwf.run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-                rwf.format,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
-                rwf.subm_notes,
-                
-                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
-                m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
-                mlm.remake_of,
-                
-                lccs.id AS lcc_id, lccs.leftover,
-                
-                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.run_meta_id) AS user_ids
-            FROM runs_with_flags rwf
-            JOIN comp_players ply
-                ON ply.run = rwf.run_meta_id
-            LEFT JOIN completion_proofs cp
-                ON cp.run = rwf.run_id
-            LEFT JOIN leastcostchimps lccs
-                ON rwf.lcc = lccs.id
-            JOIN latest_maps_meta mlm
-                ON mlm.code = rwf.map
-            JOIN maps m
-                ON m.code = mlm.code
-            WHERE mlm.deleted_on IS NULL
+
+    async with conn.transaction():
+        # I give up bro this planner cant do planning
+        # Makes the thing like 10x faster & shouldn't cause issues
+        await conn.execute("SET LOCAL enable_nestloop = off")
+
+        payload = await conn.fetch(
+            f"""
+            WITH runs_with_flags AS (
+                SELECT
+                    r.id AS run_meta_id,
+                    c.id AS run_id,
+                    r.*,
+                    c.*,
+                    (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+                FROM latest_completions r
+                JOIN completions c
+                    ON r.completion = c.id
+                JOIN comp_players ply
+                    ON ply.run = r.id
+                LEFT JOIN lccs_by_map lccs
+                    ON lccs.id = r.lcc
+                WHERE ply.user_id = $1
+                    {'AND r.format = ANY($5::int[])' if len(formats) > 0 else ''}
+                    AND r.accepted_by IS NOT NULL
+                    AND r.deleted_on IS NULL
+            ),
+            unique_runs AS (
+                SELECT DISTINCT ON (rwf.run_id)
+                    rwf.run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+                    rwf.format,
+                    ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
+                    ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
+                    rwf.subm_notes,
+                    
+                    m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
+                    m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
+                    mlm.remake_of,
+                    
+                    lccs.id AS lcc_id, lccs.leftover,
+                    
+                    ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.run_meta_id) AS user_ids
+                FROM runs_with_flags rwf
+                JOIN comp_players ply
+                    ON ply.run = rwf.run_meta_id
+                LEFT JOIN completion_proofs cp
+                    ON cp.run = rwf.run_id
+                LEFT JOIN leastcostchimps lccs
+                    ON rwf.lcc = lccs.id
+                JOIN latest_maps_meta($4) mlm
+                    ON mlm.code = rwf.map
+                JOIN maps m
+                    ON m.code = mlm.code
+                WHERE mlm.deleted_on IS NULL
+            )
+            SELECT COUNT(*) OVER() AS total_count, uq.*
+            FROM unique_runs uq
+            ORDER BY
+                uq.map ASC,
+                uq.black_border DESC,
+                uq.no_geraldo DESC,
+                uq.current_lcc DESC
+            LIMIT $3
+            OFFSET $2
+            """,
+            int(uid), idx_start, amount, timestamp, *extra_args,
         )
-        SELECT COUNT(*) OVER() AS total_count, uq.*
-        FROM unique_runs uq
-        ORDER BY
-            uq.map ASC,
-            uq.black_border DESC,
-            uq.no_geraldo DESC,
-            uq.current_lcc DESC
-        LIMIT $3
-        OFFSET $2
-        """,
-        int(uid), idx_start, amount, *extra_args,
-    )
 
     return [
         ListCompletion(
@@ -195,7 +206,7 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
         FROM runs_with_flags rwf
         JOIN comp_players ply
             ON ply.run = rwf.run_meta_id
-        JOIN latest_maps_meta m
+        JOIN latest_maps_meta(NOW()::timestamp) m
             ON m.code = rwf.map
         WHERE ply.user_id = $1
             AND m.deleted_on IS NULL
@@ -223,27 +234,14 @@ async def get_min_completions_by(uid: str | int, conn=None) -> list[ListCompleti
 
 
 @postgres
-async def get_leaderboard_placement(
+async def get_maps_created_by(
         uid: str,
-        format: int,
-        type: LeaderboardType = "points",
-        conn=None
-) -> FormatPlacement:
-    payload = await conn.fetchrow(
-        f"""
-        SELECT user_id, score, placement
-        FROM {leaderboard_name(format, type)}
-        WHERE user_id=$1
-        """,
-        int(uid)
-    )
-    if payload is None or payload["score"] == 0:
-        return 0.0, None
-    return float(payload["score"]), int(payload["placement"])
+        timestamp: datetime | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> list[PartialMap]:
+    if timestamp is None:
+        timestamp = datetime.now()
 
-
-@postgres
-async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
     payload = await conn.fetch(
         """
         SELECT
@@ -251,14 +249,15 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
             m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url,
             mlm.botb_difficulty, mlm.remake_of
         FROM maps m
-        JOIN latest_maps_meta mlm
+        JOIN latest_maps_meta($2) mlm
             ON m.code = mlm.code
         JOIN creators c
             ON m.code = c.map
         WHERE c.user_id = $1
             AND mlm.deleted_on IS NULL
         """,
-        int(uid)
+        int(uid),
+        timestamp,
     )
     return [
         PartialMap(
@@ -280,7 +279,14 @@ async def get_maps_created_by(uid: str, conn=None) -> list[PartialMap]:
 
 
 @postgres
-async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
+async def get_user_medals(
+        uid: str,
+        timestamp: datetime | None = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> MaplistMedals:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     payload = await conn.fetch(
         """
         WITH runs_with_flags AS (
@@ -293,6 +299,11 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             WHERE r.accepted_by IS NOT NULL
                 AND r.deleted_on IS NULL
         ),
+        valid_maps AS MATERIALIZED (
+            SELECT *
+            FROM latest_maps_meta($2::timestamp)
+            WHERE deleted_on IS NULL
+        ),
         medals_per_map AS (
             SELECT
                 c.map,
@@ -304,10 +315,9 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
                 ON c.id = rwf.completion
             JOIN comp_players ply
                 ON ply.run = rwf.id
-            JOIN latest_maps_meta m
+            JOIN valid_maps m
                 ON c.map = m.code
             WHERE ply.user_id = $1
-                AND m.deleted_on IS NULL
             GROUP BY c.map
         )
         SELECT
@@ -317,7 +327,8 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
             COUNT(CASE WHEN current_lcc THEN 1 END) AS current_lcc
         FROM medals_per_map
         """,
-        int(uid)
+        int(uid),
+        timestamp
     )
 
     return MaplistMedals(
@@ -329,17 +340,68 @@ async def get_user_medals(uid: str, conn=None) -> MaplistMedals:
 
 
 @postgres
-async def get_user_placements(uid: str, format: int, conn=None) -> MaplistProfile:
-    pos_points = await get_leaderboard_placement(uid, format, conn=conn, type="points")
-    pos_lccs = await get_leaderboard_placement(uid, format, conn=conn, type="lccs")
-    pos_nogerry = await get_leaderboard_placement(uid, format, conn=conn, type="no_geraldo")
-    pos_bb = await get_leaderboard_placement(uid, format, conn=conn, type="black_border")
-    return MaplistProfile(
-        *pos_points,
-        *pos_lccs,
-        *pos_nogerry,
-        *pos_bb,
+async def get_user_placements(
+        uid: str | int,
+        format_id: int,
+        timestamp: datetime = None,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> MaplistProfile:
+    if timestamp is None:
+        timestamp = datetime.now()
+    if isinstance(uid, str):
+        uid = int(uid)
+
+    points_lb = leaderboard_name(format_id, "points")
+    points_query = ""
+    if points_lb:
+        points_query = f"""
+        UNION ALL
+        SELECT 'points' AS lb_type, user_id, score, placement
+        FROM {points_lb}
+        """
+
+    rows = await conn.fetch(
+        f"""
+        SELECT *
+        FROM (
+            SELECT 'lccs' AS lb_type, user_id, score, placement
+            FROM {leaderboard_name(format_id, "lccs")}
+            
+            UNION ALL 
+            SELECT 'no_geraldo' AS lb_type, user_id, score, placement
+            FROM {leaderboard_name(format_id, "no_geraldo")}
+            
+            UNION ALL 
+            SELECT 'black_border' AS lb_type, user_id, score, placement
+            FROM {leaderboard_name(format_id, "black_border")}
+            
+            {points_query}
+        ) AS all_format_lbs
+        WHERE user_id = $1
+        """,
+        uid
     )
+
+    positions = [
+        (0, None),
+        (0, None),
+        (0, None),
+        (0, None),
+    ]
+    pos_to_index = {
+        "points": 0,
+        "lccs": 1,
+        "no_geraldo": 2,
+        "black_border": 3,
+    }
+    for row in rows:
+        positions[pos_to_index[row["lb_type"]]] = (row["score"], row["placement"])
+
+    return MaplistProfile(*[
+        x  # Flatten the list pretty much
+        for placement in positions
+        for x in placement
+    ])
 
 
 @postgres
@@ -364,10 +426,21 @@ async def get_minimal_profile(
 
 
 @postgres
-async def get_user(id: str, with_completions: bool = False, conn=None) -> User | None:
+async def get_user(
+        id: str,
+        with_completions: bool = False,
+        timestamp: datetime | None = None,
+        minimal: bool = False,
+        conn: "asyncpg.pool.PoolConnectionProxy" = None,
+) -> PartialUser | None:
+    if timestamp is None:
+        timestamp = datetime.now()
+
     puser = await get_user_min(id, conn=conn)
     if not puser:
         return None
+    if minimal:
+        return puser
 
     comps = []
     if with_completions:
@@ -383,7 +456,7 @@ async def get_user(id: str, with_completions: bool = False, conn=None) -> User |
             format_id: await get_user_placements(id, format_id, conn=conn)
             for format_id in [1, 2, 51]
         },
-        await get_maps_created_by(id, conn=conn),
+        await get_maps_created_by(id, timestamp=timestamp, conn=conn),
         comps,
         await get_user_medals(id, conn=conn),
         await get_user_roles(puser.id, conn=conn),
