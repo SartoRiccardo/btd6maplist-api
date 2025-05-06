@@ -5,8 +5,8 @@ CREATE INDEX IF NOT EXISTS idx_config_difficulty ON config(difficulty);
 CREATE INDEX IF NOT EXISTS idx_mapmeta_difficulty ON map_list_meta(difficulty);
 
 CREATE TABLE formats_rules_subsets (
-    format_parent INT,
-    format_child INT,
+    format_parent INT,  -- Less restrictive format
+    format_child INT,  -- More restrictive format
     PRIMARY KEY(format_parent, format_child)
 );
 ALTER TABLE formats_rules_subsets ADD CONSTRAINT fk_formats_1
@@ -15,11 +15,11 @@ ALTER TABLE formats_rules_subsets ADD CONSTRAINT fk_formats_2
     FOREIGN KEY (format_child) REFERENCES formats(id);
 
 INSERT INTO formats_rules_subsets VALUES
-(1, 2),
-(1, 11),
-(1, 51),
-(1, 52),
-(51, 11),
-(51, 52),
+(2, 1),
+(11, 1),
+(11, 51),
 (11, 52),
+(51, 1),
+(52, 1),
+(52, 51),
 (52, 11);

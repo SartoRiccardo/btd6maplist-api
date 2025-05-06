@@ -300,7 +300,7 @@ AS $$
         FROM lccs_by_map lccs
         JOIN formats_rules_subsets f
             ON lccs.format = f.format_child AND format_id = f.format_parent
-                OR f.format_parent = format_id
+            OR lccs.format = format_id
         ORDER BY lccs.map DESC, lccs.leftover DESC
     ),
     valid_maps AS MATERIALIZED (
@@ -350,7 +350,7 @@ AS $$
             ON c.id = r.completion
         JOIN formats_rules_subsets f
             ON r.format = f.format_child AND format_id = f.format_parent
-                OR f.format_parent = format_id
+            OR r.format = format_id
         JOIN comp_players lcp
             ON r.id = lcp.run
         WHERE r.no_geraldo
@@ -399,7 +399,7 @@ AS $$
             ON c.id = r.completion
         JOIN formats_rules_subsets f
             ON r.format = f.format_child AND format_id = f.format_parent
-                OR f.format_parent = format_id
+            OR r.format = format_id
         JOIN comp_players lcp
             ON r.id = lcp.run
         WHERE r.black_border

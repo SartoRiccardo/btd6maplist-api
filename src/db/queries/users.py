@@ -16,7 +16,7 @@ from src.db.models import (
     Permissions,
     MinimalUser,
 )
-from src.db.queries.subqueries import LeaderboardType, leaderboard_name
+from src.db.queries.subqueries import leaderboard_name
 postgres = src.db.connection.postgres
 
 FormatPlacement = tuple[float, int | None]
@@ -77,67 +77,73 @@ async def get_completions_by(
     extra_args = []
     if len(formats):
         extra_args.append(formats)
-    payload = await conn.fetch(
-        f"""
-        WITH runs_with_flags AS (
-            SELECT
-                r.id AS run_meta_id,
-                c.id AS run_id,
-                r.*,
-                c.*,
-                (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
-            FROM latest_completions r
-            JOIN completions c
-                ON r.completion = c.id
-            JOIN comp_players ply
-                ON ply.run = r.id
-            LEFT JOIN lccs_by_map lccs
-                ON lccs.id = r.lcc
-            WHERE ply.user_id = $1
-                {'AND r.format = ANY($5::int[])' if len(formats) > 0 else ''}
-                AND r.accepted_by IS NOT NULL
-                AND r.deleted_on IS NULL
-        ),
-        unique_runs AS (
-            SELECT DISTINCT ON (rwf.run_id)
-                rwf.run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
-                rwf.format,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
-                ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
-                rwf.subm_notes,
-                
-                m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
-                m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
-                mlm.remake_of,
-                
-                lccs.id AS lcc_id, lccs.leftover,
-                
-                ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.run_meta_id) AS user_ids
-            FROM runs_with_flags rwf
-            JOIN comp_players ply
-                ON ply.run = rwf.run_meta_id
-            LEFT JOIN completion_proofs cp
-                ON cp.run = rwf.run_id
-            LEFT JOIN leastcostchimps lccs
-                ON rwf.lcc = lccs.id
-            JOIN latest_maps_meta($4) mlm
-                ON mlm.code = rwf.map
-            JOIN maps m
-                ON m.code = mlm.code
-            WHERE mlm.deleted_on IS NULL
+
+    async with conn.transaction():
+        # I give up bro this planner cant do planning
+        # Makes the thing like 10x faster & shouldn't cause issues
+        await conn.execute("SET LOCAL enable_nestloop = off")
+
+        payload = await conn.fetch(
+            f"""
+            WITH runs_with_flags AS (
+                SELECT
+                    r.id AS run_meta_id,
+                    c.id AS run_id,
+                    r.*,
+                    c.*,
+                    (r.lcc = lccs.id AND lccs.id IS NOT NULL) AS current_lcc
+                FROM latest_completions r
+                JOIN completions c
+                    ON r.completion = c.id
+                JOIN comp_players ply
+                    ON ply.run = r.id
+                LEFT JOIN lccs_by_map lccs
+                    ON lccs.id = r.lcc
+                WHERE ply.user_id = $1
+                    {'AND r.format = ANY($5::int[])' if len(formats) > 0 else ''}
+                    AND r.accepted_by IS NOT NULL
+                    AND r.deleted_on IS NULL
+            ),
+            unique_runs AS (
+                SELECT DISTINCT ON (rwf.run_id)
+                    rwf.run_id, rwf.map, rwf.black_border, rwf.no_geraldo, rwf.current_lcc,
+                    rwf.format,
+                    ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 0) OVER(PARTITION BY rwf.run_id) AS subm_proof_img,
+                    ARRAY_AGG(cp.proof_url) FILTER(WHERE cp.proof_type = 1) OVER(PARTITION BY rwf.run_id) AS subm_proof_vid,
+                    rwf.subm_notes,
+                    
+                    m.name, mlm.placement_curver, mlm.placement_allver, mlm.difficulty,
+                    m.r6_start, m.map_data, mlm.optimal_heros, m.map_preview_url, mlm.botb_difficulty,
+                    mlm.remake_of,
+                    
+                    lccs.id AS lcc_id, lccs.leftover,
+                    
+                    ARRAY_AGG(ply.user_id) OVER (PARTITION by rwf.run_meta_id) AS user_ids
+                FROM runs_with_flags rwf
+                JOIN comp_players ply
+                    ON ply.run = rwf.run_meta_id
+                LEFT JOIN completion_proofs cp
+                    ON cp.run = rwf.run_id
+                LEFT JOIN leastcostchimps lccs
+                    ON rwf.lcc = lccs.id
+                JOIN latest_maps_meta($4) mlm
+                    ON mlm.code = rwf.map
+                JOIN maps m
+                    ON m.code = mlm.code
+                WHERE mlm.deleted_on IS NULL
+            )
+            SELECT COUNT(*) OVER() AS total_count, uq.*
+            FROM unique_runs uq
+            ORDER BY
+                uq.map ASC,
+                uq.black_border DESC,
+                uq.no_geraldo DESC,
+                uq.current_lcc DESC
+            LIMIT $3
+            OFFSET $2
+            """,
+            int(uid), idx_start, amount, timestamp, *extra_args,
         )
-        SELECT COUNT(*) OVER() AS total_count, uq.*
-        FROM unique_runs uq
-        ORDER BY
-            uq.map ASC,
-            uq.black_border DESC,
-            uq.no_geraldo DESC,
-            uq.current_lcc DESC
-        LIMIT $3
-        OFFSET $2
-        """,
-        int(uid), idx_start, amount, timestamp, *extra_args,
-    )
 
     return [
         ListCompletion(
