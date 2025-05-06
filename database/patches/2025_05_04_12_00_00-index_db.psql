@@ -1,0 +1,25 @@
+CREATE INDEX IF NOT EXISTS idx_comp_players_user_id ON comp_players (user_id);
+CREATE INDEX IF NOT EXISTS idx_compmeta_completion_creation ON completions_meta (completion, created_on);
+CREATE INDEX IF NOT EXISTS idx_mapmeta_code_creation ON map_list_meta (code, created_on);
+CREATE INDEX IF NOT EXISTS idx_config_difficulty ON config(difficulty);
+CREATE INDEX IF NOT EXISTS idx_mapmeta_difficulty ON map_list_meta(difficulty);
+
+CREATE TABLE formats_rules_subsets (
+    format_parent INT,  -- Less restrictive format
+    format_child INT,  -- More restrictive format
+    PRIMARY KEY(format_parent, format_child)
+);
+ALTER TABLE formats_rules_subsets ADD CONSTRAINT fk_formats_1
+    FOREIGN KEY (format_parent) REFERENCES formats(id);
+ALTER TABLE formats_rules_subsets ADD CONSTRAINT fk_formats_2
+    FOREIGN KEY (format_child) REFERENCES formats(id);
+
+INSERT INTO formats_rules_subsets VALUES
+(2, 1),
+(11, 1),
+(11, 51),
+(11, 52),
+(51, 1),
+(52, 1),
+(52, 51),
+(52, 11);
