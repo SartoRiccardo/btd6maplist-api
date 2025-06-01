@@ -35,7 +35,7 @@ CREATE PROCEDURE set_comp_as_verification(comp_meta_id INT) AS
 $$
 DECLARE
     comp_id INT;
-    current_completion completions;
+    map_code VARCHAR(10);
     current_btd6_ver INT;
     is_verified BOOLEAN;
 BEGIN
@@ -43,7 +43,7 @@ BEGIN
     FROM completions_meta
     WHERE id = comp_meta_id;
 
-    SELECT c.* INTO current_completion
+    SELECT c.map INTO map_code
     FROM completions c
     WHERE c.id = comp_id;
 
@@ -55,14 +55,14 @@ BEGIN
 
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
-    WHERE version=current_btd6_ver
-        AND map=current_completion.map;
+    WHERE version = current_btd6_ver
+        AND map = map_code;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT current_completion.map, user_id, current_btd6_ver
+        SELECT map_code, user_id, current_btd6_ver
         FROM comp_players
-        WHERE run = comp_id;
+        WHERE run = comp_meta_id;
     END IF;
 
     -- First time verifier
@@ -70,13 +70,13 @@ BEGIN
     SELECT COUNT(*) > 0 INTO is_verified
     FROM verifications
     WHERE version IS NULL
-        AND map=current_completion.map;
+        AND map = map_code;
 
     IF NOT is_verified THEN
         INSERT INTO verifications (map, user_id, version)
-        SELECT current_completion.map, user_id, NULL
+        SELECT map_code, user_id, NULL
         FROM comp_players
-        WHERE run = comp_id;
+        WHERE run = comp_meta_id;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -86,14 +86,16 @@ CREATE OR REPLACE FUNCTION set_verif_on_accept()
 RETURNS TRIGGER AS
 $$
 BEGIN
-    CALL set_comp_as_verification(NEW.id);
+    IF (TG_OP = 'INSERT' OR OLD.accepted_by IS NULL) THEN
+        CALL set_comp_as_verification(NEW.id);
+    END IF;
     RETURN NEW;
 END;
 $$
 LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER tr_set_verif_on_accept
-AFTER UPDATE ON completions_meta
+AFTER INSERT OR UPDATE ON completions_meta
 FOR EACH ROW
-WHEN (NEW.accepted_by IS NOT NULL AND OLD.accepted_by IS NULL AND NEW.format IN (1, 51))
+WHEN (NEW.accepted_by IS NOT NULL AND NEW.format IN (1, 51))
 EXECUTE PROCEDURE set_verif_on_accept();
