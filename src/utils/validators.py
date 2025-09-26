@@ -192,7 +192,7 @@ async def validate_full_map(
 
     allowed_heros = [
         "quincy", "gwen", "obyn", "striker", "churchill", "ben", "ezili", "pat", "adora", "brickell", "etienne",
-        "sauda", "psi", "geraldo", "corvus", "rosalia",
+        "sauda", "psi", "geraldo", "corvus", "rosalia", "silas",
     ]
     for i, hero in enumerate(body["optimal_heros"]):
         if hero not in allowed_heros:
