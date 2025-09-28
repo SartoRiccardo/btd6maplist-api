@@ -22,7 +22,7 @@ from src.utils.colors import green, yellow, blue, red, cyan, underline
 
 # https://docs.aiohttp.org/en/v3.8.5/web_advanced.html#complex-applications
 async def init_client_session(_app):
-    cache = aiohttp_client_cache.SQLiteBackend(
+    cache = aiohttp_client_cache.FileBackend(
         cache_name=os.path.join(config.PERSISTENT_DATA_PATH, ".cache", "aiohttp-requests.db"),
         expire_after=0,
         urls_expire_after={
