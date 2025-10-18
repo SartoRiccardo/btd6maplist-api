@@ -14,6 +14,7 @@ async def start(should_init_database: bool = True):
         pool = await asyncpg.create_pool(
             user=config.DB_USER, password=config.DB_PSWD,
             database=config.DB_NAME, host=config.DB_HOST,
+            port=config.DB_PORT if hasattr(config, "DB_PORT") else 5432,
         )
         print(f"{purple('[PSQL]')} Connected")
         if should_init_database:
