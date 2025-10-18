@@ -30,6 +30,8 @@ Testing uses the `pytest` module. The tests go in the `test` folder and are divi
 
 Common tests helpers include a data fuzzer, a data field "remover" (to test validation errors). You can find all sorts of helpers in the `tests.testutils` file.
 
+`database/data` includes a `gentestdata.py` script which procedurally generates data to be used exclusively for testing purposes. Should you add new data en-masse, add it through that script. Every time you use random in that script it must be with a seed, so it creates 100% reproducible data, and you must not reuse random instances that are already used elsewhere.
+
 ### Migrations
 
 Migrations are done through "patches" in the `database/patches` folder. You should name each patch `YYYY_MM_DD_HH_mm_ss-name.psql`. These files are pure SQL.
