@@ -3,7 +3,7 @@ import pytest
 from tests.testutils import to_formdata
 from tests.maps.conftest import map_submission_payload
 
-@pytest.mark.asyncio
+@pytest.mark.get
 async def test_get_map_submissions_empty(btd6ml_test_client, mock_auth):
     """Test getting map submissions when there are none."""
     await mock_auth(user_id=123, username="test_user")
@@ -14,35 +14,40 @@ async def test_get_map_submissions_empty(btd6ml_test_client, mock_auth):
     assert data["pages"] == 0
     assert data["data"] == []
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_map_submissions_invalid_type(btd6ml_test_client, mock_auth):
     """Test that an invalid type results in a 400 response."""
     await mock_auth(user_id=123, username="test_user")
     resp = await btd6ml_test_client.get("/users/@me/submissions?type=invalid", headers={"Authorization": "Bearer test_token"})
     assert resp.status == 400
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_map_submissions_invalid_page(btd6ml_test_client, mock_auth):
     """Test that a non-numeric page results in a 400 response."""
     await mock_auth(user_id=123, username="test_user")
     resp = await btd6ml_test_client.get("/users/@me/submissions?page=invalid", headers={"Authorization": "Bearer test_token"})
     assert resp.status == 400
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_map_submissions_zero_page(btd6ml_test_client, mock_auth):
     """Test that a page of 0 results in a 400 response."""
     await mock_auth(user_id=123, username="test_user")
     resp = await btd6ml_test_client.get("/users/@me/submissions?page=0", headers={"Authorization": "Bearer test_token"})
     assert resp.status == 400
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_map_submissions_invalid_status(btd6ml_test_client, mock_auth):
     """Test that an invalid status results in a 400 response."""
     await mock_auth(user_id=123, username="test_user")
     resp = await btd6ml_test_client.get("/users/@me/submissions?status=invalid", headers={"Authorization": "Bearer test_token"})
     assert resp.status == 400
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_completion_submissions_empty(btd6ml_test_client, mock_auth):
     """Test getting completion submissions when there are none."""
     await mock_auth(user_id=123, username="test_user")
@@ -53,7 +58,8 @@ async def test_get_completion_submissions_empty(btd6ml_test_client, mock_auth):
     assert data["pages"] == 0
     assert data["data"] == []
 
-@pytest.mark.asyncio
+
+@pytest.mark.get
 async def test_get_map_submissions_with_data(btd6ml_test_client, mock_auth, map_submission_payload, save_image):
     """Test getting map submissions with data."""
     await mock_auth(user_id=123, username="test_user")
