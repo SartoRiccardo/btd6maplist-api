@@ -153,7 +153,7 @@ async def delete(
         reject = resource.accepted_by is None
         if reject:
             asyncio.create_task(update_run_webhook(resource, fail=True))
-        await delete_completion(resource.id, hard_delete=reject)
+        await delete_completion(resource.id, hard_delete=False)
         asyncio.create_task(src.log.log_action("completion", "delete", resource.id, None, discord_profile["id"]))
 
     return web.Response(status=http.HTTPStatus.NO_CONTENT)

@@ -3,6 +3,7 @@ api.btd6maplist.crt*
 *.pem
 config.py
 config.test.py
+.gemini
 
 # Python
 venv
