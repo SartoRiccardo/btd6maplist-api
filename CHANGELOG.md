@@ -1,5 +1,12 @@
 # Changelog
 
+## 2025-10-21
+## Added
+- Added `GET /users/@me/submissions`
+
+## Changed
+- Deleting pending commissions no longer hard deletes them
+
 ## 2025-06-01
 ### Fixed
 - Correctly sets the verifier once a submission is accepted.
