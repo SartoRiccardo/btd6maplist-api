@@ -35,7 +35,7 @@ async def delete(
         return err_resp
 
     profile = json_data["user"]
-    await delete_completion(resource.id, hard_delete=True)
+    await delete_completion(resource.id, hard_delete=False)
     asyncio.create_task(update_run_webhook(resource, fail=True))
 
     asyncio.create_task(src.log.log_action("completion", "delete", resource.id, None, profile["id"]))

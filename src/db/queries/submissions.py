@@ -2,7 +2,7 @@
 from src.db.connection import postgres
 from src.db.models.maps import PartialMap
 from src.db.models.challenges import ListCompletionWithMeta, LCC
-from src.db.models.MapSubmission import MapSubmission
+from src.db.models.MapSubmission import MapSubmission, MapSubmissionWithAccepted
 
 @postgres
 async def get_map_submissions_by_user(
@@ -10,7 +10,7 @@ async def get_map_submissions_by_user(
     user_id: int,
     page: int,
     status: str
-) -> tuple[int, list[MapSubmission]]:
+) -> tuple[int, list[MapSubmissionWithAccepted]]:
     offset = (page - 1) * 50
     
     status_filter = ""
@@ -24,10 +24,16 @@ async def get_map_submissions_by_user(
     """
     
     query = f"""
-        SELECT code, submitter, subm_notes, format_id, proposed as proposed_diff, rejected_by, created_on, completion_proof, wh_data, NULL as id, NULL as wh_msg_id
-        FROM map_submissions
-        WHERE submitter = $1 {status_filter}
-        ORDER BY created_on DESC
+        SELECT
+            ms.code, ms.submitter, ms.subm_notes, ms.format_id, ms.proposed as proposed_diff, ms.rejected_by, ms.created_on, ms.completion_proof, ms.wh_data, NULL as id, NULL as wh_msg_id,
+            EXISTS (
+                SELECT 1
+                FROM map_list_meta mlm
+                WHERE mlm.code = ms.code AND mlm.created_on > ms.created_on
+            ) as is_accepted
+        FROM map_submissions ms
+        WHERE ms.submitter = $1 {status_filter}
+        ORDER BY ms.created_on DESC
         LIMIT 50 OFFSET $2
     """
 
@@ -37,7 +43,7 @@ async def get_map_submissions_by_user(
 
     submissions = await conn.fetch(query, user_id, offset)
 
-    return total, [MapSubmission(**row) for row in submissions]
+    return total, [MapSubmissionWithAccepted(**row) for row in submissions]
 
 @postgres
 async def get_completion_submissions_by_user(

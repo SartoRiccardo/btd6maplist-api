@@ -67,3 +67,23 @@ class MapSubmission:
             "completion_proof": self.completion_proof,
             "created_on": int(self.created_on.timestamp()),
         }
+
+
+@dataclass
+class MapSubmissionWithAccepted(MapSubmission):
+    """
+    type: object
+    allOf:
+      - $ref: "#/components/schemas/MapSubmission"
+      - type: object
+        properties:
+          is_accepted:
+            type: boolean
+            description: Whether the map submission has been accepted.
+    """
+    is_accepted: bool
+
+    def to_dict(self) -> dict:
+        base_dict = super().to_dict()
+        base_dict["is_accepted"] = self.is_accepted
+        return base_dict
