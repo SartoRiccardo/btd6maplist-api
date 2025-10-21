@@ -70,10 +70,13 @@ async def get_completion_submissions_by_user(
         WITH user_submissions AS (
             SELECT c.id, cm.id as meta_id, c.map, c.subm_notes, c.subm_wh_payload,
                    cm.black_border, cm.no_geraldo, cm.lcc, cm.format, cm.accepted_by, cm.created_on, cm.deleted_on,
-                   array_agg(cp.user_id) as user_ids
+                   array_agg(cp.user_id) as user_ids,
+                   ARRAY_AGG(cpp.proof_url) FILTER (WHERE cpp.proof_type = 0) AS subm_proof_img,
+                   ARRAY_AGG(cpp.proof_url) FILTER (WHERE cpp.proof_type = 1) AS subm_proof_vid
             FROM completions c
             JOIN completions_meta cm ON c.id = cm.completion
             JOIN comp_players cp ON cm.id = cp.run
+            LEFT JOIN completion_proofs cpp ON c.id = cpp.run
             WHERE cp.user_id = $1 {status_filter}
             GROUP BY c.id, cm.id
         )
@@ -116,8 +119,8 @@ async def get_completion_submissions_by_user(
         current_lcc=False, # This is not available in the query
         format=row["format"],
         lcc=LCC(id=row["lcc"], leftover=0) if row["lcc"] else None,
-        subm_proof_img=[],
-        subm_proof_vid=[],
+        subm_proof_img=row["subm_proof_img"],
+        subm_proof_vid=row["subm_proof_vid"],
         subm_notes=row["subm_notes"],
         accepted_by=row["accepted_by"],
         created_on=row["created_on"],
