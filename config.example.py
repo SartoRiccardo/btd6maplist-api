@@ -13,6 +13,7 @@ DB_USER = "postgres"
 DB_PSWD = "postgres"
 DB_HOST = "127.0.0.1"
 DB_NAME = "database"
+DB_PORT = 5432
 
 BOT_PUBKEY = "btd6maplist-bot.pub.pem"
 BOT_TOKEN = "bot-token.jwt"

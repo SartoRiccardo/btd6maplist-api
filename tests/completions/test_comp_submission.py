@@ -570,11 +570,17 @@ class TestHandleSubmissions(CompletionTest):
     async def test_reject_submission(self, btd6ml_test_client, mock_auth):
         """Test rejecting a completion submission hard deletes it"""
         await mock_auth(perms={51: {Permissions.delete.completion}})
+        async with btd6ml_test_client.get("/completions/29") as resp_get:
+            completion_data = await resp_get.json()
+            del completion_data["deleted_on"]
+
         async with btd6ml_test_client.delete("/completions/29", headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Deleting a completion returns {resp.status}"
 
         async with btd6ml_test_client.get("/completions/29", headers=HEADERS) as resp:
-            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+            assert resp.status == http.HTTPStatus.OK, \
                 f"Getting a deleted completion submission returned {resp.status}"
-            assert resp.headers["Content-Length"] == "0", "Deleted completion returned some content"
+            completion_data_now = await resp.json()
+            del completion_data_now["deleted_on"]
+            assert completion_data == completion_data_now

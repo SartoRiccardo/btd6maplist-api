@@ -60,14 +60,21 @@ class TestHandleSubmissions:
         data_str = json.dumps(data)
         signature = sign_message(f"{RUN_ID}{data_str}".encode())
 
+        async with btd6ml_test_client.get(f"/completions/{RUN_ID}") as resp_get:
+            completion_data = await resp_get.json()
+            del completion_data["deleted_on"]
+
         payload = {"data": data_str, "signature": signature}
         async with btd6ml_test_client.delete(f"/completions/{RUN_ID}/bot", json=payload) as resp:
             assert resp.status == http.HTTPStatus.NO_CONTENT, \
                 f"Successfully deleting a completion returns {resp.status}"
 
         async with btd6ml_test_client.get(f"/completions/{RUN_ID}") as resp:
-            assert resp.status == http.HTTPStatus.NOT_FOUND, \
+            assert resp.status == http.HTTPStatus.OK, \
                 f"Getting a rejected (deleted) completion returns {resp.status}"
+            completion_data_now = await resp.json()
+            del completion_data_now["deleted_on"]
+            assert completion_data == completion_data_now
 
     @pytest.mark.delete
     async def test_reject_already_accepted(self, btd6ml_test_client, mock_auth, bot_user_payload, sign_message):

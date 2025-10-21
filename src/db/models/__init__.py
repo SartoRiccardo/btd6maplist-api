@@ -95,6 +95,7 @@ Btd6Hero:
     - churchill
     - ben
     - ezili
+    - silas
     - pat
     - adora
     - brickell

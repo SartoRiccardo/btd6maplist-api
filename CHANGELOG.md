@@ -1,5 +1,16 @@
 # Changelog
 
+## 2025-10-21
+## Added
+- Added `GET /users/@me/submissions`
+
+## Changed
+- Deleting pending commissions no longer hard deletes them
+
+## 2025-06-01
+### Fixed
+- Correctly sets the verifier once a submission is accepted.
+
 ## 2025-05-06
 ### Added
 - `/users/{uid}` supports a `minimal` query parameter to quickly get a minimal user's info. Useful for frontend.

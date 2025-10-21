@@ -3,7 +3,7 @@ aiobotocore==2.13.1
 aiofiles==24.1.0
 aiohappyeyeballs==2.3.5
 aiohttp==3.10.3
-aiohttp-client-cache==0.11.1
+aiohttp-client-cache==0.13.0
 aiohttp-swagger==1.0.16
 aioitertools==0.11.0
 aioresponses==0.7.6
@@ -47,7 +47,7 @@ s3transfer==0.10.2
 six==1.16.0
 tomli==2.0.2
 typing_extensions==4.12.2
-url-normalize==1.4.3
+url-normalize==2.2.1
 urllib3==2.2.2
 validators==0.34.0
 wrapt==1.16.0
