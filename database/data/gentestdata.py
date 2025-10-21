@@ -51,7 +51,7 @@ allowed_heros = [
 ]
 
 
-def User(user_id: int) -> str:
+def User(user_id: int, *args, **kwargs) -> str:
     name = f"usr{user_id}"
     if user_id == 100000:
         name = "Authenticated User"
