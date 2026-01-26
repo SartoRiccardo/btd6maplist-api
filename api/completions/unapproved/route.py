@@ -1,4 +1,5 @@
 import math
+import src.utils.routedecos
 from aiohttp import web
 from src.db.queries.completions import get_unapproved_completions
 
@@ -6,7 +7,14 @@ from src.db.queries.completions import get_unapproved_completions
 PAGE_ENTRIES = 50
 
 
-async def get(request: web.Request) -> web.Response:
+@src.utils.routedecos.bearer_auth
+@src.utils.routedecos.with_discord_profile
+@src.utils.routedecos.require_perms()
+async def get(
+        request: web.Request,
+        permissions: "src.db.models.Permissions" = None,
+        **_kwargs
+) -> web.Response:
     """
     ---
     description: |
@@ -47,9 +55,14 @@ async def get(request: web.Request) -> web.Response:
     else:
         page = max(1, int(page))
 
+    allowed_formats = permissions.formats_where('edit:completion')
+    if None in allowed_formats:
+        allowed_formats = None
+
     completions, count = await get_unapproved_completions(
-        idx_start=(page-1)*PAGE_ENTRIES,
+        idx_start=(page - 1) * PAGE_ENTRIES,
         amount=PAGE_ENTRIES,
+        only_in_formats=allowed_formats
     )
     return web.json_response({
         "total": count,

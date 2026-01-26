@@ -80,7 +80,7 @@ class TestCompletionList:
 
     @staticmethod
     async def assert_empty_pages(btd6ml_test_client, endpoint: str):
-        async with btd6ml_test_client.get(endpoint) as resp:
+        async with btd6ml_test_client.get(endpoint, headers=HEADERS) as resp:
             assert resp.status == http.HTTPStatus.OK, \
                 f"Getting overflown page completions returns {resp.status}"
             resp_data = await resp.json()
@@ -218,12 +218,15 @@ class TestCompletionList:
             assert len(resp_data) == 5, "Total completions differ from expected"
             self.validate_comp_list(resp_data, schema_completion_map, allowed_formats=[2])
 
-    async def test_unapproved_completions(self, btd6ml_test_client):
+    async def test_unapproved_completions(self, btd6ml_test_client, mock_auth):
         """Test getting unapproved runs, and the pagination"""
+        await mock_auth(perms={None: {"edit:completion"}})
+
         expected_total = 75
         expected_pages = math.ceil(expected_total/50)
         for pg in range(1, expected_pages+1):
-            async with btd6ml_test_client.get(f"/completions/unapproved?page={pg}") as resp:
+            print(HEADERS)
+            async with btd6ml_test_client.get(f"/completions/unapproved?page={pg}", headers=HEADERS) as resp:
                 assert resp.status == http.HTTPStatus.OK, \
                     f"Getting unapproved completions returns {resp.status}"
                 resp_data = await resp.json()
@@ -237,3 +240,49 @@ class TestCompletionList:
                 )
 
         await self.assert_empty_pages(btd6ml_test_client, f"/completions/unapproved?page={expected_pages+1}")
+
+
+@pytest.mark.get
+@pytest.mark.completions
+class TestUnapprovedCompletionFiltering:
+    async def test_unapproved_completions_filtering(self, btd6ml_test_client, mock_auth):
+        """Test getting unapproved runs with format filtering"""
+        await mock_auth(
+            perms={
+                1: {"edit:completion"},
+                2: {"view:completion"},
+            }
+        )
+        
+        expected_total = 27
+        expected_pages = math.ceil(expected_total / 50)
+        
+        async with btd6ml_test_client.get(f"/completions/unapproved", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.OK, \
+                f"Getting unapproved completions returns {resp.status}"
+            resp_data = await resp.json()
+            
+            assert resp_data["total"] == expected_total, "Total completions differ from expected"
+            assert resp_data["pages"] == expected_pages, "Total pages differ from expected"
+
+    async def test_unapproved_completions_no_perms(self, btd6ml_test_client, mock_auth):
+        """Test getting unapproved runs with no permissions"""
+        await mock_auth(user_id=44) # User 44 has no roles by default
+
+        async with btd6ml_test_client.get(f"/completions/unapproved", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.OK
+            resp_data = await resp.json()
+            assert resp_data["total"] == 0
+            assert resp_data["pages"] == 0
+            assert len(resp_data["completions"]) == 0
+    
+    async def test_unapproved_completions_global_perms(self, btd6ml_test_client, mock_auth):
+        """Test getting unapproved runs with global permissions"""
+        await mock_auth(user_id=45, perms={None: {"edit:completion"}})
+
+        async with btd6ml_test_client.get(f"/completions/unapproved", headers=HEADERS) as resp:
+            assert resp.status == http.HTTPStatus.OK
+            resp_data = await resp.json()
+            # 27 (fmt 1) + 25 (fmt 2) + 23 (fmt 51) = 75
+            assert resp_data["total"] == 75
+            assert resp_data["pages"] == 2

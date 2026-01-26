@@ -308,10 +308,20 @@ async def delete_completion(
 async def get_unapproved_completions(
         idx_start: int = 0,
         amount: int = 50,
+        only_in_formats: list[int] = None,
         conn=None,
 ) -> tuple[list[ListCompletionWithMeta], int]:
+    if only_in_formats is not None and not len(only_in_formats):
+        return [], 0
+
+    query_args = [idx_start, amount]
+    format_filter_str = ""
+    if only_in_formats is not None:
+        query_args.append(only_in_formats)
+        format_filter_str = "AND cm.format = ANY($3::integer[])"
+
     payload = await conn.fetch(
-        """
+        f"""
         WITH unapproved_runs AS (
             SELECT
                 c.id AS run_id,
@@ -324,6 +334,7 @@ async def get_unapproved_completions(
                 ON cm.completion = c.id
             WHERE cm.deleted_on IS NULL
                 AND cm.accepted_by IS NULL
+                {format_filter_str}
         ),
         unique_runs AS (
             SELECT DISTINCT ON (run.run_id)
@@ -360,8 +371,7 @@ async def get_unapproved_completions(
         LIMIT $2
         OFFSET $1
         """,
-        idx_start,
-        amount
+        *query_args,
     )
 
     completions = [
