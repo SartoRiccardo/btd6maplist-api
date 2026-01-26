@@ -1,10 +1,28 @@
 import pytest
 import pytest_asyncio
 import http
+import json
 from ..mocks import Permissions
 from ..testutils import fuzz_data, remove_fields, invalidate_field
 
 HEADERS = {"Authorization": "Bearer test_token"}
+
+
+def normalize_floats(obj):
+    """Recursively convert whole zeroes to ints. Mutates in place."""
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if value == 0:
+                obj[key] = 0
+            elif isinstance(value, (dict, list)):
+                normalize_floats(value)
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj):
+            if item == 0:
+                obj[i] = 0
+            elif isinstance(item, (dict, list)):
+                normalize_floats(item)
+    return obj
 
 
 @pytest_asyncio.fixture
@@ -30,7 +48,7 @@ async def validate_user(btd6ml_test_client, calc_user_profile_medals, calc_usr_p
             **profile_overrides,
         }
         async with btd6ml_test_client.get(f"/users/{user_id}") as resp:
-            assert await resp.json() == expected_profile, \
+            assert normalize_floats(await resp.json()) == normalize_floats(expected_profile), \
                 "User profile differs from expected"
     return assert_user
 
