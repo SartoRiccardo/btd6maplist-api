@@ -1,5 +1,7 @@
 # BTD6 Maplist API
 
+> ⚠️ **THIS REPO IS ARCHIVED.** For the new API, check out [this repo](https://github.com/SartoRiccardo/btd6maplist-api-v2)
+
 Api for the BTD6 Maplist website and bot. Hosted at [apibtd6maplist.sarto.dev](https://apibtd6maplist.sarto.dev).
 
 ## Running locally
